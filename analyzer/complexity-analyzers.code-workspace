@@ -1,0 +1,49 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "dotnet.defaultSolution": "ComplexityAnalysis.Analyzers.sln",
+    "dotnet.server.useOmnisharp": false,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    "files.exclude": {
+      "**/bin": true,
+      "**/obj": true,
+      "**/.vs": true,
+      "**/.git": true,
+      "**/TestResults": true,
+      "**/artifacts": true,
+      "**/coverage": true,
+      "**/coverage-report": true,
+      "**/StrykerOutput": true
+    },
+    "search.exclude": {
+      "**/bin": true,
+      "**/obj": true,
+      "**/.vs": true,
+      "**/.git": true,
+      "**/TestResults": true,
+      "**/artifacts": true,
+      "**/coverage": true,
+      "**/coverage-report": true,
+      "**/StrykerOutput": true
+    },
+    "files.watcherExclude": {
+      "**/bin/**": true,
+      "**/obj/**": true,
+      "**/.vs/**": true,
+      "**/TestResults/**": true,
+      "**/artifacts/**": true,
+      "**/coverage/**": true,
+      "**/coverage-report/**": true,
+      "**/StrykerOutput/**": true
+    },
+    "search.useIgnoreFiles": true,
+    "search.useGlobalIgnoreFiles": true
+  }
+}

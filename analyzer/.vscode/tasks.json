@@ -1,0 +1,76 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dotnet: restore",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "restore",
+        "${workspaceFolder}/ComplexityAnalysis.Analyzers.sln"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "dotnet: build",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/ComplexityAnalysis.Analyzers.sln",
+        "--configuration",
+        "Release",
+        "--no-restore"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "dotnet: test",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/ComplexityAnalysis.Analyzers.sln",
+        "--configuration",
+        "Release",
+        "--no-build"
+      ],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "dotnet: pack",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "pack",
+        "${workspaceFolder}/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
+        "--configuration",
+        "Release",
+        "--no-build",
+        "-p:PackageVersion=0.0.0-local"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "dotnet: audit packages",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "list",
+        "${workspaceFolder}/ComplexityAnalysis.Analyzers.sln",
+        "package",
+        "--vulnerable",
+        "--include-transitive"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
