@@ -73,6 +73,23 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_reports_the_probe_at_a_source_location_when_source_is_available()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public int M() => 42;
+            }
+            """,
+            enableProbe: true);
+
+        Diagnostic diagnostic = Assert.Single(diagnostics, diagnostic => diagnostic.Id == AnalyzerExecutionProbeId);
+
+        Assert.True(diagnostic.Location.IsInSource);
+    }
+
+    [Fact]
     public async Task Analyzer_reports_only_one_probe_for_code_with_multiple_methods()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(

@@ -1,9 +1,11 @@
 using System.Collections.Immutable;
+using System.Linq;
 
 using ComplexityAnalysis.Analyzers.Diagnostics;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 
 namespace ComplexityAnalysis.Analyzers;
 
@@ -27,8 +29,13 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
+        SyntaxTree? syntaxTree = context.Compilation.SyntaxTrees.FirstOrDefault();
+        Location location = syntaxTree is null
+            ? Location.None
+            : Location.Create(syntaxTree, new TextSpan(0, 0));
+
         context.ReportDiagnostic(Diagnostic.Create(
             DiagnosticDescriptors.AnalyzerExecutionProbe,
-            Location.None));
+            location));
     }
 }

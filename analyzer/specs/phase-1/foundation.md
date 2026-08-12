@@ -2,9 +2,11 @@
 
 ## Status
 
-Specification for Phase 1, step 1/5. This document is the versioned SDD contract for the Analyzer Foundation delivery.
+Phase 1 complete.
 
-The current repository already contains an isolated `analyzer/` workspace and a bootstrap project file for `ComplexityAnalysis.Analyzers`. This step does not add analyzer implementation code, Roslyn `DiagnosticAnalyzer` classes, tests, or ports from the inherited implementation.
+The isolated analyzer foundation has been validated end to end: source builds, tests pass, the analyzer packs as a NuGet analyzer asset, a temporary consumer loads the package without `ProjectReference`, `BIG9000` remains disabled by default, and consumer `.editorconfig` enablement reports exactly one probe diagnostic per compilation.
+
+No inherited project outside `analyzer/` was modified by Phase 1.
 
 ## Objective
 
