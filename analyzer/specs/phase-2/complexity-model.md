@@ -44,7 +44,11 @@ Intentional differences from the inherited implementation:
 - Do not include numerical evaluation, variable substitution, recurrence types, builders, conditional expressions, min/best-case operations, or symbolic algebra engines.
 - Do not preserve multiplicative coefficients for initial Big-O forms.
 - Do not preserve logarithm bases for logarithmic equivalence; constant log-base factors are normalized away.
+- Do not include recurrence, amortized, probabilistic, parallel, or memory-complexity models in Phase 2.
+- Do not include the inherited builder API, multi-way branching helpers, branch-condition overhead helpers, early-exit/min operations, loop factories, or function-call composition helpers in Phase 2.
 - Do not depend on `ComplexityAnalysis.Core` or any inherited project.
+
+Concepts deliberately preserved from the inherited subset are limited to Big-O expression representation, the `n^k log^j(n)` polylogarithmic shape, and sequential, nested, and branching composition semantics. Phase 2 keeps the model smaller and Roslyn-free so later analyzer phases can build on it without importing the inherited runtime architecture.
 
 ## Architectural Decisions
 

@@ -1,3 +1,7 @@
+using System.Globalization;
+using System.Reflection;
+using System.Threading;
+
 using ComplexityAnalysis.Analyzers.Model;
 
 using Xunit;
@@ -71,6 +75,7 @@ public sealed class ComplexityModelTests
             (ComplexityFactory.Polynomial(ComplexityVariable.N, 3), "O(n\u00b3)"),
             (ComplexityFactory.Polynomial(ComplexityVariable.N, 4), "O(n^4)"),
             (ComplexityFactory.Exponential(ComplexityVariable.N, 2), "O(2^n)"),
+            (ComplexityFactory.Exponential(ComplexityVariable.N, 3), "O(3^n)"),
             (ComplexityFactory.Factorial(ComplexityVariable.N), "O(n!)"),
             (ComplexityFactory.Unknown(), "Unknown"),
         ];
@@ -95,6 +100,26 @@ public sealed class ComplexityModelTests
         Assert.Equal(ComplexityFactory.NLogN(n), new PolynomialLogComplexity(n, polynomialDegree: 1, logExponent: 1));
         Assert.Equal(ComplexityFactory.Exponential(n, 2), ComplexityFactory.Exponential(new ComplexityVariable("n"), 2));
         Assert.Equal(ComplexityFactory.Factorial(n), ComplexityFactory.Factorial(new ComplexityVariable("n")));
+    }
+
+    [Fact]
+    public void Composite_complexity_compares_by_value_without_reordering_operands()
+    {
+        ComplexityExpression first = ComplexityComposer.Sequential(
+            ComplexityFactory.Linear(ComplexityVariable.N),
+            ComplexityFactory.Linear(ComplexityVariable.M));
+        ComplexityExpression second = ComplexityComposer.Sequential(
+            ComplexityFactory.Linear(new ComplexityVariable("n")),
+            ComplexityFactory.Linear(new ComplexityVariable("m")));
+        ComplexityExpression reversed = ComplexityComposer.Sequential(
+            ComplexityFactory.Linear(ComplexityVariable.M),
+            ComplexityFactory.Linear(ComplexityVariable.N));
+
+        Assert.Equal(first, second);
+        Assert.Equal(first.GetHashCode(), second.GetHashCode());
+        Assert.NotEqual(first, reversed);
+        Assert.Equal("O(n + m)", first.ToBigONotation());
+        Assert.Equal("O(m + n)", reversed.ToBigONotation());
     }
 
     [Fact]
@@ -143,6 +168,7 @@ public sealed class ComplexityModelTests
         _ = Assert.Throws<ArgumentOutOfRangeException>(() => new ExponentialComplexity(n, -2));
         _ = Assert.Throws<ArgumentOutOfRangeException>(() => new ExponentialComplexity(n, double.NaN));
         _ = Assert.Throws<ArgumentOutOfRangeException>(() => new ExponentialComplexity(n, double.PositiveInfinity));
+        _ = Assert.Throws<ArgumentOutOfRangeException>(() => new ExponentialComplexity(n, double.NegativeInfinity));
     }
 
     [Fact]
@@ -275,6 +301,8 @@ public sealed class ComplexityModelTests
 
         AssertComparison(unknown, ComplexityFactory.Constant(), GrowthComparison.Incomparable);
         AssertComparison(unknown, ComplexityFactory.Linear(ComplexityVariable.N), GrowthComparison.Incomparable);
+        AssertComparison(unknown, ComplexityFactory.Exponential(ComplexityVariable.N, 2), GrowthComparison.Incomparable);
+        AssertComparison(unknown, ComplexityFactory.Factorial(ComplexityVariable.N), GrowthComparison.Incomparable);
         AssertComparison(unknown, ComplexityFactory.Unknown(), GrowthComparison.Equivalent);
     }
 
@@ -369,14 +397,18 @@ public sealed class ComplexityModelTests
     }
 
     [Fact]
-    public void Composition_preserves_unknown_inconclusive_results()
+    public void Composition_preserves_unknown_inconclusive_results_in_each_operation()
     {
         ComplexityExpression unknown = ComplexityFactory.Unknown();
         ComplexityExpression linear = ComplexityFactory.Linear(ComplexityVariable.N);
 
         Assert.Equal("Unknown", ComplexityComposer.Sequential(unknown, linear).ToBigONotation());
+        Assert.Equal("Unknown", ComplexityComposer.Sequential(linear, unknown).ToBigONotation());
         Assert.Equal("Unknown", ComplexityComposer.Nested(linear, unknown).ToBigONotation());
+        Assert.Equal("Unknown", ComplexityComposer.Nested(unknown, linear).ToBigONotation());
         Assert.Equal("Unknown", ComplexityComposer.Branching(unknown, linear).ToBigONotation());
+        Assert.Equal("Unknown", ComplexityComposer.Branching(linear, unknown).ToBigONotation());
+        Assert.Equal("Unknown", ComplexityComposer.Branching(unknown, unknown).ToBigONotation());
     }
 
     [Fact]
@@ -399,6 +431,82 @@ public sealed class ComplexityModelTests
         Assert.Equal("O(n \u00b7 m)", nested.ToBigONotation());
         Assert.Equal("O(max(n, m))", branching.ToBigONotation());
         Assert.Equal("O((n + m) \u00b7 k)", nestedSequential.ToBigONotation());
+    }
+
+    [Fact]
+    public void Big_o_formatting_uses_invariant_culture()
+    {
+        CultureInfo originalCulture = Thread.CurrentThread.CurrentCulture;
+        CultureInfo originalUiCulture = Thread.CurrentThread.CurrentUICulture;
+
+        try
+        {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.GetCultureInfo("pt-BR");
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfo("pt-BR");
+
+            Assert.Equal("O(n^12)", ComplexityFactory.Polynomial(ComplexityVariable.N, 12).ToBigONotation());
+            Assert.Equal("O(log^12 n)", new PolynomialLogComplexity(ComplexityVariable.N, polynomialDegree: 0, logExponent: 12).ToBigONotation());
+            Assert.Equal("O(1.5^n)", ComplexityFactory.Exponential(ComplexityVariable.N, 1.5).ToBigONotation());
+        }
+        finally
+        {
+            Thread.CurrentThread.CurrentCulture = originalCulture;
+            Thread.CurrentThread.CurrentUICulture = originalUiCulture;
+        }
+    }
+
+    [Fact]
+    public void Repeated_compositions_remain_deterministic_and_do_not_depend_on_shared_mutation()
+    {
+        ComplexityExpression expression = ComplexityFactory.Linear(ComplexityVariable.N);
+
+        for (int index = 0; index < 4; index++)
+        {
+            expression = ComplexityComposer.Nested(expression, ComplexityFactory.Linear(ComplexityVariable.N));
+        }
+
+        Assert.Equal("O(n^5)", expression.ToBigONotation());
+        Assert.Equal(
+            ComplexityFactory.Polynomial(ComplexityVariable.N, 5),
+            ComplexityComposer.Nested(
+                ComplexityComposer.Nested(
+                    ComplexityComposer.Nested(
+                        ComplexityComposer.Nested(
+                            ComplexityFactory.Linear(ComplexityVariable.N),
+                            ComplexityFactory.Linear(ComplexityVariable.N)),
+                        ComplexityFactory.Linear(ComplexityVariable.N)),
+                    ComplexityFactory.Linear(ComplexityVariable.N)),
+                ComplexityFactory.Linear(ComplexityVariable.N)));
+    }
+
+    [Fact]
+    public void Model_expression_types_are_immutable_by_observable_api()
+    {
+        Type[] expressionTypes =
+        [
+            typeof(ComplexityVariable),
+            typeof(ConstantComplexity),
+            typeof(PolynomialLogComplexity),
+            typeof(ExponentialComplexity),
+            typeof(FactorialComplexity),
+            typeof(UnknownComplexity),
+            typeof(CompositeComplexity),
+        ];
+
+        foreach (Type type in expressionTypes)
+        {
+            Assert.True(type.IsSealed, type.Name + " should remain sealed for value-oriented model semantics.");
+
+            foreach (PropertyInfo property in type.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+            {
+                Assert.Null(property.SetMethod);
+            }
+
+            foreach (FieldInfo field in type.GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public))
+            {
+                Assert.True(field.IsInitOnly, type.Name + "." + field.Name + " should not be mutable shared state.");
+            }
+        }
     }
 
     [Fact]
