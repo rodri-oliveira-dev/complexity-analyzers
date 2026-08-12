@@ -1,50 +1,55 @@
 {
-  "delivery": "Phase 1 — Analyzer Foundation",
-  "currentObjective": "Create the formal Phase 1 specification and initialize minimal handoff governance.",
-  "completedStep": "1/5 — specification",
+  "delivery": "Phase 1 - Analyzer Foundation",
+  "currentObjective": "Create a compilable and packable scaffold for the isolated ComplexityAnalysis.Analyzers project without analyzer implementation code.",
+  "completedStep": "2/5 - scaffold isolated analyzer project",
   "decisions": [
-    "The analyzer product remains isolated under analyzer/.",
-    "The main analyzer project path is analyzer/src/ComplexityAnalysis.Analyzers/.",
-    "The analyzer target framework is netstandard2.0 because Roslyn/compiler hosts load analyzer assemblies.",
-    "The future test project path is analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ and may target net10.0.",
-    "Roslyn starts at Microsoft.CodeAnalysis.CSharp 4.8.0 and must not be automatically upgraded.",
-    "Roslyn build/development dependencies use PrivateAssets=\"all\".",
-    "Phase 1 uses BIG9000 only as a disabled-by-default analyzer execution probe."
+    "The analyzer project remains isolated at analyzer/src/ComplexityAnalysis.Analyzers/.",
+    "The project targets netstandard2.0 and sets IsAnalyzerProject=true, IsPackable=true, EnforceExtendedAnalyzerRules=true, and Nullable=enable.",
+    "Central Package Management is used from analyzer/Directory.Packages.props; project PackageReference items do not declare Version.",
+    "Microsoft.CodeAnalysis.CSharp remains pinned to 4.8.0 and Microsoft.CodeAnalysis.Analyzers to 3.3.4.",
+    "Roslyn package references use PrivateAssets=\"all\".",
+    "Packaging uses IncludeBuildOutput=false, SuppressDependenciesWhenPacking=true, DevelopmentDependency=true, and explicitly packs the built DLL into analyzers/dotnet/cs/.",
+    "No DiagnosticAnalyzer, diagnostic descriptor, BIG9000 probe, syntax analysis, semantic analysis, CodeFixProvider, or copied inherited classes were added in this step."
   ],
   "constraints": [
-    "Do not implement Big-O analysis in Phase 1.",
-    "Do not create analyzer implementation code during step 1/5.",
     "Do not add ProjectReference or dependency on inherited projects.",
     "Do not modify inherited projects outside analyzer/.",
     "Do not add Microsoft.CodeAnalysis.Workspaces or Microsoft.CodeAnalysis.CSharp.Workspaces in Phase 1.",
     "Do not add MathNet.Numerics in Phase 1.",
-    "Package the analyzer assembly under analyzers/dotnet/cs/.",
-    "Analyzer implementation must be deterministic, side-effect free, cancellation-aware, and avoid network, I/O, process execution, heavy reflection, and mutable static state."
+    "Do not implement Big-O analysis, BIG9000, DiagnosticAnalyzer, DiagnosticDescriptor, syntax analysis, semantic analysis, loop analysis, BCL mappings, or CodeFixProvider during step 2/5.",
+    "Package the analyzer assembly under analyzers/dotnet/cs/ and avoid lib/netstandard2.0/ for the analyzer assembly."
   ],
   "relevantFiles": [
     "analyzer/specs/phase-1/foundation.md",
     "analyzer/handoff/README.md",
     "analyzer/handoff/phase-1.json",
     "analyzer/AGENTS.md",
-    "analyzer/README.md",
     "analyzer/Directory.Packages.props",
     "analyzer/Directory.Build.props",
     "analyzer/Directory.Build.targets",
-    "analyzer/global.json"
+    "analyzer/global.json",
+    "analyzer/ComplexityAnalysis.Analyzers.sln",
+    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj"
   ],
   "validations": [
-    "git diff --check passed before commit.",
-    "phase-1.json parsed successfully with ConvertFrom-Json.",
-    "markdownlint was not available in the workspace.",
-    "git status showed only analyzer/specs/ and analyzer/handoff/ as untracked changes before staging."
+    "dotnet --version reported 10.0.302 because analyzer/global.json allows rollForward=latestFeature from 10.0.100.",
+    "dotnet restore succeeded in analyzer/.",
+    "dotnet build --configuration Release --no-restore succeeded in analyzer/.",
+    "dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local succeeded.",
+    "The nupkg contains analyzers/dotnet/cs/ComplexityAnalysis.Analyzers.dll and does not contain lib/netstandard2.0/ComplexityAnalysis.Analyzers.dll.",
+    "The nupkg nuspec has no runtime dependency group for Roslyn packages.",
+    "The analyzer project contains no ProjectReference, Workspaces package, MathNet.Numerics package, or Version attribute on PackageReference items.",
+    "Only analyzer/handoff/phase-1.json and analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj changed before commit.",
+    "git diff --check passed before commit."
   ],
   "knownPendingItems": [
-    "Step 2/5 must scaffold the isolated analyzer implementation and tests according to analyzer/specs/phase-1/foundation.md.",
-    "Step 2/5 must implement BIG9000 as infrastructure probe only."
+    "Step 3/5 must add the minimal DiagnosticAnalyzer and BIG9000 execution probe only.",
+    "Future tests must prove BIG9000 descriptor metadata, disabled-by-default behavior, and at-most-once emission when enabled.",
+    "Packaging currently contains only the scaffold assembly because this step intentionally adds no functional analyzer implementation."
   ],
-  "nextStep": "2/5 — scaffold isolated analyzer project",
+  "nextStep": "3/5 - minimal DiagnosticAnalyzer and BIG9000 probe",
   "lastCommit": {
-    "hash": "21b0d99ab80ad319df8a438631b8d01618ef5e92",
-    "message": "docs: define phase 1 analyzer foundation"
+    "hash": "pending",
+    "message": "chore: scaffold isolated analyzer project"
   }
 }

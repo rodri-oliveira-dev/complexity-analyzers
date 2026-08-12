@@ -4,6 +4,7 @@
     <IsAnalyzerProject>true</IsAnalyzerProject>
     <IsPackable>true</IsPackable>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <Nullable>enable</Nullable>
 
     <PackageId>ComplexityAnalysis.Analyzers</PackageId>
     <Title>ComplexityAnalysis.Analyzers</Title>
