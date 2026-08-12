@@ -1,13 +1,17 @@
 {
   "delivery": "Phase 3 — Roslyn Extraction",
   "currentObjective": "Implement deterministic intraprocedural Roslyn complexity extraction",
-  "completedStep": "1/8 — specification",
+  "completedStep": "2/8 — semantic context and input-size resolution",
   "decisions": [
     "Phase 3 is specified as an intraprocedural transformation from method C# syntax plus SemanticModel to the Phase 2 ComplexityExpression model.",
     "Extraction responsibilities should be separated across method extraction, method-local semantic context, input-size resolution, basic-operation classification, and loop-bound analysis.",
     "Input-size parameters receive deterministic canonical variables such as n, m, k, and p; irrelevant parameters such as bool and enum do not consume canonical names.",
     "Unsupported invocations and unproven loop bounds produce or propagate Unknown instead of being classified as O(1) or O(n).",
-    "BCL/LINQ mappings, call graph, recursion, product diagnostics, and Complexity Model changes remain out of scope for Phase 3."
+    "BCL/LINQ mappings, call graph, recursion, product diagnostics, and Complexity Model changes remain out of scope for Phase 3.",
+    "MethodAnalysisContext is method-local and stores only SemanticModel, IMethodSymbol, CancellationToken, and an immutable symbol-to-ComplexityVariable map.",
+    "InputSizeResolver assigns variables by eligible parameter order in the method signature: n, m, k, p, then invariant fallback names v5, v6, and so on.",
+    "The initial resolver treats arrays, string, recognized collection/enumerable interfaces, and integral numeric parameters as input-size candidates; bool, enum, delegates, and CancellationToken are excluded.",
+    "Input-size symbol lookup uses SymbolEqualityComparer.Default through an immutable dictionary."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -24,14 +28,16 @@
     "analyzer/handoff/phase-3.json",
     "analyzer/AGENTS.md",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodAnalysisContext.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/InputSizeResolver.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InputSizeResolverTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityModelTests.cs",
-    "src/ComplexityAnalysis.Roslyn/Analysis/RoslynComplexityExtractor.cs",
-    "src/ComplexityAnalysis.Roslyn/Analysis/LoopAnalyzer.cs",
     "src/ComplexityAnalysis.Roslyn/Analysis/AnalysisContext.cs"
   ],
   "validations": [
-    "Phase 2 completion was verified against current code and Release tests before creating the Phase 3 specification."
+    "Phase 2 completion was verified against current code and Release tests before creating the Phase 3 specification.",
+    "Analyzer workspace restore, Release build, and Release tests passed before and after Step 2 implementation."
   ],
   "knownPendingItems": [],
-  "nextStep": "2/8 — semantic context and input-size resolution"
+  "nextStep": "3/8 — basic method and block extraction"
 }
