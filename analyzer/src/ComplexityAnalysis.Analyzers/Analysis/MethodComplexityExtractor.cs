@@ -295,6 +295,11 @@ internal sealed class MethodComplexityExtractor
         StatementSyntax statement,
         MethodAnalysisContext context)
     {
+        if (context.LocalLoopBounds.IsEmpty)
+        {
+            return context;
+        }
+
         MethodAnalysisContext currentContext = context;
 
         foreach (SyntaxNode node in statement.DescendantNodesAndSelf())

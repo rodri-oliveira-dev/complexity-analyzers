@@ -1,53 +1,52 @@
 {
   "delivery": "Phase 3 - Roslyn Extraction",
-  "currentObjective": "Implement deterministic intraprocedural Roslyn complexity extraction",
-  "completedStep": "6/8 — branching extraction",
+  "currentObjective": "Harden deterministic intraprocedural Roslyn extraction contracts",
+  "completedStep": "7/8 — characterization and extraction hardening",
   "decisions": [
-    "Phase 3 extraction is intraprocedural and returns only Phase 2 ComplexityExpression values.",
-    "MethodAnalysisContext is method-local and stores SemanticModel, IMethodSymbol, CancellationToken, and immutable input-size variables resolved by InputSizeResolver.",
-    "Basic method and block extraction is implemented through MethodComplexityExtractor plus BasicOperationAnalyzer.",
-    "Sequential statements are composed with ComplexityComposer.Sequential; no separate Big-O algebra is implemented in the Roslyn layer.",
-    "Only explicitly safe basic operations are classified as O(1): literals, primitive arithmetic/comparison, simple local declarations, simple assignments, increment/decrement, return, array Length, string Length, and array element access.",
-    "Custom properties, custom indexers, object/array creation, unsupported invocations, unsupported loops, and branching remain Unknown or out of scope for this step.",
-    "Linear foreach loops, safe linear for loops, safe logarithmic for loops, and proven while/do-while loops are composed with ComplexityComposer.Nested.",
-    "Logarithmic loop extraction recognizes only constant multiplicative or divisive factors greater than one and normalizes all constant bases to O(log n).",
-    "While and do-while extraction uses simple method-local loop-bound facts from prior local declarations or simple assignments, plus one direct compatible control-variable mutation in the loop body.",
-    "LoopBoundAnalyzer returns Unknown for unproven loop origins, missing conditions, wrong increment variables, inconsistent progressions, invocation bounds, invalid multiplicative factors, nonconstant factors, unrelated conditions, and conflicting control-variable mutations.",
-    "If/else, else-if chains, and switch statements use ComplexityComposer.Branching for deterministic worst-case alternatives; switch sections are analyzed as sequential statements and case counts are not treated as input-size factors.",
-    "Switch expressions remain out of scope for this step and continue to produce Unknown through the existing unsupported-expression policy.",
-    "BCL/LINQ mappings, call graph analysis, recursion handling, product diagnostics, and Complexity Model changes remain out of scope for Phase 3."
+    "Phase 3 extraction remains intraprocedural and returns only Phase 2 ComplexityExpression values.",
+    "MethodAnalysisContext remains method-local and carries SemanticModel, IMethodSymbol, CancellationToken, deterministic input-size variables, and simple local loop-bound facts.",
+    "MethodComplexityExtractor coordinates statement/block composition; BasicOperationAnalyzer owns proven constant-time syntax; LoopBoundAnalyzer owns safe linear/logarithmic loop bounds.",
+    "Unknown is intentionally propagated for unresolved invocations, unproven loop bounds/progress, custom properties, custom indexers, object/array creation, switch expressions, and unsupported pattern labels.",
+    "Canonical variables are assigned from eligible parameters in signature order and must not depend on hash iteration order.",
+    "Generated-code filtering remains the DiagnosticAnalyzer boundary responsibility; the extraction layer analyzes the method it is given.",
+    "BCL/LINQ mappings, call graph analysis, recursion handling, diagnostics, and solver behavior remain out of scope for Phase 3.",
+    "Local loop-bound fact invalidation avoids subtree walks when no local loop facts exist."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
     "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
-    "Do not implement BCL mappings, LINQ mappings, call graph analysis, recursion handling, BIG000x, BIG100x, CodeFixProvider, Workspaces, solver, calibration, amortized, parallel, probabilistic, or memory complexity in Phase 3.",
+    "Do not add Microsoft.CodeAnalysis.Workspaces, MathNet, or SymPy.",
     "Keep BIG9000 unchanged and disabled by default.",
-    "Respect CancellationToken and avoid I/O, network access, process execution, and global mutable analyzer state."
+    "Respect CancellationToken and avoid I/O, network access, process execution, reflection-heavy behavior, and global mutable analyzer state."
   ],
   "relevantFiles": [
+    "analyzer/AGENTS.md",
     "analyzer/specs/phase-3/roslyn-extraction.md",
-    "analyzer/specs/phase-2/complexity-model.md",
     "analyzer/handoff/README.md",
     "analyzer/handoff/phase-3.json",
-    "analyzer/AGENTS.md",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodAnalysisContext.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/InputSizeResolver.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/BasicOperationAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/LoopBoundAnalyzer.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InputSizeResolverTests.cs",
-    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityModelTests.cs",
-    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs"
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityModelTests.cs"
   ],
   "validations": [
-    "Release build passed after Step 5 implementation.",
-    "Release tests passed after Step 5 implementation.",
-    "Release build passed after Step 6 branching extraction.",
-    "Release tests passed after Step 6 branching extraction."
+    "dotnet restore passed in analyzer/.",
+    "dotnet build --configuration Release --no-restore passed in analyzer/ with 0 warnings and 0 errors.",
+    "dotnet test --configuration Release --no-build passed in analyzer/: 146 passed, 0 failed.",
+    "Coverage tooling was not run because no official coverage tool configuration was present.",
+    "Dependency inspection found no Microsoft.CodeAnalysis.Workspaces, MathNet, or SymPy in analyzer src/tests/project configuration.",
+    "ProjectReference inspection found only the isolated test project reference to the new analyzer project, and no references to inherited projects.",
+    "Structural performance/safety inspection found no I/O, network, process execution, reflection-heavy calls, or global mutable collections in analyzer src."
   ],
   "knownPendingItems": [
-    "Advanced CFG/data-flow remains out of scope; while/do-while recognition is limited to simple local initialization and a single direct provable control-variable mutation."
+    "Unresolved method invocations require Phase 4 BCL/LINQ mappings when the target is a known framework operation.",
+    "Advanced CFG/data-flow remains out of scope; while/do-while recognition is limited to simple local initialization and one direct provable control-variable mutation.",
+    "Project-local call graph and recursion analysis remain unsupported beyond Phase 4."
   ],
-  "nextStep": "7/8 — characterization and extraction hardening"
+  "nextStep": "8/8 — phase validation and closure"
 }

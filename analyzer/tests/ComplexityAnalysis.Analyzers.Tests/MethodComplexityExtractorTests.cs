@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Threading;
 
 using ComplexityAnalysis.Analyzers.Analysis;
+using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -14,6 +15,199 @@ namespace ComplexityAnalysis.Analyzers.Tests;
 
 public sealed class MethodComplexityExtractorTests
 {
+    [Fact]
+    public void Phase_three_characterization_matrix_covers_core_extraction_contracts()
+    {
+        (string Scenario, string Source, string Expected)[] cases =
+        [
+            (
+                "constant",
+                """
+                public sealed class Sample
+                {
+                    int M() => 1;
+                }
+                """,
+                "O(1)"),
+            (
+                "foreach-input",
+                """
+                public sealed class Sample
+                {
+                    void M(int[] input)
+                    {
+                        foreach (var item in input)
+                        {
+                            var x = item + 1;
+                        }
+                    }
+                }
+                """,
+                "O(n)"),
+            (
+                "nested-same-input",
+                """
+                public sealed class Sample
+                {
+                    void M(int[] input)
+                    {
+                        foreach (var outer in input)
+                        {
+                            foreach (var inner in input)
+                            {
+                                var x = outer + inner;
+                            }
+                        }
+                    }
+                }
+                """,
+                "O(n\u00b2)"),
+            (
+                "nested-independent-inputs",
+                """
+                public sealed class Sample
+                {
+                    void M(int[] left, int[] right)
+                    {
+                        foreach (var l in left)
+                        {
+                            foreach (var r in right)
+                            {
+                                var x = l + r;
+                            }
+                        }
+                    }
+                }
+                """,
+                "O(n \u00b7 m)"),
+            (
+                "logarithmic-for",
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = 1; i < count; i *= 2)
+                        {
+                            var x = i + 1;
+                        }
+                    }
+                }
+                """,
+                "O(log n)"),
+            (
+                "linear-with-nested-logarithmic",
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = 0; i < count; i++)
+                        {
+                            for (var j = 1; j < count; j *= 2)
+                            {
+                                var x = i + j;
+                            }
+                        }
+                    }
+                }
+                """,
+                "O(n log n)"),
+            (
+                "branch-worst-case",
+                """
+                public sealed class Sample
+                {
+                    void M(bool enabled, int[] input)
+                    {
+                        if (enabled)
+                        {
+                            foreach (var item in input)
+                            {
+                                var x = item + 1;
+                            }
+                        }
+                        else
+                        {
+                            foreach (var outer in input)
+                            {
+                                foreach (var inner in input)
+                                {
+                                    var x = outer + inner;
+                                }
+                            }
+                        }
+                    }
+                }
+                """,
+                "O(n\u00b2)"),
+            (
+                "unresolved-invocation",
+                """
+                public sealed class Sample
+                {
+                    void M()
+                    {
+                        Visit();
+                    }
+
+                    void Visit()
+                    {
+                    }
+                }
+                """,
+                "Unknown"),
+            (
+                "unknown-while-bound",
+                """
+                public sealed class Sample
+                {
+                    void M(bool condition)
+                    {
+                        while (condition)
+                        {
+                            var x = 1;
+                        }
+                    }
+                }
+                """,
+                "Unknown"),
+            (
+                "custom-property",
+                """
+                public sealed class Holder
+                {
+                    public int Count => 1;
+                }
+
+                public sealed class Sample
+                {
+                    int M(Holder holder) => holder.Count;
+                }
+                """,
+                "Unknown"),
+            (
+                "custom-indexer",
+                """
+                public sealed class Indexed
+                {
+                    public int this[int index] => index;
+                }
+
+                public sealed class Sample
+                {
+                    int M(Indexed indexed) => indexed[0];
+                }
+                """,
+                "Unknown")
+        ];
+
+        foreach ((string scenario, string source, string expected) in cases)
+        {
+            AssertMethodComplexity(source, expected, scenario);
+        }
+    }
+
     [Fact]
     public void Empty_block_is_constant()
     {
@@ -534,6 +728,64 @@ public sealed class MethodComplexityExtractorTests
             }
             """,
             "O(n \u00b7 m)");
+    }
+
+    [Fact]
+    public void Repeated_extraction_preserves_expression_notation_and_canonical_variables()
+    {
+        MethodFacts facts = CreateFacts(
+            """
+            public sealed class Sample
+            {
+                void M(int[] left, int[] right)
+                {
+                    foreach (var l in left)
+                    {
+                        foreach (var r in right)
+                        {
+                            var x = l + r;
+                        }
+                    }
+                }
+            }
+            """);
+        var extractor = new MethodComplexityExtractor();
+        ComplexityExpression? expectedExpression = null;
+        string? expectedNotation = null;
+        string[]? expectedVariables = null;
+
+        for (int attempt = 0; attempt < 8; attempt++)
+        {
+            MethodAnalysisContext context = MethodAnalysisContext.Create(
+                facts.MethodDeclaration,
+                facts.SemanticModel,
+                CancellationToken.None);
+            ComplexityExpression expression = extractor.AnalyzeMethod(
+                facts.MethodDeclaration,
+                facts.SemanticModel,
+                CancellationToken.None);
+            string[] variables =
+            [
+                .. context.MethodSymbol.Parameters
+                .Select(parameter => context.TryGetInputSizeVariable(parameter, out ComplexityVariable variable)
+                    ? parameter.Name + ":" + variable.Name
+                    : parameter.Name + ":<none>")
+            ];
+
+            expectedExpression ??= expression;
+            expectedNotation ??= expression.ToBigONotation();
+            expectedVariables ??= variables;
+
+            Assert.Equal(expectedExpression, expression);
+            Assert.Equal(expectedNotation, expression.ToBigONotation());
+            Assert.Equal(expectedVariables, variables);
+        }
+
+        string finalNotation = expectedNotation ?? throw new InvalidOperationException("Expected a baseline notation.");
+        string[] finalVariables = expectedVariables ?? throw new InvalidOperationException("Expected baseline variables.");
+
+        Assert.Equal("O(n \u00b7 m)", finalNotation);
+        Assert.Equal(["left:n", "right:m"], finalVariables);
     }
 
     [Fact]
@@ -1130,6 +1382,122 @@ public sealed class MethodComplexityExtractorTests
             "Unknown");
     }
 
+    [Theory]
+    [InlineData("custom-property-getter")]
+    [InlineData("custom-indexer")]
+    [InlineData("unknown-invocation")]
+    [InlineData("while-without-progression")]
+    [InlineData("complex-control-mutation")]
+    [InlineData("bound-dependent-on-call")]
+    public void False_positive_safety_patterns_remain_unknown(string scenario)
+    {
+        string source = scenario switch
+        {
+            "custom-property-getter" =>
+                """
+                public sealed class Holder
+                {
+                    public int Count => 1;
+                }
+
+                public sealed class Sample
+                {
+                    int M(Holder holder) => holder.Count;
+                }
+                """,
+            "custom-indexer" =>
+                """
+                public sealed class Indexed
+                {
+                    public int this[int index] => index;
+                }
+
+                public sealed class Sample
+                {
+                    int M(Indexed indexed) => indexed[0];
+                }
+                """,
+            "unknown-invocation" =>
+                """
+                public sealed class Sample
+                {
+                    void M()
+                    {
+                        Visit();
+                    }
+
+                    void Visit()
+                    {
+                    }
+                }
+                """,
+            "while-without-progression" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        var i = 0;
+                        while (i < count)
+                        {
+                            var x = i;
+                        }
+                    }
+                }
+                """,
+            "complex-control-mutation" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        var i = 0;
+                        while (i < count)
+                        {
+                            i += GetStep();
+                        }
+                    }
+
+                    int GetStep() => 1;
+                }
+                """,
+            "bound-dependent-on-call" =>
+                """
+                public sealed class Sample
+                {
+                    void M()
+                    {
+                        var limit = GetLimit();
+                        var i = 0;
+                        while (i < limit)
+                        {
+                            i++;
+                        }
+                    }
+
+                    int GetLimit() => 10;
+                }
+                """,
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
+        };
+
+        AssertMethodComplexity(source, "Unknown");
+    }
+
+    [Fact]
+    public void Generated_code_marker_does_not_change_extraction_layer_contract()
+    {
+        AssertMethodComplexity(
+            """
+            // <auto-generated/>
+            public sealed class Sample
+            {
+                int M() => 1;
+            }
+            """,
+            "O(1)");
+    }
+
     [Fact]
     public void Switch_expression_remains_out_of_scope()
     {
@@ -1320,16 +1688,59 @@ public sealed class MethodComplexityExtractorTests
                 cancellationTokenSource.Token));
     }
 
-    private static void AssertMethodComplexity(string source, string expected)
+    [Fact]
+    public void Cancellation_requested_after_context_creation_is_respected_by_block_extraction()
+    {
+        MethodFacts facts = CreateFacts(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    var i = 0;
+                    while (i < count)
+                    {
+                        i++;
+                    }
+                }
+            }
+            """);
+        using var cancellationTokenSource = new CancellationTokenSource();
+        MethodAnalysisContext context = MethodAnalysisContext.Create(
+            facts.MethodDeclaration,
+            facts.SemanticModel,
+            cancellationTokenSource.Token);
+        cancellationTokenSource.Cancel();
+        var extractor = new MethodComplexityExtractor();
+
+        _ = Assert.Throws<OperationCanceledException>(() =>
+            extractor.AnalyzeBlock(
+                facts.MethodDeclaration.Body!,
+                context));
+    }
+
+    private static void AssertMethodComplexity(string source, string expected, string? scenario = null)
+    {
+        string actual = AnalyzeMethod(source).ToBigONotation();
+
+        Assert.True(
+            StringComparer.Ordinal.Equals(expected, actual),
+            (scenario is null ? string.Empty : scenario + ": ")
+            + "expected "
+            + expected
+            + " but got "
+            + actual);
+    }
+
+    private static ComplexityExpression AnalyzeMethod(string source)
     {
         MethodFacts facts = CreateFacts(source);
         var extractor = new MethodComplexityExtractor();
 
-        string actual = extractor
-            .AnalyzeMethod(facts.MethodDeclaration, facts.SemanticModel, CancellationToken.None)
-            .ToBigONotation();
-
-        Assert.Equal(expected, actual);
+        return extractor.AnalyzeMethod(
+            facts.MethodDeclaration,
+            facts.SemanticModel,
+            CancellationToken.None);
     }
 
     private static MethodFacts CreateFacts(string source)
