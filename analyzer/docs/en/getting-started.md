@@ -18,9 +18,9 @@ From the repository root:
 
 ```bash
 cd analyzer
-dotnet restore ComplexityAnalysis.Analyzers.sln
-dotnet build ComplexityAnalysis.Analyzers.sln --configuration Release --no-restore
-dotnet test ComplexityAnalysis.Analyzers.sln --configuration Release --no-build
+dotnet restore ComplexityAnalysis.Analyzers.slnx
+dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
+dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 ```
 
 The solution is isolated under `analyzer/`. Files outside that directory belong to the inherited implementation and are reference-only for this analyzer workspace.

@@ -5,7 +5,7 @@
     }
   ],
   "settings": {
-    "dotnet.defaultSolution": "ComplexityAnalysis.Analyzers.sln",
+    "dotnet.defaultSolution": "ComplexityAnalysis.Analyzers.slnx",
     "dotnet.server.useOmnisharp": false,
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {

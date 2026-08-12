@@ -20,7 +20,7 @@
     "analyzer/handoff/README.md",
     "analyzer/handoff/phase-1.json",
     "analyzer/AGENTS.md",
-    "analyzer/ComplexityAnalysis.Analyzers.sln",
+    "analyzer/ComplexityAnalysis.Analyzers.slnx",
     "analyzer/Directory.Packages.props",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",

@@ -23,7 +23,7 @@ Consulte apenas os arquivos relevantes para a tarefa atual:
 5. `analyzer/Directory.Build.targets`
 6. `analyzer/.editorconfig`
 7. `analyzer/global.json`
-8. `analyzer/ComplexityAnalysis.Analyzers.sln`
+8. `analyzer/ComplexityAnalysis.Analyzers.slnx`
 9. Skills em `analyzer/.agents/skills/`
 10. Projetos e testes dentro de `analyzer/src/` e `analyzer/tests/`
 
@@ -98,8 +98,8 @@ Eles nunca devem ser referenciados pelo novo analyzer por `ProjectReference`, pa
 Execute validacoes proporcionais ao impacto. Para mudancas de bootstrap, MSBuild, NuGet ou empacotamento:
 
 ```bash
-dotnet restore ./ComplexityAnalysis.Analyzers.sln
-dotnet build ./ComplexityAnalysis.Analyzers.sln --configuration Release --no-restore
+dotnet restore ./ComplexityAnalysis.Analyzers.slnx
+dotnet build ./ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
 dotnet pack ./src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local
 ```
 

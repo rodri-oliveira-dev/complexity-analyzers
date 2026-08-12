@@ -79,9 +79,9 @@ Os pre-requisitos sao derivados deste workspace:
 
 ```bash
 cd analyzer
-dotnet restore ComplexityAnalysis.Analyzers.sln
-dotnet build ComplexityAnalysis.Analyzers.sln --configuration Release --no-restore
-dotnet test ComplexityAnalysis.Analyzers.sln --configuration Release --no-build
+dotnet restore ComplexityAnalysis.Analyzers.slnx
+dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
+dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.3.0-docs-local
 ```
 
@@ -140,16 +140,16 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 A solution isolada do analyzer e:
 
 ```text
-analyzer/ComplexityAnalysis.Analyzers.sln
+analyzer/ComplexityAnalysis.Analyzers.slnx
 ```
 
 Comandos comuns de validacao:
 
 ```bash
 cd analyzer
-dotnet restore ComplexityAnalysis.Analyzers.sln
-dotnet build ComplexityAnalysis.Analyzers.sln --configuration Release --no-restore
-dotnet test ComplexityAnalysis.Analyzers.sln --configuration Release --no-build
+dotnet restore ComplexityAnalysis.Analyzers.slnx
+dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
+dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 ```
 
 Arquivos fora de `analyzer/` pertencem a implementacao herdada e sao tratados como referencia apenas para este workspace.
