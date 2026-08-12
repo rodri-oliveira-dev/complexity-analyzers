@@ -1,20 +1,19 @@
 {
   "delivery": "Phase 1 - Analyzer Foundation",
-  "currentObjective": "Implement the first real DiagnosticAnalyzer for the isolated ComplexityAnalysis.Analyzers project with the BIG9000 infrastructure execution probe only.",
-  "completedStep": "3/5 - minimal analyzer + BIG9000",
+  "currentObjective": "Package the analyzer and validate end-to-end consumption from a temporary consumer project.",
+  "completedStep": "4/5 - automated analyzer tests",
   "decisions": [
-    "Added ComplexityAnalyzer as a C# DiagnosticAnalyzer under analyzer/src/ComplexityAnalysis.Analyzers/.",
-    "BIG9000 is an infrastructure-only execution probe with Info severity and is disabled by default.",
-    "The analyzer registers a compilation action, configures generated code handling explicitly, enables concurrent execution, and reports at most one BIG9000 diagnostic per compilation.",
-    "The probe does not inspect methods, loops, LINQ, recursion, call graphs, or complexity patterns.",
-    "Analyzer release tracking for BIG9000 is recorded in AnalyzerReleases.Unshipped.md."
+    "Added an isolated xUnit test project under analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ targeting net10.0.",
+    "The test project references only the isolated analyzer project and Roslyn test dependencies; it does not reference inherited projects.",
+    "Tests use CSharpCompilation and CompilationWithAnalyzers directly instead of a heavier Roslyn test framework.",
+    "Automated tests confirm ComplexityAnalyzer instantiation, SupportedDiagnostics shape, BIG9000 metadata, disabled-by-default behavior, explicit enablement, one diagnostic per compilation, multiple-method code, generated-code input, and valid C# execution without exceptions."
   ],
   "constraints": [
     "Do not add ProjectReference or dependency on inherited projects.",
     "Do not modify inherited projects outside analyzer/.",
     "Do not add Microsoft.CodeAnalysis.Workspaces or Microsoft.CodeAnalysis.CSharp.Workspaces in Phase 1.",
     "Do not add MathNet.Numerics in Phase 1.",
-    "Do not implement Big-O analysis, BIG0001, BIG1001, ComplexityExpression, BCL mappings, recurrence solving, call graph analysis, CodeFixProvider, Workspaces, Solver, Engine, or inherited ports in this step.",
+    "Do not implement Big-O analysis, BIG0001, BIG1001, ComplexityExpression, BCL mappings, recurrence solving, call graph analysis, CodeFixProvider, Workspaces, Solver, Engine, or inherited ports in Phase 1.",
     "Package the analyzer assembly under analyzers/dotnet/cs/ and avoid lib/netstandard2.0/ for the analyzer assembly."
   ],
   "relevantFiles": [
@@ -22,26 +21,27 @@
     "analyzer/handoff/README.md",
     "analyzer/handoff/phase-1.json",
     "analyzer/AGENTS.md",
+    "analyzer/ComplexityAnalysis.Analyzers.sln",
     "analyzer/Directory.Packages.props",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
-    "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs"
+    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalysis.Analyzers.Tests.csproj",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
   ],
   "validations": [
     "dotnet restore succeeded in analyzer/.",
-    "dotnet build --configuration Release --no-restore succeeded in analyzer/ with 0 warnings and 0 errors.",
-    "git diff --check passed before commit.",
-    "git diff was reviewed before commit."
+    "dotnet build --configuration Release --no-restore succeeded in analyzer/ with 1 warning and 0 errors.",
+    "dotnet test --configuration Release --no-build succeeded in analyzer/ with 8 passing tests."
   ],
   "knownPendingItems": [
-    "Step 4/5 must add automated tests for the analyzer and BIG9000 behavior.",
-    "Future tests must prove descriptor metadata, disabled-by-default behavior, no diagnostics without explicit enablement, and at-most-one BIG9000 diagnostic per compilation when enabled.",
-    "Future package/consumer smoke tests must prove the analyzer package can be consumed and BIG9000 can be enabled through .editorconfig."
+    "Step 5/5 must validate package contents and temporary consumer end-to-end behavior.",
+    "Step 5/5 must prove the packed analyzer can be enabled through .editorconfig from a consumer project and reports BIG9000 during dotnet build.",
+    "Step 5/5 must verify package metadata does not expose Roslyn as runtime transitive dependencies."
   ],
-  "nextStep": "4/5 - analyzer automated tests",
+  "nextStep": "5/5 - package and consumer end-to-end validation",
   "lastCommit": {
-    "hash": "216c94e",
-    "message": "feat: add analyzer execution probe"
+    "hash": "bd8e5fd",
+    "message": "test: validate analyzer execution infrastructure"
   }
 }
