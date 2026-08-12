@@ -258,6 +258,312 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
+    public void Foreach_over_array_input_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    foreach (var item in items)
+                    {
+                        var x = item + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Foreach_over_string_input_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(string text)
+                {
+                    foreach (var ch in text)
+                    {
+                        var x = ch;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Foreach_over_collection_input_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                void M(IReadOnlyCollection<int> values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Foreach_over_unknown_origin_is_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                void M()
+                {
+                    foreach (var value in GetValues())
+                    {
+                        var x = value + 1;
+                    }
+                }
+
+                IEnumerable<int> GetValues() => null;
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void For_from_zero_to_integral_bound_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i = 0; i < count; i++)
+                    {
+                        var x = i + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void For_from_zero_to_length_bound_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] values)
+                {
+                    for (var i = 0; i < values.Length; i++)
+                    {
+                        var x = values[i];
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void For_from_bound_down_to_zero_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i = count; i > 0; i--)
+                    {
+                        var x = i - 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void For_with_constant_additive_step_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i = 0; i <= count; i += 2)
+                    {
+                        var x = i + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Constant_bound_for_is_constant_with_constant_body()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M()
+                {
+                    var x = 0;
+                    for (var i = 0; i < 10; i++)
+                    {
+                        x++;
+                    }
+                }
+            }
+            """,
+            "O(1)");
+    }
+
+    [Fact]
+    public void Nested_loops_over_same_input_are_quadratic()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    foreach (var outer in items)
+                    {
+                        foreach (var inner in items)
+                        {
+                            var x = outer + inner;
+                        }
+                    }
+                }
+            }
+            """,
+            "O(n\u00b2)");
+    }
+
+    [Fact]
+    public void Nested_loops_over_independent_inputs_preserve_product()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] left, int[] right)
+                {
+                    foreach (var l in left)
+                    {
+                        foreach (var r in right)
+                        {
+                            var x = l + r;
+                        }
+                    }
+                }
+            }
+            """,
+            "O(n \u00b7 m)");
+    }
+
+    [Theory]
+    [InlineData("missing-condition")]
+    [InlineData("wrong-increment-variable")]
+    [InlineData("inconsistent-progression")]
+    [InlineData("invocation-bound")]
+    [InlineData("multiplicative-progression")]
+    public void Unsupported_for_patterns_are_unknown(string scenario)
+    {
+        string source = scenario switch
+        {
+            "missing-condition" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = 0; ; i++)
+                        {
+                            var x = i + 1;
+                        }
+                    }
+                }
+                """,
+            "wrong-increment-variable" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        var j = 0;
+                        for (var i = 0; i < count; j++)
+                        {
+                            var x = i + 1;
+                        }
+                    }
+                }
+                """,
+            "inconsistent-progression" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = count; i > 0; i++)
+                        {
+                            var x = i + 1;
+                        }
+                    }
+                }
+                """,
+            "invocation-bound" =>
+                """
+                public sealed class Sample
+                {
+                    void M()
+                    {
+                        for (var i = 0; i < GetLimit(); i++)
+                        {
+                            var x = i + 1;
+                        }
+                    }
+
+                    int GetLimit() => 10;
+                }
+                """,
+            "multiplicative-progression" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = 1; i < count; i *= 2)
+                        {
+                            var x = i + 1;
+                        }
+                    }
+                }
+                """,
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
+        };
+
+        AssertMethodComplexity(source, "Unknown");
+    }
+
+    [Fact]
     public void Already_cancelled_token_is_respected_by_method_extractor()
     {
         MethodFacts facts = CreateFacts(

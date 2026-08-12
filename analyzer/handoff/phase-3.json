@@ -1,14 +1,16 @@
 {
   "delivery": "Phase 3 - Roslyn Extraction",
   "currentObjective": "Implement deterministic intraprocedural Roslyn complexity extraction",
-  "completedStep": "3/8 - basic method and block extraction",
+  "completedStep": "4/8 - linear for and foreach loops",
   "decisions": [
     "Phase 3 extraction is intraprocedural and returns only Phase 2 ComplexityExpression values.",
     "MethodAnalysisContext is method-local and stores SemanticModel, IMethodSymbol, CancellationToken, and immutable input-size variables resolved by InputSizeResolver.",
     "Basic method and block extraction is implemented through MethodComplexityExtractor plus BasicOperationAnalyzer.",
     "Sequential statements are composed with ComplexityComposer.Sequential; no separate Big-O algebra is implemented in the Roslyn layer.",
     "Only explicitly safe basic operations are classified as O(1): literals, primitive arithmetic/comparison, simple local declarations, simple assignments, increment/decrement, return, array Length, string Length, and array element access.",
-    "Custom properties, custom indexers, object/array creation, unsupported invocations, loops, and branching remain Unknown or out of scope for this step.",
+    "Custom properties, custom indexers, object/array creation, unsupported invocations, unsupported loops, and branching remain Unknown or out of scope for this step.",
+    "Linear foreach loops over input-size parameters and safe linear for loops are composed with ComplexityComposer.Nested.",
+    "LoopBoundAnalyzer returns Unknown for unproven loop origins, missing conditions, wrong increment variables, inconsistent progressions, invocation bounds, and multiplicative progressions.",
     "BCL/LINQ mappings, call graph analysis, recursion handling, product diagnostics, and Complexity Model changes remain out of scope for Phase 3."
   ],
   "constraints": [
@@ -29,13 +31,15 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/InputSizeResolver.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/BasicOperationAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/LoopBoundAnalyzer.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InputSizeResolverTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityModelTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs"
   ],
   "validations": [
-    "Release build and Release tests passed after Step 3 implementation."
+    "Release build passed after Step 4 implementation.",
+    "Release tests passed after Step 4 implementation."
   ],
   "knownPendingItems": [],
-  "nextStep": "4/8 - linear for and foreach loops"
+  "nextStep": "5/8 - logarithmic, while and do-while loops"
 }

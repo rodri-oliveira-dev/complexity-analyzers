@@ -25,13 +25,11 @@ internal sealed class MethodComplexityExtractor
             semanticModel,
             cancellationToken);
 
-        BasicOperationAnalyzer basicOperations = new(context);
-
         return methodDeclaration.Body is not null
-            ? AnalyzeBlock(methodDeclaration.Body, basicOperations, cancellationToken)
+            ? AnalyzeBlock(methodDeclaration.Body, context)
             : methodDeclaration.ExpressionBody is null
             ? ComplexityFactory.Unknown()
-            : basicOperations.AnalyzeExpression(methodDeclaration.ExpressionBody.Expression);
+            : new BasicOperationAnalyzer(context).AnalyzeExpression(methodDeclaration.ExpressionBody.Expression);
     }
 
     internal ComplexityExpression AnalyzeBlock(
@@ -40,30 +38,26 @@ internal sealed class MethodComplexityExtractor
     {
         _ = context ?? throw new ArgumentNullException(nameof(context));
 
-        return AnalyzeBlock(
-            block,
-            new BasicOperationAnalyzer(context),
-            context.CancellationToken);
+        return AnalyzeBlockCore(block, context);
     }
 
-    private static ComplexityExpression AnalyzeBlock(
+    private static ComplexityExpression AnalyzeBlockCore(
         BlockSyntax block,
-        BasicOperationAnalyzer basicOperations,
-        CancellationToken cancellationToken)
+        MethodAnalysisContext context)
     {
         _ = block ?? throw new ArgumentNullException(nameof(block));
-        _ = basicOperations ?? throw new ArgumentNullException(nameof(basicOperations));
+        _ = context ?? throw new ArgumentNullException(nameof(context));
 
-        cancellationToken.ThrowIfCancellationRequested();
+        context.CancellationToken.ThrowIfCancellationRequested();
 
         ComplexityExpression complexity = ComplexityFactory.Constant();
         foreach (StatementSyntax statement in block.Statements)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            context.CancellationToken.ThrowIfCancellationRequested();
 
             complexity = ComplexityComposer.Sequential(
                 complexity,
-                basicOperations.AnalyzeStatement(statement));
+                AnalyzeStatement(statement, context));
 
             if (complexity is UnknownComplexity)
             {
@@ -72,5 +66,51 @@ internal sealed class MethodComplexityExtractor
         }
 
         return complexity;
+    }
+
+    private static ComplexityExpression AnalyzeStatement(
+        StatementSyntax statement,
+        MethodAnalysisContext context)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        return statement switch
+        {
+            BlockSyntax block => AnalyzeBlockCore(block, context),
+            ForStatementSyntax forStatement => AnalyzeForStatement(forStatement, context),
+            ForEachStatementSyntax forEachStatement => AnalyzeForEachStatement(forEachStatement, context),
+            _ => new BasicOperationAnalyzer(context).AnalyzeStatement(statement),
+        };
+    }
+
+    private static ComplexityExpression AnalyzeForStatement(
+        ForStatementSyntax forStatement,
+        MethodAnalysisContext context)
+    {
+        LoopBoundAnalysisResult loopBound = new LoopBoundAnalyzer(context).AnalyzeFor(forStatement);
+        return loopBound.IsAnalyzable
+            ? ComplexityComposer.Nested(
+                loopBound.IterationComplexity,
+                AnalyzeLoopBody(forStatement.Statement, context))
+            : ComplexityFactory.Unknown();
+    }
+
+    private static ComplexityExpression AnalyzeForEachStatement(
+        ForEachStatementSyntax forEachStatement,
+        MethodAnalysisContext context)
+    {
+        LoopBoundAnalysisResult loopBound = new LoopBoundAnalyzer(context).AnalyzeForEach(forEachStatement);
+        return loopBound.IsAnalyzable
+            ? ComplexityComposer.Nested(
+                loopBound.IterationComplexity,
+                AnalyzeLoopBody(forEachStatement.Statement, context))
+            : ComplexityFactory.Unknown();
+    }
+
+    private static ComplexityExpression AnalyzeLoopBody(
+        StatementSyntax statement,
+        MethodAnalysisContext context)
+    {
+        return AnalyzeStatement(statement, context);
     }
 }
