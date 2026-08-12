@@ -1,0 +1,37 @@
+{
+  "delivery": "Phase 3 — Roslyn Extraction",
+  "currentObjective": "Implement deterministic intraprocedural Roslyn complexity extraction",
+  "completedStep": "1/8 — specification",
+  "decisions": [
+    "Phase 3 is specified as an intraprocedural transformation from method C# syntax plus SemanticModel to the Phase 2 ComplexityExpression model.",
+    "Extraction responsibilities should be separated across method extraction, method-local semantic context, input-size resolution, basic-operation classification, and loop-bound analysis.",
+    "Input-size parameters receive deterministic canonical variables such as n, m, k, and p; irrelevant parameters such as bool and enum do not consume canonical names.",
+    "Unsupported invocations and unproven loop bounds produce or propagate Unknown instead of being classified as O(1) or O(n).",
+    "BCL/LINQ mappings, call graph, recursion, product diagnostics, and Complexity Model changes remain out of scope for Phase 3."
+  ],
+  "constraints": [
+    "Do not modify inherited projects outside analyzer/.",
+    "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
+    "Do not implement BCL mappings, LINQ mappings, call graph analysis, recursion handling, BIG000x, BIG100x, CodeFixProvider, Workspaces, solver, calibration, amortized, parallel, probabilistic, or memory complexity in Phase 3.",
+    "Keep BIG9000 unchanged and disabled by default.",
+    "Respect CancellationToken and avoid I/O, network access, process execution, and global mutable analyzer state."
+  ],
+  "relevantFiles": [
+    "analyzer/specs/phase-3/roslyn-extraction.md",
+    "analyzer/specs/phase-2/complexity-model.md",
+    "analyzer/specs/phase-1/foundation.md",
+    "analyzer/handoff/README.md",
+    "analyzer/handoff/phase-3.json",
+    "analyzer/AGENTS.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityModelTests.cs",
+    "src/ComplexityAnalysis.Roslyn/Analysis/RoslynComplexityExtractor.cs",
+    "src/ComplexityAnalysis.Roslyn/Analysis/LoopAnalyzer.cs",
+    "src/ComplexityAnalysis.Roslyn/Analysis/AnalysisContext.cs"
+  ],
+  "validations": [
+    "Phase 2 completion was verified against current code and Release tests before creating the Phase 3 specification."
+  ],
+  "knownPendingItems": [],
+  "nextStep": "2/8 — semantic context and input-size resolution"
+}
