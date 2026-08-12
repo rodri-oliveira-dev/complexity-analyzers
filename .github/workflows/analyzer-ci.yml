@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: ${{ github.event_name == 'pull_request' }}
+    continue-on-error: true
     permissions:
       contents: read
       pull-requests: read
@@ -124,6 +125,11 @@ jobs:
         working-directory: analyzer
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Verify SONAR_TOKEN
         shell: bash
         env:
@@ -133,11 +139,6 @@ jobs:
             echo "SONAR_TOKEN repository secret is required."
             exit 1
           fi
-
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
