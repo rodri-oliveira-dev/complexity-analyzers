@@ -416,6 +416,63 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
+    public void For_with_multiplicative_step_by_two_is_logarithmic()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i = 1; i < count; i *= 2)
+                    {
+                        var x = i + 1;
+                    }
+                }
+            }
+            """,
+            "O(log n)");
+    }
+
+    [Fact]
+    public void For_with_multiplicative_step_by_three_is_logarithmic()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i = 1; i < count; i *= 3)
+                    {
+                        var x = i + 1;
+                    }
+                }
+            }
+            """,
+            "O(log n)");
+    }
+
+    [Fact]
+    public void For_with_divisive_step_by_two_is_logarithmic()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i = count; i > 1; i /= 2)
+                    {
+                        var x = i - 1;
+                    }
+                }
+            }
+            """,
+            "O(log n)");
+    }
+
+    [Fact]
     public void Constant_bound_for_is_constant_with_constant_body()
     {
         AssertMethodComplexity(
@@ -479,12 +536,292 @@ public sealed class MethodComplexityExtractorTests
             "O(n \u00b7 m)");
     }
 
+    [Fact]
+    public void While_with_increment_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    var i = 0;
+                    while (i < count)
+                    {
+                        i++;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void While_with_constant_add_assignment_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    var i = 0;
+                    while (i < count)
+                    {
+                        i += 2;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void While_with_multiplicative_step_is_logarithmic()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    var i = 1;
+                    while (i < count)
+                    {
+                        i *= 2;
+                    }
+                }
+            }
+            """,
+            "O(log n)");
+    }
+
+    [Fact]
+    public void While_with_divisive_step_is_logarithmic()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    var i = count;
+                    while (i > 1)
+                    {
+                        i /= 2;
+                    }
+                }
+            }
+            """,
+            "O(log n)");
+    }
+
+    [Fact]
+    public void While_without_provable_bound_is_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(bool condition)
+                {
+                    while (condition)
+                    {
+                        var x = 1;
+                    }
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Theory]
+    [InlineData("factor-one")]
+    [InlineData("variable-factor")]
+    [InlineData("condition-without-control-variable")]
+    [InlineData("multiple-control-mutations")]
+    public void Unsupported_while_patterns_are_unknown(string scenario)
+    {
+        string source = scenario switch
+        {
+            "factor-one" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        var i = 1;
+                        while (i < count)
+                        {
+                            i *= 1;
+                        }
+                    }
+                }
+                """,
+            "variable-factor" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count, int factor)
+                    {
+                        var i = 1;
+                        while (i < count)
+                        {
+                            i *= factor;
+                        }
+                    }
+                }
+                """,
+            "condition-without-control-variable" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        var i = 1;
+                        while (count > 1)
+                        {
+                            i *= 2;
+                        }
+                    }
+                }
+                """,
+            "multiple-control-mutations" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        var i = 0;
+                        while (i < count)
+                        {
+                            i++;
+                            i *= 2;
+                        }
+                    }
+                }
+                """,
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
+        };
+
+        AssertMethodComplexity(source, "Unknown");
+    }
+
+    [Fact]
+    public void Do_while_with_increment_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    var i = 0;
+                    do
+                    {
+                        i++;
+                    }
+                    while (i < count);
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Do_while_with_multiplicative_step_is_logarithmic()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    var i = 1;
+                    do
+                    {
+                        i *= 2;
+                    }
+                    while (i < count);
+                }
+            }
+            """,
+            "O(log n)");
+    }
+
+    [Fact]
+    public void Do_while_without_provable_bound_is_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(bool condition)
+                {
+                    do
+                    {
+                        var x = 1;
+                    }
+                    while (condition);
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Nested_linear_outer_and_logarithmic_inner_compose_to_n_log_n()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i = 0; i < count; i++)
+                    {
+                        for (var j = 1; j < count; j *= 2)
+                        {
+                            var x = i + j;
+                        }
+                    }
+                }
+            }
+            """,
+            "O(n log n)");
+    }
+
+    [Fact]
+    public void Nested_logarithmic_loops_compose_to_squared_log()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i = 1; i < count; i *= 2)
+                    {
+                        for (var j = 1; j < count; j *= 2)
+                        {
+                            var x = i + j;
+                        }
+                    }
+                }
+            }
+            """,
+            "O(log^2 n)");
+    }
+
     [Theory]
     [InlineData("missing-condition")]
     [InlineData("wrong-increment-variable")]
     [InlineData("inconsistent-progression")]
     [InlineData("invocation-bound")]
-    [InlineData("multiplicative-progression")]
+    [InlineData("invalid-multiplicative-factor")]
+    [InlineData("invalid-divisive-factor")]
+    [InlineData("variable-multiplicative-factor")]
+    [InlineData("unrelated-condition")]
     public void Unsupported_for_patterns_are_unknown(string scenario)
     {
         string source = scenario switch
@@ -544,13 +881,52 @@ public sealed class MethodComplexityExtractorTests
                     int GetLimit() => 10;
                 }
                 """,
-            "multiplicative-progression" =>
+            "invalid-multiplicative-factor" =>
                 """
                 public sealed class Sample
                 {
                     void M(int count)
                     {
-                        for (var i = 1; i < count; i *= 2)
+                        for (var i = 1; i < count; i *= 1)
+                        {
+                            var x = i + 1;
+                        }
+                    }
+                }
+                """,
+            "invalid-divisive-factor" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = count; i > 1; i /= 1)
+                        {
+                            var x = i - 1;
+                        }
+                    }
+                }
+                """,
+            "variable-multiplicative-factor" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count, int factor)
+                    {
+                        for (var i = 1; i < count; i *= factor)
+                        {
+                            var x = i + 1;
+                        }
+                    }
+                }
+                """,
+            "unrelated-condition" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = 1; count > 1; i *= 2)
                         {
                             var x = i + 1;
                         }

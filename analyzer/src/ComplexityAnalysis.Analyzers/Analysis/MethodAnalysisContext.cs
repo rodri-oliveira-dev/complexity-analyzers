@@ -15,11 +15,13 @@ internal sealed class MethodAnalysisContext
         SemanticModel semanticModel,
         IMethodSymbol methodSymbol,
         ImmutableDictionary<ISymbol, ComplexityVariable> inputSizeVariables,
+        ImmutableDictionary<ISymbol, LoopBoundExpression> localLoopBounds,
         CancellationToken cancellationToken)
     {
         SemanticModel = semanticModel;
         MethodSymbol = methodSymbol;
         InputSizeVariables = inputSizeVariables;
+        LocalLoopBounds = localLoopBounds;
         CancellationToken = cancellationToken;
     }
 
@@ -34,6 +36,11 @@ internal sealed class MethodAnalysisContext
     }
 
     internal ImmutableDictionary<ISymbol, ComplexityVariable> InputSizeVariables
+    {
+        get;
+    }
+
+    internal ImmutableDictionary<ISymbol, LoopBoundExpression> LocalLoopBounds
     {
         get;
     }
@@ -77,6 +84,7 @@ internal sealed class MethodAnalysisContext
             semanticModel,
             methodSymbol,
             inputSizeVariables,
+            ImmutableDictionary.Create<ISymbol, LoopBoundExpression>(SymbolEqualityComparer.Default),
             cancellationToken);
     }
 
@@ -87,5 +95,44 @@ internal sealed class MethodAnalysisContext
         CancellationToken.ThrowIfCancellationRequested();
 
         return InputSizeVariables.TryGetValue(symbol, out variable!);
+    }
+
+    internal bool TryGetLocalLoopBound(ISymbol symbol, out LoopBoundExpression bound)
+    {
+        _ = symbol ?? throw new ArgumentNullException(nameof(symbol));
+
+        CancellationToken.ThrowIfCancellationRequested();
+
+        return LocalLoopBounds.TryGetValue(symbol, out bound);
+    }
+
+    internal MethodAnalysisContext WithLocalLoopBound(ISymbol symbol, LoopBoundExpression bound)
+    {
+        _ = symbol ?? throw new ArgumentNullException(nameof(symbol));
+
+        CancellationToken.ThrowIfCancellationRequested();
+
+        return new MethodAnalysisContext(
+            SemanticModel,
+            MethodSymbol,
+            InputSizeVariables,
+            LocalLoopBounds.SetItem(symbol, bound),
+            CancellationToken);
+    }
+
+    internal MethodAnalysisContext WithoutLocalLoopBound(ISymbol symbol)
+    {
+        _ = symbol ?? throw new ArgumentNullException(nameof(symbol));
+
+        CancellationToken.ThrowIfCancellationRequested();
+
+        return LocalLoopBounds.ContainsKey(symbol)
+            ? new MethodAnalysisContext(
+                SemanticModel,
+                MethodSymbol,
+                InputSizeVariables,
+                LocalLoopBounds.Remove(symbol),
+                CancellationToken)
+            : this;
     }
 }

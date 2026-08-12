@@ -108,8 +108,17 @@ internal sealed class BasicOperationAnalyzer
 
     private ComplexityExpression AnalyzeAssignment(AssignmentExpressionSyntax assignment)
     {
-        return assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
-            && IsSimpleAssignmentTarget(assignment.Left)
+        if (!IsSimpleAssignmentTarget(assignment.Left))
+        {
+            return ComplexityFactory.Unknown();
+        }
+
+        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+        {
+            return AnalyzeExpression(assignment.Right);
+        }
+
+        return IsPrimitiveCompoundAssignment(assignment)
             ? AnalyzeExpression(assignment.Right)
             : ComplexityFactory.Unknown();
     }
@@ -208,6 +217,20 @@ internal sealed class BasicOperationAnalyzer
             && IsPrimitiveComparableType(leftType)
             && IsPrimitiveComparableType(rightType)
             && IsBooleanType(GetExpressionType(binary));
+    }
+
+    private bool IsPrimitiveCompoundAssignment(AssignmentExpressionSyntax assignment)
+    {
+        ITypeSymbol? leftType = GetExpressionType(assignment.Left);
+        ITypeSymbol? rightType = GetExpressionType(assignment.Right);
+
+        return (assignment.IsKind(SyntaxKind.AddAssignmentExpression)
+            || assignment.IsKind(SyntaxKind.SubtractAssignmentExpression)
+            || assignment.IsKind(SyntaxKind.MultiplyAssignmentExpression)
+            || assignment.IsKind(SyntaxKind.DivideAssignmentExpression)
+            || assignment.IsKind(SyntaxKind.ModuloAssignmentExpression))
+            && IsPrimitiveNumericType(leftType)
+            && IsPrimitiveNumericType(rightType);
     }
 
     private bool IsSimpleAssignmentTarget(ExpressionSyntax expression)
