@@ -1,22 +1,20 @@
 {
   "delivery": "Phase 1 - Analyzer Foundation",
-  "currentObjective": "Create a compilable and packable scaffold for the isolated ComplexityAnalysis.Analyzers project without analyzer implementation code.",
-  "completedStep": "2/5 - scaffold isolated analyzer project",
+  "currentObjective": "Implement the first real DiagnosticAnalyzer for the isolated ComplexityAnalysis.Analyzers project with the BIG9000 infrastructure execution probe only.",
+  "completedStep": "3/5 - minimal analyzer + BIG9000",
   "decisions": [
-    "The analyzer project remains isolated at analyzer/src/ComplexityAnalysis.Analyzers/.",
-    "The project targets netstandard2.0 and sets IsAnalyzerProject=true, IsPackable=true, EnforceExtendedAnalyzerRules=true, and Nullable=enable.",
-    "Central Package Management is used from analyzer/Directory.Packages.props; project PackageReference items do not declare Version.",
-    "Microsoft.CodeAnalysis.CSharp remains pinned to 4.8.0 and Microsoft.CodeAnalysis.Analyzers to 3.3.4.",
-    "Roslyn package references use PrivateAssets=\"all\".",
-    "Packaging uses IncludeBuildOutput=false, SuppressDependenciesWhenPacking=true, DevelopmentDependency=true, and explicitly packs the built DLL into analyzers/dotnet/cs/.",
-    "No DiagnosticAnalyzer, diagnostic descriptor, BIG9000 probe, syntax analysis, semantic analysis, CodeFixProvider, or copied inherited classes were added in this step."
+    "Added ComplexityAnalyzer as a C# DiagnosticAnalyzer under analyzer/src/ComplexityAnalysis.Analyzers/.",
+    "BIG9000 is an infrastructure-only execution probe with Info severity and is disabled by default.",
+    "The analyzer registers a compilation action, configures generated code handling explicitly, enables concurrent execution, and reports at most one BIG9000 diagnostic per compilation.",
+    "The probe does not inspect methods, loops, LINQ, recursion, call graphs, or complexity patterns.",
+    "Analyzer release tracking for BIG9000 is recorded in AnalyzerReleases.Unshipped.md."
   ],
   "constraints": [
     "Do not add ProjectReference or dependency on inherited projects.",
     "Do not modify inherited projects outside analyzer/.",
     "Do not add Microsoft.CodeAnalysis.Workspaces or Microsoft.CodeAnalysis.CSharp.Workspaces in Phase 1.",
     "Do not add MathNet.Numerics in Phase 1.",
-    "Do not implement Big-O analysis, BIG9000, DiagnosticAnalyzer, DiagnosticDescriptor, syntax analysis, semantic analysis, loop analysis, BCL mappings, or CodeFixProvider during step 2/5.",
+    "Do not implement Big-O analysis, BIG0001, BIG1001, ComplexityExpression, BCL mappings, recurrence solving, call graph analysis, CodeFixProvider, Workspaces, Solver, Engine, or inherited ports in this step.",
     "Package the analyzer assembly under analyzers/dotnet/cs/ and avoid lib/netstandard2.0/ for the analyzer assembly."
   ],
   "relevantFiles": [
@@ -25,31 +23,25 @@
     "analyzer/handoff/phase-1.json",
     "analyzer/AGENTS.md",
     "analyzer/Directory.Packages.props",
-    "analyzer/Directory.Build.props",
-    "analyzer/Directory.Build.targets",
-    "analyzer/global.json",
-    "analyzer/ComplexityAnalysis.Analyzers.sln",
-    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj"
+    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
+    "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs"
   ],
   "validations": [
-    "dotnet --version reported 10.0.302 because analyzer/global.json allows rollForward=latestFeature from 10.0.100.",
     "dotnet restore succeeded in analyzer/.",
-    "dotnet build --configuration Release --no-restore succeeded in analyzer/.",
-    "dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local succeeded.",
-    "The nupkg contains analyzers/dotnet/cs/ComplexityAnalysis.Analyzers.dll and does not contain lib/netstandard2.0/ComplexityAnalysis.Analyzers.dll.",
-    "The nupkg nuspec has no runtime dependency group for Roslyn packages.",
-    "The analyzer project contains no ProjectReference, Workspaces package, MathNet.Numerics package, or Version attribute on PackageReference items.",
-    "Only analyzer/handoff/phase-1.json and analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj changed before commit.",
-    "git diff --check passed before commit."
+    "dotnet build --configuration Release --no-restore succeeded in analyzer/ with 0 warnings and 0 errors.",
+    "git diff --check passed before commit.",
+    "git diff was reviewed before commit."
   ],
   "knownPendingItems": [
-    "Step 3/5 must add the minimal DiagnosticAnalyzer and BIG9000 execution probe only.",
-    "Future tests must prove BIG9000 descriptor metadata, disabled-by-default behavior, and at-most-once emission when enabled.",
-    "Packaging currently contains only the scaffold assembly because this step intentionally adds no functional analyzer implementation."
+    "Step 4/5 must add automated tests for the analyzer and BIG9000 behavior.",
+    "Future tests must prove descriptor metadata, disabled-by-default behavior, no diagnostics without explicit enablement, and at-most-one BIG9000 diagnostic per compilation when enabled.",
+    "Future package/consumer smoke tests must prove the analyzer package can be consumed and BIG9000 can be enabled through .editorconfig."
   ],
-  "nextStep": "3/5 - minimal DiagnosticAnalyzer and BIG9000 probe",
+  "nextStep": "4/5 - analyzer automated tests",
   "lastCommit": {
-    "hash": "pending",
-    "message": "chore: scaffold isolated analyzer project"
+    "hash": "216c94e",
+    "message": "feat: add analyzer execution probe"
   }
 }
