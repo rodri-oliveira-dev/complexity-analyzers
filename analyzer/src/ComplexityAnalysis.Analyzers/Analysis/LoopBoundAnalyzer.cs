@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 
 using ComplexityAnalysis.Analyzers.Model;
@@ -214,14 +215,37 @@ internal sealed class LoopBoundAnalyzer
         progression = default;
         bool found = false;
 
-        foreach (SyntaxNode node in body.DescendantNodesAndSelf())
-        {
-            context.CancellationToken.ThrowIfCancellationRequested();
+        return TryAnalyzeUnconditionalProgressionStatement(body, loopVariable, ref found, ref progression)
+            && found;
+    }
 
-            if (node is not ExpressionSyntax expression
-                || !TargetsLoopVariableMutation(expression, loopVariable))
+    private bool TryAnalyzeUnconditionalProgressionStatement(
+        StatementSyntax statement,
+        ISymbol loopVariable,
+        ref bool found,
+        ref LoopProgression progression)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        if (statement is BlockSyntax block)
+        {
+            foreach (StatementSyntax childStatement in block.Statements)
             {
-                continue;
+                if (!TryAnalyzeUnconditionalProgressionStatement(childStatement, loopVariable, ref found, ref progression))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (statement is ExpressionStatementSyntax expressionStatement)
+        {
+            ExpressionSyntax expression = expressionStatement.Expression;
+            if (!TargetsLoopVariableMutation(expression, loopVariable))
+            {
+                return !StatementContainsLoopVariableMutation(statement, loopVariable);
             }
 
             if (found
@@ -232,9 +256,27 @@ internal sealed class LoopBoundAnalyzer
             }
 
             found = true;
+            return true;
         }
 
-        return found;
+        return !StatementContainsLoopVariableMutation(statement, loopVariable);
+    }
+
+    private bool StatementContainsLoopVariableMutation(StatementSyntax statement, ISymbol loopVariable)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        foreach (ExpressionSyntax expression in statement.DescendantNodes().OfType<ExpressionSyntax>())
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (TargetsLoopVariableMutation(expression, loopVariable))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool TryAnalyzeProgression(

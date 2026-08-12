@@ -1387,6 +1387,8 @@ public sealed class MethodComplexityExtractorTests
     [InlineData("custom-indexer")]
     [InlineData("unknown-invocation")]
     [InlineData("while-without-progression")]
+    [InlineData("conditional-while-progression")]
+    [InlineData("conditional-do-while-progression")]
     [InlineData("complex-control-mutation")]
     [InlineData("bound-dependent-on-call")]
     public void False_positive_safety_patterns_remain_unknown(string scenario)
@@ -1442,6 +1444,41 @@ public sealed class MethodComplexityExtractorTests
                         {
                             var x = i;
                         }
+                    }
+                }
+                """,
+            "conditional-while-progression" =>
+                """
+                public sealed class Sample
+                {
+                    void M(bool enabled, int count)
+                    {
+                        var i = 0;
+                        while (i < count)
+                        {
+                            if (enabled)
+                            {
+                                i++;
+                            }
+                        }
+                    }
+                }
+                """,
+            "conditional-do-while-progression" =>
+                """
+                public sealed class Sample
+                {
+                    void M(bool enabled, int count)
+                    {
+                        var i = 0;
+                        do
+                        {
+                            if (enabled)
+                            {
+                                i++;
+                            }
+                        }
+                        while (i < count);
                     }
                 }
                 """,
