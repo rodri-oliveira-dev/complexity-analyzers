@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 2 - Complexity Model",
   "currentObjective": "Implement lightweight asymptotic complexity model",
-  "completedStep": "2/6 - atomic complexity expressions",
+  "completedStep": "3/6 - growth comparison",
   "decisions": [
     "Use the inherited Core complexity model only as conceptual reference; do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
     "Keep the Phase 2 model inside ComplexityAnalysis.Analyzers, preferably under analyzer/src/ComplexityAnalysis.Analyzers/Model/.",
@@ -14,7 +14,10 @@
     "Model types are internal analyzer infrastructure; tests access them through InternalsVisibleTo without making a public NuGet API.",
     "O(1) and Unknown are distinct canonical immutable values; Unknown is never treated as constant.",
     "Polynomial(variable, 0) normalizes to O(1), while direct polynomial-log construction rejects the duplicate k=0 and j=0 representation.",
-    "Complexity variable names are accepted when they start with an ASCII letter and then contain only ASCII letters or digits."
+    "Complexity variable names are accepted when they start with an ASCII letter and then contain only ASCII letters or digits.",
+    "ComplexityGrowthComparer models ordering by expression family and same-variable mathematical rules instead of using a single arbitrary score.",
+    "Constant complexity compares below known non-constant expressions regardless of variable name because it has no input variable.",
+    "Unknown comparisons are Incomparable except Unknown compared with Unknown, which is Equivalent."
   ],
   "constraints": [
     "Do not implement Roslyn extraction, SyntaxNode analysis, SemanticModel analysis, ControlFlowGraph analysis, loop analysis, LINQ/BCL mappings, interprocedural analysis, call graphs, recurrence solving, CodeFixProvider, Workspaces, MathNet, SymPy, memory, amortized, probabilistic, parallel, or confidence-scoring features in Phase 2.",
@@ -38,6 +41,8 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/ExponentialComplexity.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/FactorialComplexity.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/UnknownComplexity.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/GrowthComparison.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/ComplexityGrowthComparer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/ComplexityFactory.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs",
@@ -59,11 +64,13 @@
     "dotnet restore succeeded in analyzer/ after Step 2 implementation.",
     "dotnet build --configuration Release --no-restore succeeded in analyzer/ after Step 2 implementation with only the known documentation-file warning.",
     "dotnet test --configuration Release --no-build succeeded in analyzer/ with 32 passing tests.",
-    "rg \"Microsoft\\.CodeAnalysis\" analyzer/src/ComplexityAnalysis.Analyzers/Model returned no references."
+    "rg \"Microsoft\\.CodeAnalysis\" analyzer/src/ComplexityAnalysis.Analyzers/Model returned no references.",
+    "Step 3 precondition dotnet test --configuration Release succeeded in analyzer/ with 32 passing tests before implementation.",
+    "dotnet build --configuration Release succeeded in analyzer/ after Step 3 implementation with the known documentation-file warning in the tests project.",
+    "dotnet test --configuration Release --no-build succeeded in analyzer/ with 42 passing tests after Step 3 implementation."
   ],
   "knownPendingItems": [
-    "Implement Step 3/6 growth comparison.",
-    "Implement later Phase 2 composition rules after growth comparison."
+    "Implement Step 4/6 complexity composition."
   ],
-  "nextStep": "3/6 - growth comparison"
+  "nextStep": "4/6 - complexity composition"
 }

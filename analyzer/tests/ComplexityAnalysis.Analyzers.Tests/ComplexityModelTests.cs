@@ -159,4 +159,147 @@ public sealed class ComplexityModelTests
         Assert.Equal("Unknown", unknown.ToBigONotation());
         Assert.NotEqual(ComplexityFactory.Constant(), unknown);
     }
+
+    [Fact]
+    public void Growth_comparer_orders_required_same_variable_forms()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+
+        (ComplexityExpression Smaller, ComplexityExpression Larger)[] orderedPairs =
+        [
+            (ComplexityFactory.Constant(), ComplexityFactory.LogN(n)),
+            (ComplexityFactory.LogN(n), ComplexityFactory.Linear(n)),
+            (ComplexityFactory.Linear(n), ComplexityFactory.NLogN(n)),
+            (ComplexityFactory.NLogN(n), ComplexityFactory.Polynomial(n, 2)),
+            (ComplexityFactory.Polynomial(n, 2), ComplexityFactory.Polynomial(n, 3)),
+            (ComplexityFactory.Polynomial(n, 3), ComplexityFactory.Exponential(n, 2)),
+            (ComplexityFactory.Exponential(n, 2), ComplexityFactory.Factorial(n)),
+        ];
+
+        foreach ((ComplexityExpression smaller, ComplexityExpression larger) in orderedPairs)
+        {
+            AssertComparison(smaller, larger, GrowthComparison.Less);
+        }
+    }
+
+    [Fact]
+    public void Growth_comparer_compares_polylog_by_polynomial_degree_then_log_exponent()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+
+        AssertComparison(ComplexityFactory.Linear(n), ComplexityFactory.NLogN(n), GrowthComparison.Less);
+        AssertComparison(ComplexityFactory.NLogN(n), ComplexityFactory.Polynomial(n, 2), GrowthComparison.Less);
+        AssertComparison(ComplexityFactory.Polynomial(n, 2), new PolynomialLogComplexity(n, polynomialDegree: 2, logExponent: 1), GrowthComparison.Less);
+        AssertComparison(new PolynomialLogComplexity(n, polynomialDegree: 2, logExponent: 1), new PolynomialLogComplexity(n, polynomialDegree: 2, logExponent: 3), GrowthComparison.Less);
+        AssertComparison(new PolynomialLogComplexity(n, polynomialDegree: 3, logExponent: 0), new PolynomialLogComplexity(n, polynomialDegree: 2, logExponent: 10), GrowthComparison.Greater);
+    }
+
+    [Fact]
+    public void Growth_comparer_orders_arbitrary_polynomial_degrees()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+
+        AssertComparison(ComplexityFactory.Polynomial(n, 4), ComplexityFactory.Polynomial(n, 5), GrowthComparison.Less);
+        AssertComparison(ComplexityFactory.Polynomial(n, 12), ComplexityFactory.Polynomial(n, 9), GrowthComparison.Greater);
+    }
+
+    [Fact]
+    public void Growth_comparer_orders_polynomial_exponential_and_factorial_for_same_variable()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+
+        AssertComparison(ComplexityFactory.Polynomial(n, 10), ComplexityFactory.Exponential(n, 2), GrowthComparison.Less);
+        AssertComparison(ComplexityFactory.Exponential(n, 2), ComplexityFactory.Factorial(n), GrowthComparison.Less);
+    }
+
+    [Fact]
+    public void Growth_comparer_orders_safe_exponential_bases_for_same_variable()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+
+        AssertComparison(ComplexityFactory.Exponential(n, 2), ComplexityFactory.Exponential(n, 3), GrowthComparison.Less);
+        AssertComparison(ComplexityFactory.Exponential(n, 10), ComplexityFactory.Exponential(n, 3), GrowthComparison.Greater);
+    }
+
+    [Fact]
+    public void Growth_comparer_reports_asymptotic_equivalence_for_equal_normalized_forms()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+
+        AssertComparison(ComplexityFactory.Constant(), ComplexityFactory.Constant(), GrowthComparison.Equivalent);
+        AssertComparison(ComplexityFactory.Linear(n), ComplexityFactory.Linear(new ComplexityVariable("n")), GrowthComparison.Equivalent);
+        AssertComparison(ComplexityFactory.NLogN(n), new PolynomialLogComplexity(new ComplexityVariable("n"), polynomialDegree: 1, logExponent: 1), GrowthComparison.Equivalent);
+        AssertComparison(ComplexityFactory.Exponential(n, 2), ComplexityFactory.Exponential(new ComplexityVariable("n"), 2), GrowthComparison.Equivalent);
+        AssertComparison(ComplexityFactory.Factorial(n), ComplexityFactory.Factorial(new ComplexityVariable("n")), GrowthComparison.Equivalent);
+    }
+
+    [Fact]
+    public void Growth_comparer_does_not_order_independent_variables()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+        ComplexityVariable m = ComplexityVariable.M;
+
+        (ComplexityExpression Left, ComplexityExpression Right)[] incomparablePairs =
+        [
+            (ComplexityFactory.Linear(n), ComplexityFactory.Linear(m)),
+            (ComplexityFactory.LogN(n), ComplexityFactory.LogN(m)),
+            (ComplexityFactory.NLogN(n), ComplexityFactory.NLogN(m)),
+            (ComplexityFactory.Polynomial(n, 2), ComplexityFactory.Polynomial(m, 2)),
+            (ComplexityFactory.Polynomial(n, 2), ComplexityFactory.Exponential(m, 2)),
+            (ComplexityFactory.Exponential(n, 2), ComplexityFactory.Exponential(m, 3)),
+            (ComplexityFactory.Exponential(n, 2), ComplexityFactory.Factorial(m)),
+            (ComplexityFactory.Factorial(n), ComplexityFactory.Factorial(m)),
+        ];
+
+        foreach ((ComplexityExpression left, ComplexityExpression right) in incomparablePairs)
+        {
+            AssertComparison(left, right, GrowthComparison.Incomparable);
+        }
+    }
+
+    [Fact]
+    public void Growth_comparer_orders_constant_against_known_variable_dependent_forms()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+        ComplexityVariable m = ComplexityVariable.M;
+
+        AssertComparison(ComplexityFactory.Constant(), ComplexityFactory.Linear(n), GrowthComparison.Less);
+        AssertComparison(ComplexityFactory.Constant(), ComplexityFactory.Exponential(m, 2), GrowthComparison.Less);
+        AssertComparison(ComplexityFactory.Constant(), ComplexityFactory.Factorial(n), GrowthComparison.Less);
+    }
+
+    [Fact]
+    public void Growth_comparer_keeps_unknown_incomparable_except_same_unknown_value()
+    {
+        ComplexityExpression unknown = ComplexityFactory.Unknown();
+
+        AssertComparison(unknown, ComplexityFactory.Constant(), GrowthComparison.Incomparable);
+        AssertComparison(unknown, ComplexityFactory.Linear(ComplexityVariable.N), GrowthComparison.Incomparable);
+        AssertComparison(unknown, ComplexityFactory.Unknown(), GrowthComparison.Equivalent);
+    }
+
+    [Fact]
+    public void Growth_comparer_rejects_null_operands()
+    {
+        _ = Assert.Throws<ArgumentNullException>(() => ComplexityGrowthComparer.Compare(null!, ComplexityFactory.Constant()));
+        _ = Assert.Throws<ArgumentNullException>(() => ComplexityGrowthComparer.Compare(ComplexityFactory.Constant(), null!));
+    }
+
+    private static void AssertComparison(ComplexityExpression left, ComplexityExpression right, GrowthComparison expected)
+    {
+        Assert.Equal(expected, ComplexityGrowthComparer.Compare(left, right));
+        Assert.Equal(Invert(expected), ComplexityGrowthComparer.Compare(right, left));
+    }
+
+    private static GrowthComparison Invert(GrowthComparison comparison)
+    {
+        return comparison switch
+        {
+            GrowthComparison.Less => GrowthComparison.Greater,
+            GrowthComparison.Greater => GrowthComparison.Less,
+            GrowthComparison.Equivalent => GrowthComparison.Equivalent,
+            GrowthComparison.Incomparable => GrowthComparison.Incomparable,
+            _ => throw new ArgumentOutOfRangeException(nameof(comparison), comparison, null),
+        };
+    }
 }
