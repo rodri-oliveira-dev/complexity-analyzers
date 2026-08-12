@@ -30,7 +30,7 @@ internal sealed class ExponentialComplexity : ComplexityExpression, IEquatable<E
     public bool Equals(ExponentialComplexity? other)
     {
         return other is not null
-            && Base.Equals(other.Base)
+            && Base.CompareTo(other.Base) == 0
             && Variable.Equals(other.Variable);
     }
 
