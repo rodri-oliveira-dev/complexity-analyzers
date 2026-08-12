@@ -1,0 +1,50 @@
+{
+  "delivery": "Phase 1 — Analyzer Foundation",
+  "currentObjective": "Create the formal Phase 1 specification and initialize minimal handoff governance.",
+  "completedStep": "1/5 — specification",
+  "decisions": [
+    "The analyzer product remains isolated under analyzer/.",
+    "The main analyzer project path is analyzer/src/ComplexityAnalysis.Analyzers/.",
+    "The analyzer target framework is netstandard2.0 because Roslyn/compiler hosts load analyzer assemblies.",
+    "The future test project path is analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ and may target net10.0.",
+    "Roslyn starts at Microsoft.CodeAnalysis.CSharp 4.8.0 and must not be automatically upgraded.",
+    "Roslyn build/development dependencies use PrivateAssets=\"all\".",
+    "Phase 1 uses BIG9000 only as a disabled-by-default analyzer execution probe."
+  ],
+  "constraints": [
+    "Do not implement Big-O analysis in Phase 1.",
+    "Do not create analyzer implementation code during step 1/5.",
+    "Do not add ProjectReference or dependency on inherited projects.",
+    "Do not modify inherited projects outside analyzer/.",
+    "Do not add Microsoft.CodeAnalysis.Workspaces or Microsoft.CodeAnalysis.CSharp.Workspaces in Phase 1.",
+    "Do not add MathNet.Numerics in Phase 1.",
+    "Package the analyzer assembly under analyzers/dotnet/cs/.",
+    "Analyzer implementation must be deterministic, side-effect free, cancellation-aware, and avoid network, I/O, process execution, heavy reflection, and mutable static state."
+  ],
+  "relevantFiles": [
+    "analyzer/specs/phase-1/foundation.md",
+    "analyzer/handoff/README.md",
+    "analyzer/handoff/phase-1.json",
+    "analyzer/AGENTS.md",
+    "analyzer/README.md",
+    "analyzer/Directory.Packages.props",
+    "analyzer/Directory.Build.props",
+    "analyzer/Directory.Build.targets",
+    "analyzer/global.json"
+  ],
+  "validations": [
+    "git diff --check passed before commit.",
+    "phase-1.json parsed successfully with ConvertFrom-Json.",
+    "markdownlint was not available in the workspace.",
+    "git status showed only analyzer/specs/ and analyzer/handoff/ as untracked changes before staging."
+  ],
+  "knownPendingItems": [
+    "Step 2/5 must scaffold the isolated analyzer implementation and tests according to analyzer/specs/phase-1/foundation.md.",
+    "Step 2/5 must implement BIG9000 as infrastructure probe only."
+  ],
+  "nextStep": "2/5 — scaffold isolated analyzer project",
+  "lastCommit": {
+    "hash": "21b0d99ab80ad319df8a438631b8d01618ef5e92",
+    "message": "docs: define phase 1 analyzer foundation"
+  }
+}
