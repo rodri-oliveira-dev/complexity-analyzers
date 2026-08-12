@@ -168,7 +168,7 @@ jobs:
           /o:"rodri-oliveira-dev"
           /d:sonar.token="${SONAR_TOKEN}"
           /d:sonar.host.url="https://sonarcloud.io"
-          /d:sonar.projectBaseDir="."
+          /d:sonar.projectBaseDir="${GITHUB_WORKSPACE}/analyzer"
           /d:sonar.cs.opencover.reportsPaths="artifacts/coverage/sonar/opencover/coverage.opencover.xml"
           /d:sonar.qualitygate.wait=true
           /d:sonar.qualitygate.timeout=300
