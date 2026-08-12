@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 3 - Roslyn Extraction",
   "currentObjective": "Implement deterministic intraprocedural Roslyn complexity extraction",
-  "completedStep": "5/8 — logarithmic, while and do-while loops",
+  "completedStep": "6/8 — branching extraction",
   "decisions": [
     "Phase 3 extraction is intraprocedural and returns only Phase 2 ComplexityExpression values.",
     "MethodAnalysisContext is method-local and stores SemanticModel, IMethodSymbol, CancellationToken, and immutable input-size variables resolved by InputSizeResolver.",
@@ -13,6 +13,8 @@
     "Logarithmic loop extraction recognizes only constant multiplicative or divisive factors greater than one and normalizes all constant bases to O(log n).",
     "While and do-while extraction uses simple method-local loop-bound facts from prior local declarations or simple assignments, plus one direct compatible control-variable mutation in the loop body.",
     "LoopBoundAnalyzer returns Unknown for unproven loop origins, missing conditions, wrong increment variables, inconsistent progressions, invocation bounds, invalid multiplicative factors, nonconstant factors, unrelated conditions, and conflicting control-variable mutations.",
+    "If/else, else-if chains, and switch statements use ComplexityComposer.Branching for deterministic worst-case alternatives; switch sections are analyzed as sequential statements and case counts are not treated as input-size factors.",
+    "Switch expressions remain out of scope for this step and continue to produce Unknown through the existing unsupported-expression policy.",
     "BCL/LINQ mappings, call graph analysis, recursion handling, product diagnostics, and Complexity Model changes remain out of scope for Phase 3."
   ],
   "constraints": [
@@ -40,10 +42,12 @@
   ],
   "validations": [
     "Release build passed after Step 5 implementation.",
-    "Release tests passed after Step 5 implementation."
+    "Release tests passed after Step 5 implementation.",
+    "Release build passed after Step 6 branching extraction.",
+    "Release tests passed after Step 6 branching extraction."
   ],
   "knownPendingItems": [
     "Advanced CFG/data-flow remains out of scope; while/do-while recognition is limited to simple local initialization and a single direct provable control-variable mutation."
   ],
-  "nextStep": "6/8 — branching extraction"
+  "nextStep": "7/8 — characterization and extraction hardening"
 }

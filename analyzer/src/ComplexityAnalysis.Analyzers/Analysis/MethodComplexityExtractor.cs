@@ -49,11 +49,18 @@ internal sealed class MethodComplexityExtractor
         _ = block ?? throw new ArgumentNullException(nameof(block));
         _ = context ?? throw new ArgumentNullException(nameof(context));
 
+        return AnalyzeStatements(block.Statements, context);
+    }
+
+    private static ComplexityExpression AnalyzeStatements(
+        SyntaxList<StatementSyntax> statements,
+        MethodAnalysisContext context)
+    {
         context.CancellationToken.ThrowIfCancellationRequested();
 
         ComplexityExpression complexity = ComplexityFactory.Constant();
         MethodAnalysisContext currentContext = context;
-        foreach (StatementSyntax statement in block.Statements)
+        foreach (StatementSyntax statement in statements)
         {
             currentContext.CancellationToken.ThrowIfCancellationRequested();
 
@@ -85,6 +92,8 @@ internal sealed class MethodComplexityExtractor
             ForEachStatementSyntax forEachStatement => AnalyzeForEachStatement(forEachStatement, context),
             WhileStatementSyntax whileStatement => AnalyzeWhileStatement(whileStatement, context),
             DoStatementSyntax doStatement => AnalyzeDoWhileStatement(doStatement, context),
+            IfStatementSyntax ifStatement => AnalyzeIfStatement(ifStatement, context),
+            SwitchStatementSyntax switchStatement => AnalyzeSwitchStatement(switchStatement, context),
             _ => new BasicOperationAnalyzer(context).AnalyzeStatement(statement),
         };
     }
@@ -135,6 +144,86 @@ internal sealed class MethodComplexityExtractor
                 loopBound.IterationComplexity,
                 AnalyzeLoopBody(doStatement.Statement, context))
             : ComplexityFactory.Unknown();
+    }
+
+    private static ComplexityExpression AnalyzeIfStatement(
+        IfStatementSyntax ifStatement,
+        MethodAnalysisContext context)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        ComplexityExpression conditionComplexity =
+            new BasicOperationAnalyzer(context).AnalyzeExpression(ifStatement.Condition);
+        ComplexityExpression trueBranch = AnalyzeStatement(ifStatement.Statement, context);
+        ComplexityExpression falseBranch = ifStatement.Else is null
+            ? ComplexityFactory.Constant()
+            : AnalyzeStatement(ifStatement.Else.Statement, context);
+
+        return ComplexityComposer.Sequential(
+            conditionComplexity,
+            ComplexityComposer.Branching(trueBranch, falseBranch));
+    }
+
+    private static ComplexityExpression AnalyzeSwitchStatement(
+        SwitchStatementSyntax switchStatement,
+        MethodAnalysisContext context)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        ComplexityExpression switchExpressionComplexity =
+            new BasicOperationAnalyzer(context).AnalyzeExpression(switchStatement.Expression);
+        ComplexityExpression branchComplexity = ComplexityFactory.Constant();
+
+        foreach (SwitchSectionSyntax section in switchStatement.Sections)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            branchComplexity = ComplexityComposer.Branching(
+                branchComplexity,
+                AnalyzeSwitchSection(section, context));
+
+            if (branchComplexity is UnknownComplexity)
+            {
+                break;
+            }
+        }
+
+        return ComplexityComposer.Sequential(switchExpressionComplexity, branchComplexity);
+    }
+
+    private static ComplexityExpression AnalyzeSwitchSection(
+        SwitchSectionSyntax section,
+        MethodAnalysisContext context)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        foreach (SwitchLabelSyntax label in section.Labels)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (!IsSupportedSwitchLabel(label, context))
+            {
+                return ComplexityFactory.Unknown();
+            }
+        }
+
+        return AnalyzeStatements(section.Statements, context);
+    }
+
+    private static bool IsSupportedSwitchLabel(
+        SwitchLabelSyntax label,
+        MethodAnalysisContext context)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        return label switch
+        {
+            DefaultSwitchLabelSyntax => true,
+            CaseSwitchLabelSyntax caseLabel => context.SemanticModel
+                .GetConstantValue(caseLabel.Value, context.CancellationToken)
+                .HasValue,
+            _ => false,
+        };
     }
 
     private static ComplexityExpression AnalyzeLoopBody(

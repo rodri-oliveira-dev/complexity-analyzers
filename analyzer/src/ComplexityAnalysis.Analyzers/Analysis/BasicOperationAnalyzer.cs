@@ -28,6 +28,7 @@ internal sealed class BasicOperationAnalyzer
         return statement switch
         {
             EmptyStatementSyntax => ComplexityFactory.Constant(),
+            BreakStatementSyntax => ComplexityFactory.Constant(),
             LocalDeclarationStatementSyntax localDeclaration => AnalyzeLocalDeclaration(localDeclaration),
             ExpressionStatementSyntax expressionStatement => AnalyzeExpressionStatement(expressionStatement),
             ReturnStatementSyntax returnStatement => AnalyzeReturn(returnStatement),

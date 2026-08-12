@@ -813,6 +813,366 @@ public sealed class MethodComplexityExtractorTests
             "O(log^2 n)");
     }
 
+    [Fact]
+    public void Simple_if_without_else_uses_true_branch_as_worst_case()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(bool enabled, int[] items)
+                {
+                    if (enabled)
+                    {
+                        foreach (var item in items)
+                        {
+                            var x = item + 1;
+                        }
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void If_else_uses_worst_case_branch()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(bool enabled, int[] items)
+                {
+                    if (enabled)
+                    {
+                        var x = 1;
+                    }
+                    else
+                    {
+                        foreach (var item in items)
+                        {
+                            var x = item + 1;
+                        }
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Else_if_chain_uses_worst_case_alternative()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(bool fast, bool slow, int[] items)
+                {
+                    if (fast)
+                    {
+                        foreach (var item in items)
+                        {
+                            var x = item + 1;
+                        }
+                    }
+                    else if (slow)
+                    {
+                        foreach (var outer in items)
+                        {
+                            foreach (var inner in items)
+                            {
+                                var x = outer + inner;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var x = 1;
+                    }
+                }
+            }
+            """,
+            "O(n\u00b2)");
+    }
+
+    [Fact]
+    public void Branching_selects_quadratic_over_linear_branch()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(bool enabled, int[] items)
+                {
+                    if (enabled)
+                    {
+                        foreach (var item in items)
+                        {
+                            var x = item + 1;
+                        }
+                    }
+                    else
+                    {
+                        foreach (var outer in items)
+                        {
+                            foreach (var inner in items)
+                            {
+                                var x = outer + inner;
+                            }
+                        }
+                    }
+                }
+            }
+            """,
+            "O(n\u00b2)");
+    }
+
+    [Fact]
+    public void Branching_selects_n_log_n_over_linear_branch()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(bool enabled, int[] items)
+                {
+                    if (enabled)
+                    {
+                        foreach (var item in items)
+                        {
+                            var x = item + 1;
+                        }
+                    }
+                    else
+                    {
+                        foreach (var item in items)
+                        {
+                            for (var i = 1; i < items.Length; i *= 2)
+                            {
+                                var x = item + i;
+                            }
+                        }
+                    }
+                }
+            }
+            """,
+            "O(n log n)");
+    }
+
+    [Fact]
+    public void Switch_uses_worst_case_across_cases()
+    {
+        AssertMethodComplexity(
+            """
+            public enum Mode
+            {
+                Fast,
+                Slow
+            }
+
+            public sealed class Sample
+            {
+                void M(Mode mode, int[] items)
+                {
+                    switch (mode)
+                    {
+                        case Mode.Fast:
+                            var y = 1;
+                            break;
+                        case Mode.Slow:
+                            foreach (var item in items)
+                            {
+                                var x = item + 1;
+                            }
+                            break;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Switch_default_participates_in_worst_case()
+    {
+        AssertMethodComplexity(
+            """
+            public enum Mode
+            {
+                Fast,
+                Slow
+            }
+
+            public sealed class Sample
+            {
+                void M(Mode mode, int[] items)
+                {
+                    switch (mode)
+                    {
+                        case Mode.Fast:
+                            foreach (var item in items)
+                            {
+                                var x = item + 1;
+                            }
+                            break;
+                        default:
+                            foreach (var outer in items)
+                            {
+                                foreach (var inner in items)
+                                {
+                                    var x = outer + inner;
+                                }
+                            }
+                            break;
+                    }
+                }
+            }
+            """,
+            "O(n\u00b2)");
+    }
+
+    [Fact]
+    public void Nested_branching_uses_worst_case_inner_branch()
+    {
+        AssertMethodComplexity(
+            """
+            public enum Mode
+            {
+                Fast,
+                Slow
+            }
+
+            public sealed class Sample
+            {
+                void M(bool enabled, Mode mode, int[] items)
+                {
+                    if (enabled)
+                    {
+                        switch (mode)
+                        {
+                            case Mode.Fast:
+                                foreach (var item in items)
+                                {
+                                    var x = item + 1;
+                                }
+                                break;
+                            default:
+                                foreach (var outer in items)
+                                {
+                                    foreach (var inner in items)
+                                    {
+                                        var x = outer + inner;
+                                    }
+                                }
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        var x = 1;
+                    }
+                }
+            }
+            """,
+            "O(n\u00b2)");
+    }
+
+    [Fact]
+    public void Branch_containing_unresolved_invocation_is_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(bool enabled, int[] items)
+                {
+                    if (enabled)
+                    {
+                        Visit();
+                    }
+                    else
+                    {
+                        foreach (var item in items)
+                        {
+                            var x = item + 1;
+                        }
+                    }
+                }
+
+                void Visit()
+                {
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Condition_containing_unresolved_invocation_is_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M()
+                {
+                    if (IsEnabled())
+                    {
+                        var x = 1;
+                    }
+                }
+
+                bool IsEnabled() => true;
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Switch_expression_remains_out_of_scope()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                int M(int value) => value switch
+                {
+                    0 => 1,
+                    _ => 2
+                };
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Switch_pattern_labels_remain_out_of_scope()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(object value)
+                {
+                    switch (value)
+                    {
+                        case int number when IsPositive(number):
+                            var x = number + 1;
+                            break;
+                        default:
+                            var y = 1;
+                            break;
+                    }
+                }
+
+                bool IsPositive(int value) => value > 0;
+            }
+            """,
+            "Unknown");
+    }
+
     [Theory]
     [InlineData("missing-condition")]
     [InlineData("wrong-increment-variable")]
