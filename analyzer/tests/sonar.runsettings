@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>opencover</Format>
+          <Include>[ComplexityAnalysis.Analyzers]*</Include>
+          <Exclude>[ComplexityAnalysis.Analyzers.Tests]*</Exclude>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <UseSourceLink>false</UseSourceLink>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

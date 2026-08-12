@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsAnalyzerProject>true</IsAnalyzerProject>
+    <IsPackable>true</IsPackable>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <Nullable>enable</Nullable>
+
+    <PackageId>ComplexityAnalysis.Analyzers</PackageId>
+    <Title>ComplexityAnalysis.Analyzers</Title>
+    <Description>Roslyn analyzer package for algorithmic complexity diagnostics in C#.</Description>
+    <PackageTags>roslyn;analyzer;complexity;big-o;csharp</PackageTags>
+    <RepositoryUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DevelopmentDependency>true</DevelopmentDependency>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
+  </ItemGroup>
+</Project>

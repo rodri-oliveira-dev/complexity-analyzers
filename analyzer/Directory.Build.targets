@@ -1,0 +1,6 @@
+<Project>
+  <Target Name="ValidateAnalyzerProjectIsolation" BeforeTargets="ResolveReferences" Condition="'$(IsAnalyzerProject)' == 'true'">
+    <Error Condition="'$(TargetFramework)' != 'netstandard2.0'" Text="$(MSBuildProjectName) must target netstandard2.0 so the analyzer can run in broad Roslyn hosts." />
+    <Error Condition="'@(ProjectReference)' != ''" Text="$(MSBuildProjectName) must not use ProjectReference. Port required logic into analyzer/ with characterization tests instead." />
+  </Target>
+</Project>

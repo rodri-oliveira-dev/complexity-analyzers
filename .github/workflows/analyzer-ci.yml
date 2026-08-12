@@ -1,0 +1,297 @@
+name: Analyzer CI
+
+on:
+  push:
+    paths:
+      - 'analyzer/**'
+      - '.github/workflows/analyzer-ci.yml'
+  pull_request:
+    paths:
+      - 'analyzer/**'
+      - '.github/workflows/analyzer-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ github.event_name == 'pull_request' }}
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v5
+        continue-on-error: true
+
+  validate:
+    name: Validate analyzer
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: analyzer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: analyzer/global.json
+
+      - name: Restore
+        run: dotnet restore ComplexityAnalysis.Analyzers.slnx
+
+      - name: Build
+        run: >
+          dotnet build ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-restore
+
+      - name: Test with OpenCover
+        run: >
+          dotnet test tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalysis.Analyzers.Tests.csproj
+          --configuration Release
+          --no-build
+          --verbosity normal
+          --collect:"XPlat Code Coverage"
+          --settings tests/sonar.runsettings
+          --results-directory artifacts/coverage/validate
+
+      - name: Verify OpenCover coverage
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $output = "artifacts/coverage/validate/opencover"
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+
+          $files = @(Get-ChildItem -LiteralPath "artifacts/coverage/validate" -Recurse -File -Filter "coverage.opencover.xml" |
+            Where-Object { $_.FullName -notlike "*$([System.IO.Path]::DirectorySeparatorChar)opencover$([System.IO.Path]::DirectorySeparatorChar)*" })
+
+          if ($files.Count -ne 1) {
+            $found = if ($files.Count -eq 0) { "<none>" } else { $files.FullName -join ", " }
+            throw "Expected exactly one OpenCover report, found $($files.Count): $found"
+          }
+
+          $normalized = Join-Path $output "coverage.opencover.xml"
+          Copy-Item -LiteralPath $files[0].FullName -Destination $normalized
+
+          [xml] $coverage = Get-Content -Raw -LiteralPath $normalized
+          $moduleNames = @($coverage.CoverageSession.Modules.Module | ForEach-Object { $_.ModuleName })
+          $sourceFiles = @($coverage.CoverageSession.Modules.Module.Files.File | ForEach-Object { $_.fullPath })
+
+          if ($moduleNames -notcontains "ComplexityAnalysis.Analyzers") {
+            throw "OpenCover report does not contain production assembly ComplexityAnalysis.Analyzers."
+          }
+
+          $productionSourceFound = @($sourceFiles | Where-Object {
+            $_ -like "*src/ComplexityAnalysis.Analyzers*" -or
+            $_ -like "*src\ComplexityAnalysis.Analyzers*"
+          }).Count -gt 0
+
+          if (-not $productionSourceFound) {
+            throw "OpenCover report does not contain production source files."
+          }
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyzer-opencover
+          path: analyzer/artifacts/coverage/validate/opencover/coverage.opencover.xml
+          if-no-files-found: error
+
+  sonar:
+    name: SonarQube Cloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: validate
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+    defaults:
+      run:
+        working-directory: analyzer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify SONAR_TOKEN
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "${SONAR_TOKEN}" ]; then
+            echo "SONAR_TOKEN repository secret is required."
+            exit 1
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: analyzer/global.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: dotnet restore ComplexityAnalysis.Analyzers.slnx
+
+      - name: Begin Sonar analysis
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          dotnet sonarscanner begin
+          /k:"rodri-oliveira-dev_complexity-analyzers"
+          /o:"rodri-oliveira-dev"
+          /d:sonar.token="${SONAR_TOKEN}"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.projectBaseDir="${GITHUB_WORKSPACE}/analyzer"
+          /d:sonar.cs.opencover.reportsPaths="artifacts/coverage/sonar/opencover/coverage.opencover.xml"
+          /d:sonar.qualitygate.wait=true
+          /d:sonar.qualitygate.timeout=300
+
+      - name: Build
+        run: >
+          dotnet build ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-restore
+          --no-incremental
+          --disable-build-servers
+
+      - name: Test with OpenCover
+        run: >
+          dotnet test tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalysis.Analyzers.Tests.csproj
+          --configuration Release
+          --no-build
+          --verbosity normal
+          --collect:"XPlat Code Coverage"
+          --settings tests/sonar.runsettings
+          --results-directory artifacts/coverage/sonar/test
+
+      - name: Verify OpenCover coverage
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $output = "artifacts/coverage/sonar/opencover"
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+
+          $files = @(Get-ChildItem -LiteralPath "artifacts/coverage/sonar/test" -Recurse -File -Filter "coverage.opencover.xml")
+          if ($files.Count -ne 1) {
+            $found = if ($files.Count -eq 0) { "<none>" } else { $files.FullName -join ", " }
+            throw "Expected exactly one OpenCover report, found $($files.Count): $found"
+          }
+
+          $normalized = Join-Path $output "coverage.opencover.xml"
+          Copy-Item -LiteralPath $files[0].FullName -Destination $normalized
+
+          [xml] $coverage = Get-Content -Raw -LiteralPath $normalized
+          $moduleNames = @($coverage.CoverageSession.Modules.Module | ForEach-Object { $_.ModuleName })
+          $sourceFiles = @($coverage.CoverageSession.Modules.Module.Files.File | ForEach-Object { $_.fullPath })
+
+          if ($moduleNames -notcontains "ComplexityAnalysis.Analyzers") {
+            throw "OpenCover report does not contain production assembly ComplexityAnalysis.Analyzers."
+          }
+
+          $productionSourceFound = @($sourceFiles | Where-Object {
+            $_ -like "*src/ComplexityAnalysis.Analyzers*" -or
+            $_ -like "*src\ComplexityAnalysis.Analyzers*"
+          }).Count -gt 0
+
+          if (-not $productionSourceFound) {
+            throw "OpenCover report does not contain production source files."
+          }
+
+      - name: End Sonar analysis
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
+
+  pack:
+    name: Pack analyzer
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: validate
+    defaults:
+      run:
+        working-directory: analyzer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: analyzer/global.json
+
+      - name: Restore
+        run: dotnet restore ComplexityAnalysis.Analyzers.slnx
+
+      - name: Pack
+        run: >
+          dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj
+          --configuration Release
+          --no-restore
+          --output artifacts/packages
+          -p:PackageVersion=0.0.0-ci.${{ github.run_number }}
+
+      - name: Validate package contents
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $packages = @(Get-ChildItem -LiteralPath "artifacts/packages" -File -Filter "*.nupkg")
+
+          if ($packages.Count -ne 1) {
+            $found = if ($packages.Count -eq 0) { "<none>" } else { $packages.FullName -join ", " }
+            throw "Expected exactly one .nupkg, found $($packages.Count): $found"
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $package = $packages[0].FullName
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($package)
+          try {
+            $entries = @($archive.Entries | ForEach-Object { $_.FullName })
+
+            if ($entries -notcontains "analyzers/dotnet/cs/ComplexityAnalysis.Analyzers.dll") {
+              throw "Analyzer assembly is missing from analyzers/dotnet/cs/."
+            }
+
+            $libEntries = @($entries | Where-Object { $_ -like "lib/*/ComplexityAnalysis.Analyzers.dll" })
+            if ($libEntries.Count -ne 0) {
+              throw "Analyzer assembly must not be packed under lib/: $($libEntries -join ', ')"
+            }
+          }
+          finally {
+            $archive.Dispose()
+          }
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyzer-nuget-package
+          path: analyzer/artifacts/packages/*.nupkg
+          if-no-files-found: error

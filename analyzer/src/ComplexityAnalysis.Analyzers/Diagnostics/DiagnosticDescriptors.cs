@@ -1,0 +1,16 @@
+using Microsoft.CodeAnalysis;
+
+namespace ComplexityAnalysis.Analyzers.Diagnostics;
+
+internal static class DiagnosticDescriptors
+{
+    internal static readonly DiagnosticDescriptor AnalyzerExecutionProbe = new(
+        id: "BIG9000",
+        title: "Analyzer execution probe",
+        messageFormat: "ComplexityAnalysis.Analyzers execution probe is active",
+        category: "Infrastructure",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: false,
+        description: "Reports once per compilation when explicitly enabled to prove the analyzer executed.",
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
+}
