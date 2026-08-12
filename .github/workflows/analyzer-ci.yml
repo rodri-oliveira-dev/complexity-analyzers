@@ -165,6 +165,7 @@ jobs:
           /k:"rodri-oliveira-dev_complexity-analyzers"
           /o:"rodri-oliveira-dev"
           /d:sonar.token="${SONAR_TOKEN}"
+          /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.projectBaseDir="."
           /d:sonar.cs.opencover.reportsPaths="artifacts/coverage/sonar/opencover/coverage.opencover.xml"
           /d:sonar.qualitygate.wait=true
