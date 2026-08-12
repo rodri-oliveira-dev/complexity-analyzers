@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 2 - Complexity Model",
   "currentObjective": "Implement lightweight asymptotic complexity model",
-  "completedStep": "1/6 - specification",
+  "completedStep": "2/6 - atomic complexity expressions",
   "decisions": [
     "Use the inherited Core complexity model only as conceptual reference; do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
     "Keep the Phase 2 model inside ComplexityAnalysis.Analyzers, preferably under analyzer/src/ComplexityAnalysis.Analyzers/Model/.",
@@ -9,7 +9,12 @@
     "Normalize multiplicative constants away for initial Big-O modeling.",
     "Represent input variables as Roslyn-free immutable value objects and do not infer ordering between independent variables.",
     "Use explicit growth comparison results: Less, Equivalent, Greater, and Incomparable.",
-    "Define composition operations as Sequential, Nested, and Branching with conservative simplification only when mathematically safe."
+    "Define composition operations as Sequential, Nested, and Branching with conservative simplification only when mathematically safe.",
+    "Step 2 implemented only atomic expressions; composition, growth comparison, and Roslyn extraction remain unimplemented.",
+    "Model types are internal analyzer infrastructure; tests access them through InternalsVisibleTo without making a public NuGet API.",
+    "O(1) and Unknown are distinct canonical immutable values; Unknown is never treated as constant.",
+    "Polynomial(variable, 0) normalizes to O(1), while direct polynomial-log construction rejects the duplicate k=0 and j=0 representation.",
+    "Complexity variable names are accepted when they start with an ASCII letter and then contain only ASCII letters or digits."
   ],
   "constraints": [
     "Do not implement Roslyn extraction, SyntaxNode analysis, SemanticModel analysis, ControlFlowGraph analysis, loop analysis, LINQ/BCL mappings, interprocedural analysis, call graphs, recurrence solving, CodeFixProvider, Workspaces, MathNet, SymPy, memory, amortized, probabilistic, parallel, or confidence-scoring features in Phase 2.",
@@ -25,8 +30,18 @@
     "analyzer/handoff/phase-1.json",
     "analyzer/AGENTS.md",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Properties/AssemblyInfo.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/ComplexityVariable.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/ComplexityExpression.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/ConstantComplexity.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/PolynomialLogComplexity.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/ExponentialComplexity.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/FactorialComplexity.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/UnknownComplexity.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/ComplexityFactory.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityModelTests.cs",
     "src/ComplexityAnalysis.Core/Complexity/ComplexityExpression.cs",
     "src/ComplexityAnalysis.Core/Complexity/PolyLogComplexity.cs",
     "src/ComplexityAnalysis.Core/Complexity/ComplexityComposition.cs",
@@ -40,12 +55,15 @@
     "dotnet restore ./ComplexityAnalysis.Analyzers.sln succeeded in analyzer/.",
     "dotnet build ./ComplexityAnalysis.Analyzers.sln --configuration Release --no-restore succeeded in analyzer/ with the known documentation-file warning.",
     "dotnet test ./ComplexityAnalysis.Analyzers.sln --configuration Release --no-build succeeded in analyzer/ with 9 passing tests.",
-    "dotnet pack ./src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-phase2-spec-precheck succeeded."
+    "dotnet pack ./src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-phase2-spec-precheck succeeded.",
+    "dotnet restore succeeded in analyzer/ after Step 2 implementation.",
+    "dotnet build --configuration Release --no-restore succeeded in analyzer/ after Step 2 implementation with only the known documentation-file warning.",
+    "dotnet test --configuration Release --no-build succeeded in analyzer/ with 32 passing tests.",
+    "rg \"Microsoft\\.CodeAnalysis\" analyzer/src/ComplexityAnalysis.Analyzers/Model returned no references."
   ],
   "knownPendingItems": [
-    "Implement Step 2/6 atomic complexity expressions.",
-    "Add public model tests required by the Phase 2 specification.",
-    "Run Release build, Release tests, and pack again after implementation."
+    "Implement Step 3/6 growth comparison.",
+    "Implement later Phase 2 composition rules after growth comparison."
   ],
-  "nextStep": "2/6 - atomic complexity expressions"
+  "nextStep": "3/6 - growth comparison"
 }
