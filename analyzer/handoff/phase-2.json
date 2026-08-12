@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 2 - Complexity Model",
   "currentObjective": "Implement lightweight asymptotic complexity model",
-  "completedStep": "3/6 - growth comparison",
+  "completedStep": "4/6 - composition",
   "decisions": [
     "Use the inherited Core complexity model only as conceptual reference; do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
     "Keep the Phase 2 model inside ComplexityAnalysis.Analyzers, preferably under analyzer/src/ComplexityAnalysis.Analyzers/Model/.",
@@ -17,7 +17,11 @@
     "Complexity variable names are accepted when they start with an ASCII letter and then contain only ASCII letters or digits.",
     "ComplexityGrowthComparer models ordering by expression family and same-variable mathematical rules instead of using a single arbitrary score.",
     "Constant complexity compares below known non-constant expressions regardless of variable name because it has no input variable.",
-    "Unknown comparisons are Incomparable except Unknown compared with Unknown, which is Equivalent."
+    "Unknown comparisons are Incomparable except Unknown compared with Unknown, which is Equivalent.",
+    "Composition uses ComplexityOperation.Sequential, ComplexityOperation.Nested, and ComplexityOperation.Maximum; ComplexityComposer.Branching maps branching semantics to the Maximum operation.",
+    "Sequential and Branching use ComplexityGrowthComparer to keep the dominant term only when comparison is safe; independent variables are preserved as CompositeComplexity.",
+    "Nested eliminates O(1) factors and multiplies same-variable polynomial-log terms by adding polynomial and log exponents.",
+    "Composition involving Unknown returns Unknown to avoid hiding inconclusive analysis."
   ],
   "constraints": [
     "Do not implement Roslyn extraction, SyntaxNode analysis, SemanticModel analysis, ControlFlowGraph analysis, loop analysis, LINQ/BCL mappings, interprocedural analysis, call graphs, recurrence solving, CodeFixProvider, Workspaces, MathNet, SymPy, memory, amortized, probabilistic, parallel, or confidence-scoring features in Phase 2.",
@@ -43,6 +47,9 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/UnknownComplexity.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/GrowthComparison.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/ComplexityGrowthComparer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/ComplexityOperation.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/CompositeComplexity.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/ComplexityComposer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/ComplexityFactory.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs",
@@ -67,10 +74,14 @@
     "rg \"Microsoft\\.CodeAnalysis\" analyzer/src/ComplexityAnalysis.Analyzers/Model returned no references.",
     "Step 3 precondition dotnet test --configuration Release succeeded in analyzer/ with 32 passing tests before implementation.",
     "dotnet build --configuration Release succeeded in analyzer/ after Step 3 implementation with the known documentation-file warning in the tests project.",
-    "dotnet test --configuration Release --no-build succeeded in analyzer/ with 42 passing tests after Step 3 implementation."
+    "dotnet test --configuration Release --no-build succeeded in analyzer/ with 42 passing tests after Step 3 implementation.",
+    "dotnet build --configuration Release succeeded in analyzer/ after Step 4 implementation with only the known documentation-file warning.",
+    "dotnet test --configuration Release --no-build succeeded in analyzer/ with 54 passing tests after Step 4 implementation.",
+    "rg \"Microsoft\\.CodeAnalysis\" analyzer/src/ComplexityAnalysis.Analyzers/Model returned no references.",
+    "git diff --check succeeded after Step 4 implementation."
   ],
   "knownPendingItems": [
-    "Implement Step 4/6 complexity composition."
+    "Implement Step 5/6 characterization and contract hardening."
   ],
-  "nextStep": "4/6 - complexity composition"
+  "nextStep": "5/6 - characterization and contract hardening"
 }

@@ -66,18 +66,18 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
         }
     }
 
-    internal override string ToBigONotation()
+    internal override string ToBigOBody()
     {
         return PolynomialDegree == 0
-            ? "O(" + FormatLogTerm() + ")"
-            : FormatPolynomialLogNotation();
+            ? FormatLogTerm()
+            : FormatPolynomialLogBody();
     }
 
-    private string FormatPolynomialLogNotation()
+    private string FormatPolynomialLogBody()
     {
         return LogExponent == 0
-            ? "O(" + FormatPolynomialTerm() + ")"
-            : "O(" + FormatPolynomialTerm() + " " + FormatLogTerm() + ")";
+            ? FormatPolynomialTerm()
+            : FormatPolynomialTerm() + " " + FormatLogTerm();
     }
 
     private string FormatPolynomialTerm()

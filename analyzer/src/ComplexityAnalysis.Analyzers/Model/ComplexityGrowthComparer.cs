@@ -9,12 +9,17 @@ internal static class ComplexityGrowthComparer
         left = left ?? throw new ArgumentNullException(nameof(left));
         right = right ?? throw new ArgumentNullException(nameof(right));
 
+        return left.Equals(right)
+            ? GrowthComparison.Equivalent
+            : CompareDifferentExpressions(left, right);
+    }
+
+    private static GrowthComparison CompareDifferentExpressions(ComplexityExpression left, ComplexityExpression right)
+    {
         return (left, right) switch
         {
-            (UnknownComplexity, UnknownComplexity) => GrowthComparison.Equivalent,
             (UnknownComplexity, _) => GrowthComparison.Incomparable,
             (_, UnknownComplexity) => GrowthComparison.Incomparable,
-            (ConstantComplexity, ConstantComplexity) => GrowthComparison.Equivalent,
             (ConstantComplexity, _) => GrowthComparison.Less,
             (_, ConstantComplexity) => GrowthComparison.Greater,
             (PolynomialLogComplexity leftPolynomialLog, _) => ComparePolynomialLogWith(leftPolynomialLog, right),

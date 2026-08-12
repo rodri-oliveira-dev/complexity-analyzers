@@ -25,6 +25,11 @@ internal sealed class UnknownComplexity : ComplexityExpression, IEquatable<Unkno
         return typeof(UnknownComplexity).GetHashCode();
     }
 
+    internal override string ToBigOBody()
+    {
+        return "Unknown";
+    }
+
     internal override string ToBigONotation()
     {
         return "Unknown";

@@ -285,6 +285,130 @@ public sealed class ComplexityModelTests
         _ = Assert.Throws<ArgumentNullException>(() => ComplexityGrowthComparer.Compare(ComplexityFactory.Constant(), null!));
     }
 
+    [Fact]
+    public void Sequential_composition_keeps_only_dominant_comparable_term()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+
+        ComplexityExpression expression = ComplexityComposer.Sequential(
+            ComplexityFactory.Linear(n),
+            ComplexityFactory.Polynomial(n, 2));
+
+        Assert.Equal("O(n\u00b2)", expression.ToBigONotation());
+        AssertComparison(expression, ComplexityFactory.Polynomial(n, 2), GrowthComparison.Equivalent);
+    }
+
+    [Fact]
+    public void Sequential_composition_preserves_independent_terms()
+    {
+        ComplexityExpression expression = ComplexityComposer.Sequential(
+            ComplexityFactory.Linear(ComplexityVariable.N),
+            ComplexityFactory.Linear(ComplexityVariable.M));
+
+        Assert.Equal("O(n + m)", expression.ToBigONotation());
+        AssertComparison(expression, ComplexityFactory.Linear(ComplexityVariable.N), GrowthComparison.Incomparable);
+        AssertComparison(expression, ComplexityFactory.Linear(ComplexityVariable.M), GrowthComparison.Incomparable);
+    }
+
+    [Theory]
+    [InlineData("constant-times-linear", "O(n)")]
+    [InlineData("linear-times-linear", "O(n\u00b2)")]
+    [InlineData("linear-times-log", "O(n log n)")]
+    [InlineData("quadratic-times-linear", "O(n\u00b3)")]
+    public void Nested_composition_simplifies_same_variable_polylog_terms(string scenario, string expected)
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+
+        ComplexityExpression expression = scenario switch
+        {
+            "constant-times-linear" => ComplexityComposer.Nested(ComplexityFactory.Constant(), ComplexityFactory.Linear(n)),
+            "linear-times-linear" => ComplexityComposer.Nested(ComplexityFactory.Linear(n), ComplexityFactory.Linear(n)),
+            "linear-times-log" => ComplexityComposer.Nested(ComplexityFactory.Linear(n), ComplexityFactory.LogN(n)),
+            "quadratic-times-linear" => ComplexityComposer.Nested(ComplexityFactory.Polynomial(n, 2), ComplexityFactory.Linear(n)),
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
+        };
+
+        Assert.Equal(expected, expression.ToBigONotation());
+    }
+
+    [Fact]
+    public void Nested_composition_preserves_independent_variables_as_product()
+    {
+        ComplexityExpression expression = ComplexityComposer.Nested(
+            ComplexityFactory.Linear(ComplexityVariable.N),
+            ComplexityFactory.Linear(ComplexityVariable.M));
+
+        Assert.Equal("O(n \u00b7 m)", expression.ToBigONotation());
+        AssertComparison(expression, ComplexityFactory.Linear(ComplexityVariable.N), GrowthComparison.Incomparable);
+        AssertComparison(expression, ComplexityFactory.Linear(ComplexityVariable.M), GrowthComparison.Incomparable);
+    }
+
+    [Fact]
+    public void Branching_composition_keeps_dominant_comparable_term()
+    {
+        ComplexityVariable n = ComplexityVariable.N;
+
+        ComplexityExpression expression = ComplexityComposer.Branching(
+            ComplexityFactory.Linear(n),
+            ComplexityFactory.Polynomial(n, 2));
+
+        Assert.Equal("O(n\u00b2)", expression.ToBigONotation());
+        AssertComparison(expression, ComplexityFactory.Polynomial(n, 2), GrowthComparison.Equivalent);
+    }
+
+    [Fact]
+    public void Branching_composition_preserves_independent_variables_as_maximum()
+    {
+        ComplexityExpression expression = ComplexityComposer.Branching(
+            ComplexityFactory.Linear(ComplexityVariable.N),
+            ComplexityFactory.Linear(ComplexityVariable.M));
+
+        Assert.Equal("O(max(n, m))", expression.ToBigONotation());
+        AssertComparison(expression, ComplexityFactory.Linear(ComplexityVariable.N), GrowthComparison.Incomparable);
+        AssertComparison(expression, ComplexityFactory.Linear(ComplexityVariable.M), GrowthComparison.Incomparable);
+    }
+
+    [Fact]
+    public void Composition_preserves_unknown_inconclusive_results()
+    {
+        ComplexityExpression unknown = ComplexityFactory.Unknown();
+        ComplexityExpression linear = ComplexityFactory.Linear(ComplexityVariable.N);
+
+        Assert.Equal("Unknown", ComplexityComposer.Sequential(unknown, linear).ToBigONotation());
+        Assert.Equal("Unknown", ComplexityComposer.Nested(linear, unknown).ToBigONotation());
+        Assert.Equal("Unknown", ComplexityComposer.Branching(unknown, linear).ToBigONotation());
+    }
+
+    [Fact]
+    public void Composite_big_o_formatting_is_deterministic()
+    {
+        ComplexityExpression sequential = ComplexityComposer.Sequential(
+            ComplexityFactory.Linear(ComplexityVariable.N),
+            ComplexityFactory.Linear(ComplexityVariable.M));
+        ComplexityExpression nested = ComplexityComposer.Nested(
+            ComplexityFactory.Linear(ComplexityVariable.N),
+            ComplexityFactory.Linear(ComplexityVariable.M));
+        ComplexityExpression branching = ComplexityComposer.Branching(
+            ComplexityFactory.Linear(ComplexityVariable.N),
+            ComplexityFactory.Linear(ComplexityVariable.M));
+        ComplexityExpression nestedSequential = ComplexityComposer.Nested(
+            sequential,
+            ComplexityFactory.Linear(new ComplexityVariable("k")));
+
+        Assert.Equal("O(n + m)", sequential.ToBigONotation());
+        Assert.Equal("O(n \u00b7 m)", nested.ToBigONotation());
+        Assert.Equal("O(max(n, m))", branching.ToBigONotation());
+        Assert.Equal("O((n + m) \u00b7 k)", nestedSequential.ToBigONotation());
+    }
+
+    [Fact]
+    public void ComplexityComposer_rejects_null_operands()
+    {
+        _ = Assert.Throws<ArgumentNullException>(() => ComplexityComposer.Sequential(null!, ComplexityFactory.Constant()));
+        _ = Assert.Throws<ArgumentNullException>(() => ComplexityComposer.Nested(ComplexityFactory.Constant(), null!));
+        _ = Assert.Throws<ArgumentNullException>(() => ComplexityComposer.Branching(null!, ComplexityFactory.Constant()));
+    }
+
     private static void AssertComparison(ComplexityExpression left, ComplexityExpression right, GrowthComparison expected)
     {
         Assert.Equal(expected, ComplexityGrowthComparer.Compare(left, right));

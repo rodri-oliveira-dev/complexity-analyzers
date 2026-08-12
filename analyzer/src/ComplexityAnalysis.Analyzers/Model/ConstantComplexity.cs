@@ -25,8 +25,8 @@ internal sealed class ConstantComplexity : ComplexityExpression, IEquatable<Cons
         return typeof(ConstantComplexity).GetHashCode();
     }
 
-    internal override string ToBigONotation()
+    internal override string ToBigOBody()
     {
-        return "O(1)";
+        return "1";
     }
 }

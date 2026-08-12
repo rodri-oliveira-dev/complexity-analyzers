@@ -47,8 +47,8 @@ internal sealed class ExponentialComplexity : ComplexityExpression, IEquatable<E
         }
     }
 
-    internal override string ToBigONotation()
+    internal override string ToBigOBody()
     {
-        return "O(" + Base.ToString("G", CultureInfo.InvariantCulture) + "^" + Variable.Name + ")";
+        return Base.ToString("G", CultureInfo.InvariantCulture) + "^" + Variable.Name;
     }
 }

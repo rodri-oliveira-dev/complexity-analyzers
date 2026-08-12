@@ -32,8 +32,8 @@ internal sealed class FactorialComplexity : ComplexityExpression, IEquatable<Fac
         }
     }
 
-    internal override string ToBigONotation()
+    internal override string ToBigOBody()
     {
-        return "O(" + Variable.Name + "!)";
+        return Variable.Name + "!";
     }
 }
