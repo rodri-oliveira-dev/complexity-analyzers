@@ -1,17 +1,15 @@
 {
-  "delivery": "Phase 3 — Roslyn Extraction",
+  "delivery": "Phase 3 - Roslyn Extraction",
   "currentObjective": "Implement deterministic intraprocedural Roslyn complexity extraction",
-  "completedStep": "2/8 — semantic context and input-size resolution",
+  "completedStep": "3/8 - basic method and block extraction",
   "decisions": [
-    "Phase 3 is specified as an intraprocedural transformation from method C# syntax plus SemanticModel to the Phase 2 ComplexityExpression model.",
-    "Extraction responsibilities should be separated across method extraction, method-local semantic context, input-size resolution, basic-operation classification, and loop-bound analysis.",
-    "Input-size parameters receive deterministic canonical variables such as n, m, k, and p; irrelevant parameters such as bool and enum do not consume canonical names.",
-    "Unsupported invocations and unproven loop bounds produce or propagate Unknown instead of being classified as O(1) or O(n).",
-    "BCL/LINQ mappings, call graph, recursion, product diagnostics, and Complexity Model changes remain out of scope for Phase 3.",
-    "MethodAnalysisContext is method-local and stores only SemanticModel, IMethodSymbol, CancellationToken, and an immutable symbol-to-ComplexityVariable map.",
-    "InputSizeResolver assigns variables by eligible parameter order in the method signature: n, m, k, p, then invariant fallback names v5, v6, and so on.",
-    "The initial resolver treats arrays, string, recognized collection/enumerable interfaces, and integral numeric parameters as input-size candidates; bool, enum, delegates, and CancellationToken are excluded.",
-    "Input-size symbol lookup uses SymbolEqualityComparer.Default through an immutable dictionary."
+    "Phase 3 extraction is intraprocedural and returns only Phase 2 ComplexityExpression values.",
+    "MethodAnalysisContext is method-local and stores SemanticModel, IMethodSymbol, CancellationToken, and immutable input-size variables resolved by InputSizeResolver.",
+    "Basic method and block extraction is implemented through MethodComplexityExtractor plus BasicOperationAnalyzer.",
+    "Sequential statements are composed with ComplexityComposer.Sequential; no separate Big-O algebra is implemented in the Roslyn layer.",
+    "Only explicitly safe basic operations are classified as O(1): literals, primitive arithmetic/comparison, simple local declarations, simple assignments, increment/decrement, return, array Length, string Length, and array element access.",
+    "Custom properties, custom indexers, object/array creation, unsupported invocations, loops, and branching remain Unknown or out of scope for this step.",
+    "BCL/LINQ mappings, call graph analysis, recursion handling, product diagnostics, and Complexity Model changes remain out of scope for Phase 3."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -23,21 +21,21 @@
   "relevantFiles": [
     "analyzer/specs/phase-3/roslyn-extraction.md",
     "analyzer/specs/phase-2/complexity-model.md",
-    "analyzer/specs/phase-1/foundation.md",
     "analyzer/handoff/README.md",
     "analyzer/handoff/phase-3.json",
     "analyzer/AGENTS.md",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodAnalysisContext.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/InputSizeResolver.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/BasicOperationAnalyzer.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InputSizeResolverTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityModelTests.cs",
-    "src/ComplexityAnalysis.Roslyn/Analysis/AnalysisContext.cs"
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs"
   ],
   "validations": [
-    "Phase 2 completion was verified against current code and Release tests before creating the Phase 3 specification.",
-    "Analyzer workspace restore, Release build, and Release tests passed before and after Step 2 implementation."
+    "Release build and Release tests passed after Step 3 implementation."
   ],
   "knownPendingItems": [],
-  "nextStep": "3/8 — basic method and block extraction"
+  "nextStep": "4/8 - linear for and foreach loops"
 }
