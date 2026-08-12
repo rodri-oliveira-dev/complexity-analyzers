@@ -1,0 +1,44 @@
+{
+  "delivery": "Phase 4 — BCL, LINQ & Actionable Diagnostics",
+  "currentObjective": "Phase 4 specification initialized",
+  "completedStep": "1/9 — specification",
+  "decisions": [
+    "Known operations must be resolved through Roslyn symbols, not text-only method names.",
+    "Unsupported or unresolved invocations remain Unknown; the inherited conservative O(n) fallback is explicitly rejected.",
+    "Known operation mappings carry complexity, execution semantics, provenance, and diagnostic metadata.",
+    "LINQ deferred pipeline creation must not be charged as full enumeration until supported consumption is observed.",
+    "Initial scope prioritizes small BCL/LINQ subsets with verifiable provenance rather than full parity with inherited mappings.",
+    "BIG0001 is specified as Info and disabled by default; BIG100x diagnostics start conservatively and must minimize false positives."
+  ],
+  "constraints": [
+    "Do not modify inherited projects outside analyzer/.",
+    "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
+    "Do not copy the inherited BCL registry wholesale.",
+    "Do not implement call graph, interprocedural analysis, recursion, recurrence solving, Workspaces, CodeFix, memory complexity, parallel complexity, or probabilistic complexity in Phase 4.",
+    "Do not change BIG9000 unless a later explicit spec changes that contract.",
+    "Respect CancellationToken and keep analyzer hot paths deterministic, immutable, and free from I/O, network access, process execution, and reflection-heavy behavior."
+  ],
+  "relevantFiles": [
+    "analyzer/specs/phase-4/bcl-linq-diagnostics.md",
+    "analyzer/specs/phase-3/roslyn-extraction.md",
+    "analyzer/specs/phase-2/complexity-model.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
+  ],
+  "validations": [
+    "Phase 3 was verified from code and tests before creating the Phase 4 specification.",
+    "Release tests passed for the analyzer workspace before documentation edits."
+  ],
+  "knownPendingItems": [
+    "Implement known-operation model and immutable registry.",
+    "Implement semantic resolver for BCL and LINQ mappings.",
+    "Implement deferred pipeline consumption accounting.",
+    "Add BIG0001 and BIG100x diagnostics only after descriptor/release/documentation updates and tests."
+  ],
+  "nextStep": "2/9 — known-operation model and registry"
+}
