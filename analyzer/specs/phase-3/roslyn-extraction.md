@@ -2,9 +2,11 @@
 
 ## Status
 
-Specified. Not implemented.
+Complete.
 
-Phase 3 begins after Phase 2 has delivered the lightweight `ComplexityExpression` model, `ComplexityVariable`, `ComplexityFactory`, `ComplexityComposer`, growth comparison, deterministic formatting, and explicit `Unknown`.
+Phase 3 closes with deterministic intraprocedural Roslyn extraction implemented under the isolated analyzer project. The extractor maps one method body to the Phase 2 `ComplexityExpression` model, handles proven constant work, deterministic input-size variables, linear and logarithmic loops, branching worst-case composition, cancellation, and conservative `Unknown` results for unsupported work.
+
+The isolated analyzer workspace has been validated in Release, packaged as a Roslyn analyzer asset, audited for prohibited dependencies and premature later-phase features, and checked against the inherited upstream solution without modifying upstream files.
 
 This phase defines the Roslyn extraction layer only. It must not introduce product diagnostics, BCL/LINQ mappings, call graph analysis, recursion handling, or changes to the Phase 2 complexity model.
 

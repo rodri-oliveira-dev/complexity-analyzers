@@ -1,52 +1,44 @@
 {
   "delivery": "Phase 3 - Roslyn Extraction",
-  "currentObjective": "Harden deterministic intraprocedural Roslyn extraction contracts",
-  "completedStep": "7/8 — characterization and extraction hardening",
+  "currentObjective": "Phase 3 complete",
+  "completedStep": "8/8 - validation and closure",
   "decisions": [
     "Phase 3 extraction remains intraprocedural and returns only Phase 2 ComplexityExpression values.",
-    "MethodAnalysisContext remains method-local and carries SemanticModel, IMethodSymbol, CancellationToken, deterministic input-size variables, and simple local loop-bound facts.",
-    "MethodComplexityExtractor coordinates statement/block composition; BasicOperationAnalyzer owns proven constant-time syntax; LoopBoundAnalyzer owns safe linear/logarithmic loop bounds.",
-    "Unknown is intentionally propagated for unresolved invocations, unproven loop bounds/progress, custom properties, custom indexers, object/array creation, switch expressions, and unsupported pattern labels.",
-    "Canonical variables are assigned from eligible parameters in signature order and must not depend on hash iteration order.",
-    "Generated-code filtering remains the DiagnosticAnalyzer boundary responsibility; the extraction layer analyzes the method it is given.",
-    "BCL/LINQ mappings, call graph analysis, recursion handling, diagnostics, and solver behavior remain out of scope for Phase 3.",
-    "Local loop-bound fact invalidation avoids subtree walks when no local loop facts exist."
+    "Canonical input-size variables are assigned deterministically from eligible parameters in signature order.",
+    "Unresolved invocations, unproven loops, custom properties/indexers, object creation, switch expressions, and unsupported switch labels remain Unknown.",
+    "BCL/LINQ mappings, product diagnostics, call graph analysis, recursion handling, and recurrence solving remain out of scope for Phase 3."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
     "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
     "Do not add Microsoft.CodeAnalysis.Workspaces, MathNet, or SymPy.",
-    "Keep BIG9000 unchanged and disabled by default.",
-    "Respect CancellationToken and avoid I/O, network access, process execution, reflection-heavy behavior, and global mutable analyzer state."
+    "Keep BIG9000 disabled by default unless a later spec explicitly changes diagnostic behavior.",
+    "Respect CancellationToken and avoid I/O, network access, process execution, reflection-heavy behavior, and global mutable analyzer state in analyzer hot paths."
   ],
   "relevantFiles": [
-    "analyzer/AGENTS.md",
     "analyzer/specs/phase-3/roslyn-extraction.md",
-    "analyzer/handoff/README.md",
-    "analyzer/handoff/phase-3.json",
+    "analyzer/specs/phase-2/complexity-model.md",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodAnalysisContext.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/InputSizeResolver.cs",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/BasicOperationAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/LoopBoundAnalyzer.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InputSizeResolverTests.cs",
-    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityModelTests.cs"
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
   ],
   "validations": [
-    "dotnet restore passed in analyzer/.",
-    "dotnet build --configuration Release --no-restore passed in analyzer/ with 0 warnings and 0 errors.",
-    "dotnet test --configuration Release --no-build passed in analyzer/: 146 passed, 0 failed.",
-    "Coverage tooling was not run because no official coverage tool configuration was present.",
-    "Dependency inspection found no Microsoft.CodeAnalysis.Workspaces, MathNet, or SymPy in analyzer src/tests/project configuration.",
-    "ProjectReference inspection found only the isolated test project reference to the new analyzer project, and no references to inherited projects.",
-    "Structural performance/safety inspection found no I/O, network, process execution, reflection-heavy calls, or global mutable collections in analyzer src."
+    "Analyzer workspace restore, Release build, and Release test passed.",
+    "Phase 3 behavioral extraction matrix passed, including constant, linear, logarithmic, nested, branching, switch, invocation Unknown, and unprovable loop Unknown cases.",
+    "Package inspection confirmed the analyzer DLL under analyzers/dotnet/cs/ with no upstream DLLs and no dependency groups.",
+    "Dependency and scope inspection found no Workspaces, MathNet, SymPy, inherited ProjectReference, BCL/LINQ operation mappings, call graph, interprocedural traversal, recursion handling, or recurrence solver in the isolated implementation.",
+    "Inherited solution restore and Release build passed using an isolated package cache and redirected documentation output; upstream files were not edited."
   ],
   "knownPendingItems": [
-    "Unresolved method invocations require Phase 4 BCL/LINQ mappings when the target is a known framework operation.",
-    "Advanced CFG/data-flow remains out of scope; while/do-while recognition is limited to simple local initialization and one direct provable control-variable mutation.",
-    "Project-local call graph and recursion analysis remain unsupported beyond Phase 4."
+    "Method invocations without mappings remain Unknown.",
+    "BCL/LINQ complexity mappings belong to Phase 4.",
+    "Project-local call graph and recursion analysis remain unsupported."
   ],
-  "nextStep": "8/8 — phase validation and closure"
+  "nextStep": "Phase 4 - BCL, LINQ and actionable diagnostics"
 }
