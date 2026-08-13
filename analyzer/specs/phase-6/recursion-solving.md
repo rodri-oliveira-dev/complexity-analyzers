@@ -2,9 +2,9 @@
 
 ## Status
 
-Specification initialized.
+Complete.
 
-Phase 6 has not implemented production code yet. This document defines the SDD contract for bounded direct-recursion extraction and recurrence solving inside the isolated analyzer.
+Phase 6 closes with bounded direct-recursion extraction and recurrence solving implemented inside the isolated analyzer. Supported direct recursion requires semantic identity, base-case evidence, proven argument reduction, path-aware recursive-call multiplicity, and known non-recursive local work. Unsupported, invalid, numerically inconclusive, and mutual-recursive cases remain `Unknown`.
 
 ## Objective
 
