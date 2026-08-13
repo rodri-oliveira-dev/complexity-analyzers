@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 4 - BCL, LINQ & Actionable Diagnostics",
-  "currentObjective": "Expose known Roslyn method extraction through the disabled-by-default BIG0001 informational diagnostic",
-  "completedStep": "6/9 — BIG0001 estimated complexity",
+  "currentObjective": "Implement actionable diagnostics for semantically known linear lookups, materialization, and consumed ordering inside loops",
+  "completedStep": "7/9 - actionable diagnostics",
   "decisions": [
     "Known operations must be resolved through Roslyn symbols, not text-only method names.",
     "Unsupported or unresolved invocations remain Unknown; the inherited conservative O(n) fallback is explicitly rejected.",
@@ -19,7 +19,10 @@
     "Invocation receiver/source dimensions are substituted from the actual receiver expression, so later parameters such as right map to their own canonical variable instead of always using n.",
     "BIG0001 exposes known method complexity estimates as an Info diagnostic and remains disabled by default.",
     "BIG0001 reports at the method identifier and is not emitted when method extraction returns Unknown.",
-    "No BIG100x actionable diagnostics were added in step 6."
+    "BIG1001 reports semantically resolved linear lookup operations inside analyzable loop bodies, points at the lookup invocation, suppresses constant lookup mappings such as HashSet<T>.Contains, and does not report custom same-name methods.",
+    "BIG1002 reports semantically resolved materializing LINQ terminal operations inside analyzable loop bodies, points at the materializing invocation, and explains repeated enumeration/allocation without modeling space complexity.",
+    "BIG1003 reports semantically resolved deferred ordering operations only when a supported consuming invocation is proven inside an analyzable loop body, points at the ordering invocation, and respects deferred execution.",
+    "BIG100x diagnostics use Info severity and are enabled by default; they remain non-error diagnostics and are not a quality gate."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -32,6 +35,7 @@
   "relevantFiles": [
     "analyzer/specs/phase-4/bcl-linq-diagnostics.md",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/ActionableComplexityDiagnosticAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperationComplexityAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/BclMappings.cs",
@@ -39,21 +43,24 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/LoopBoundAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/BasicOperationAnalyzer.cs",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/KnownOperationRegistryTests.cs",
-    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs"
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
   ],
   "validations": [
     "Known-operation infrastructure tests cover exact match, unknown lookup, overload distinction, custom same-name non-match, reduced extension resolution, deterministic registry ordering, concurrent read behavior, and Unknown not becoming O(n).",
     "Core BCL mapping tests cover List<T>.Count/indexer/Contains/IndexOf/Sort overloads, Dictionary<TKey,TValue>.ContainsKey/ContainsValue, HashSet<T>.Contains, Array.Length, string.Length, custom homonymous List<T>.Contains, verified or explicitly conservative provenance, and absence of LINQ mappings from the BCL-only registry.",
     "LINQ mapping tests cover semantic resolution and provenance for Where, Select, OrderBy, Distinct, GroupBy, ToList, Any, Count, and Contains plus custom homonymous extensions.",
     "Method extraction tests cover List.Contains, HashSet.Contains, Dictionary.ContainsValue, LINQ Any, LINQ ToList, Where+ToList, OrderBy+ToList, foreach Where, unknown custom methods, receiver-dimension substitution, foreach plus inner List.Contains composition, Count specialization, custom Where/Any extensions, nested/chained operators, SelectMany with known inner receiver, and unresolved consumed predicate preserving Unknown.",
-    "Public analyzer tests cover BIG0001 descriptor metadata, disabled-by-default behavior, enabled O(1)/O(n)/O(n²) reports, Unknown suppression, and unchanged BIG9000 behavior.",
+    "Public analyzer tests cover BIG0001 descriptor metadata, disabled-by-default behavior, enabled O(1)/O(n)/O(n^2) reports, Unknown suppression, BIG1001/BIG1002/BIG1003 descriptor metadata and actionable positive/negative fixtures, coexistence without duplicate reports, and unchanged BIG9000 behavior.",
     "dotnet build --configuration Release passed.",
     "dotnet test --configuration Release --no-build passed."
   ],
   "knownPendingItems": [
-    "Add BIG100x actionable diagnostics only after descriptor/release/documentation updates and tests."
+    "Complete characterization, documentation, and package hardening for Phase 4."
   ],
-  "nextStep": "7/9 — actionable performance diagnostics"
+  "nextStep": "8/9 - characterization, documentation and package hardening"
 }

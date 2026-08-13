@@ -22,6 +22,9 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
     } =
         ImmutableArray.Create(
             DiagnosticDescriptors.EstimatedAlgorithmicComplexity,
+            DiagnosticDescriptors.LinearLookupInsideIteration,
+            DiagnosticDescriptors.MaterializationInsideIteration,
+            DiagnosticDescriptors.OrderingInsideIteration,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)
@@ -37,6 +40,14 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         context.CancellationToken.ThrowIfCancellationRequested();
 
         MethodDeclarationSyntax methodDeclaration = (MethodDeclarationSyntax)context.Node;
+        foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMethod(
+            methodDeclaration,
+            context.SemanticModel,
+            context.CancellationToken))
+        {
+            context.ReportDiagnostic(diagnostic);
+        }
+
         ComplexityExpression complexity = new MethodComplexityExtractor().AnalyzeMethod(
             methodDeclaration,
             context.SemanticModel,
