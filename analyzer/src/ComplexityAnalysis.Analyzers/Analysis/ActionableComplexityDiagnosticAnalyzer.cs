@@ -47,7 +47,7 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         MethodAnalysisContext context,
         ImmutableArray<Diagnostic>.Builder diagnostics)
     {
-        if (!TryResolveInvocation(invocation, context, out IMethodSymbol? methodSymbol, out KnownOperationMapping? mapping)
+        if (!KnownOperationInvocation.TryResolve(invocation, context, Resolver, out IMethodSymbol? methodSymbol, out KnownOperationMapping? mapping)
             || methodSymbol is null
             || mapping is null
             || !TryGetContainingIterationComplexity(invocation, context, out ComplexityExpression iterationComplexity))
@@ -138,12 +138,12 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            if (!TryResolveInvocation(ancestor, context, out IMethodSymbol? ancestorSymbol, out KnownOperationMapping? ancestorMapping)
+            if (!KnownOperationInvocation.TryResolve(ancestor, context, Resolver, out IMethodSymbol? ancestorSymbol, out KnownOperationMapping? ancestorMapping)
                 || ancestorSymbol is null
                 || ancestorMapping is null
                 || ancestorMapping.ExecutionKind != KnownOperationExecutionKind.Immediate
                 || !ancestorMapping.Metadata.EnumeratesReceiver
-                || !TryGetReceiverExpression(ancestor, ancestorSymbol, out ExpressionSyntax? receiver)
+                || !KnownOperationInvocation.TryGetReceiverExpression(ancestor, ancestorSymbol, out ExpressionSyntax? receiver)
                 || receiver is null
                 || !receiver.Span.Contains(invocation.Span))
             {
@@ -167,7 +167,7 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            if (TryResolveInvocation(descendant, context, out _, out KnownOperationMapping? mapping)
+            if (KnownOperationInvocation.TryResolve(descendant, context, Resolver, out _, out KnownOperationMapping? mapping)
                 && mapping is not null
                 && mapping.Metadata.Orders
                 && mapping.ExecutionKind == KnownOperationExecutionKind.Deferred)
@@ -307,59 +307,6 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         };
 
         return body is not null;
-    }
-
-    private static bool TryResolveInvocation(
-        InvocationExpressionSyntax invocation,
-        MethodAnalysisContext context,
-        out IMethodSymbol? methodSymbol,
-        out KnownOperationMapping? mapping)
-    {
-        context.CancellationToken.ThrowIfCancellationRequested();
-
-        SymbolInfo symbolInfo = context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken);
-        methodSymbol = symbolInfo.Symbol as IMethodSymbol;
-        if (methodSymbol is null
-            || !Resolver.TryResolve(methodSymbol, context.CancellationToken, out KnownOperationMapping resolvedMapping))
-        {
-            mapping = null;
-            return false;
-        }
-
-        mapping = resolvedMapping;
-        return true;
-    }
-
-    private static bool TryGetReceiverExpression(
-        InvocationExpressionSyntax invocation,
-        IMethodSymbol methodSymbol,
-        out ExpressionSyntax? receiver)
-    {
-        receiver = null;
-
-        if (methodSymbol.ReducedFrom is not null
-            && invocation.Expression is MemberAccessExpressionSyntax memberAccess)
-        {
-            receiver = memberAccess.Expression;
-            return true;
-        }
-
-        if (methodSymbol.ReducedFrom is null
-            && invocation.Expression is MemberAccessExpressionSyntax
-            && methodSymbol.IsStatic
-            && invocation.ArgumentList.Arguments.Count > 0)
-        {
-            receiver = invocation.ArgumentList.Arguments[0].Expression;
-            return true;
-        }
-
-        if (invocation.Expression is MemberAccessExpressionSyntax instanceMemberAccess)
-        {
-            receiver = instanceMemberAccess.Expression;
-            return true;
-        }
-
-        return false;
     }
 
     private static string FormatOperation(IMethodSymbol methodSymbol)

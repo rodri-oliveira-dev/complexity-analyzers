@@ -28,7 +28,7 @@ internal sealed class KnownOperationComplexityAnalyzer
 
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        if (!TryResolveInvocation(invocation, out IMethodSymbol? methodSymbol, out KnownOperationMapping? mapping)
+        if (!KnownOperationInvocation.TryResolve(invocation, context, Resolver, out IMethodSymbol? methodSymbol, out KnownOperationMapping? mapping)
             || methodSymbol is null
             || mapping is null)
         {
@@ -132,6 +132,14 @@ internal sealed class KnownOperationComplexityAnalyzer
 
     internal bool TryResolveInputDimension(ExpressionSyntax expression, out ComplexityVariable? variable)
     {
+        return TryResolveInputDimension(expression, includeDeferredPipeline: true, out variable);
+    }
+
+    private bool TryResolveInputDimension(
+        ExpressionSyntax expression,
+        bool includeDeferredPipeline,
+        out ComplexityVariable? variable)
+    {
         context.CancellationToken.ThrowIfCancellationRequested();
 
         expression = UnwrapParentheses(expression);
@@ -167,7 +175,8 @@ internal sealed class KnownOperationComplexityAnalyzer
             return true;
         }
 
-        if (TryAnalyzeDeferredPipeline(expression, out SequenceEnumerationPlan plan)
+        if (includeDeferredPipeline
+            && TryAnalyzeDeferredPipeline(expression, out SequenceEnumerationPlan plan)
             && !plan.IsUnknown
             && plan.PrimaryVariable is not null)
         {
@@ -194,7 +203,7 @@ internal sealed class KnownOperationComplexityAnalyzer
             return ComplexityComposer.Sequential(argumentComplexity, mapping.Complexity);
         }
 
-        return TryGetReceiverExpression(invocation, methodSymbol, out ExpressionSyntax? receiver)
+        return KnownOperationInvocation.TryGetReceiverExpression(invocation, methodSymbol, out ExpressionSyntax? receiver)
             && receiver is not null
             && TryResolveInputDimension(receiver, out ComplexityVariable? variable)
             && variable is not null
@@ -207,7 +216,7 @@ internal sealed class KnownOperationComplexityAnalyzer
         IMethodSymbol methodSymbol,
         KnownOperationMapping mapping)
     {
-        if (!TryGetReceiverExpression(invocation, methodSymbol, out ExpressionSyntax? source)
+        if (!KnownOperationInvocation.TryGetReceiverExpression(invocation, methodSymbol, out ExpressionSyntax? source)
             || source is null)
         {
             return ComplexityFactory.Unknown();
@@ -312,11 +321,11 @@ internal sealed class KnownOperationComplexityAnalyzer
         plan = SequenceEnumerationPlan.Unknown();
 
         if (expression is not InvocationExpressionSyntax invocation
-            || !TryResolveInvocation(invocation, out IMethodSymbol? methodSymbol, out KnownOperationMapping? mapping)
+            || !KnownOperationInvocation.TryResolve(invocation, context, Resolver, out IMethodSymbol? methodSymbol, out KnownOperationMapping? mapping)
             || methodSymbol is null
             || mapping is null
             || mapping.ExecutionKind != KnownOperationExecutionKind.Deferred
-            || !TryGetReceiverExpression(invocation, methodSymbol, out ExpressionSyntax? source)
+            || !KnownOperationInvocation.TryGetReceiverExpression(invocation, methodSymbol, out ExpressionSyntax? source)
             || source is null)
         {
             return false;
@@ -505,92 +514,9 @@ internal sealed class KnownOperationComplexityAnalyzer
         return invocation.ArgumentList.Arguments.Any(argument => argument.Expression is LambdaExpressionSyntax);
     }
 
-    private bool TryResolveInvocation(
-        InvocationExpressionSyntax invocation,
-        out IMethodSymbol? methodSymbol,
-        out KnownOperationMapping? mapping)
-    {
-        SymbolInfo symbolInfo = context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken);
-        methodSymbol = symbolInfo.Symbol as IMethodSymbol;
-        if (methodSymbol is null
-            || !Resolver.TryResolve(methodSymbol, context.CancellationToken, out KnownOperationMapping resolvedMapping))
-        {
-            mapping = null;
-            return false;
-        }
-
-        mapping = resolvedMapping;
-        return true;
-    }
-
-    private static bool TryGetReceiverExpression(
-        InvocationExpressionSyntax invocation,
-        IMethodSymbol methodSymbol,
-        out ExpressionSyntax? receiver)
-    {
-        receiver = null;
-
-        if (methodSymbol.ReducedFrom is not null
-            && invocation.Expression is MemberAccessExpressionSyntax memberAccess)
-        {
-            receiver = memberAccess.Expression;
-            return true;
-        }
-
-        if (methodSymbol.ReducedFrom is null
-            && invocation.Expression is MemberAccessExpressionSyntax
-            && methodSymbol.IsStatic
-            && invocation.ArgumentList.Arguments.Count > 0)
-        {
-            receiver = invocation.ArgumentList.Arguments[0].Expression;
-            return true;
-        }
-
-        if (invocation.Expression is MemberAccessExpressionSyntax instanceMemberAccess)
-        {
-            receiver = instanceMemberAccess.Expression;
-            return true;
-        }
-
-        return false;
-    }
-
     private bool TryResolveDirectInputDimension(ExpressionSyntax expression, out ComplexityVariable? variable)
     {
-        context.CancellationToken.ThrowIfCancellationRequested();
-
-        expression = UnwrapParentheses(expression);
-        variable = null;
-
-        if (expression is IdentifierNameSyntax)
-        {
-            SymbolInfo symbolInfo = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken);
-            if (symbolInfo.Symbol is not null
-                && context.TryGetInputSizeVariable(symbolInfo.Symbol, out ComplexityVariable directVariable))
-            {
-                variable = directVariable;
-                return true;
-            }
-
-            if (symbolInfo.Symbol is not null
-                && context.TryGetLocalLoopBound(symbolInfo.Symbol, out LoopBoundExpression localBound)
-                && localBound.IsVariable)
-            {
-                variable = localBound.Variable;
-                return true;
-            }
-        }
-
-        if (expression is MemberAccessExpressionSyntax memberAccess
-            && StringComparer.Ordinal.Equals(memberAccess.Name.Identifier.ValueText, "Length")
-            && TryResolveDirectInputDimension(memberAccess.Expression, out ComplexityVariable? receiverVariable)
-            && IsArrayOrString(memberAccess.Expression))
-        {
-            variable = receiverVariable;
-            return true;
-        }
-
-        return false;
+        return TryResolveInputDimension(expression, includeDeferredPipeline: false, out variable);
     }
 
     private bool IsCheapCountSource(ExpressionSyntax source)

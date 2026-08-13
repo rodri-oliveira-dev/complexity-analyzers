@@ -491,46 +491,8 @@ internal sealed class LoopBoundAnalyzer
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        if (new KnownOperationComplexityAnalyzer(context).TryResolveInputDimension(expression, out variable)
-            && variable is not null)
-        {
-            return true;
-        }
-
-        expression = UnwrapParentheses(expression);
-        variable = null;
-
-        if (expression is IdentifierNameSyntax)
-        {
-            SymbolInfo symbolInfo = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken);
-            if (symbolInfo.Symbol is not null
-                && context.TryGetInputSizeVariable(symbolInfo.Symbol, out ComplexityVariable directVariable))
-            {
-                variable = directVariable;
-                return true;
-            }
-
-            if (symbolInfo.Symbol is not null
-                && context.TryGetLocalLoopBound(symbolInfo.Symbol, out LoopBoundExpression localBound)
-                && localBound.IsVariable)
-            {
-                variable = localBound.Variable;
-                return true;
-            }
-
-            return false;
-        }
-
-        if (expression is MemberAccessExpressionSyntax memberAccess
-            && StringComparer.Ordinal.Equals(memberAccess.Name.Identifier.ValueText, "Length")
-            && TryResolveInputDimension(memberAccess.Expression, out ComplexityVariable? receiverVariable)
-            && IsArrayOrString(memberAccess.Expression))
-        {
-            variable = receiverVariable;
-            return true;
-        }
-
-        return false;
+        return new KnownOperationComplexityAnalyzer(context).TryResolveInputDimension(expression, out variable)
+            && variable is not null;
     }
 
     private bool TargetsLoopVariableMutation(ExpressionSyntax expression, ISymbol loopVariable)
@@ -575,15 +537,6 @@ internal sealed class LoopBoundAnalyzer
 
         return symbolInfo.Symbol is not null
             && SymbolEqualityComparer.Default.Equals(symbolInfo.Symbol, symbol);
-    }
-
-    private bool IsArrayOrString(ExpressionSyntax expression)
-    {
-        context.CancellationToken.ThrowIfCancellationRequested();
-
-        ITypeSymbol? type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
-        return type?.TypeKind == TypeKind.Array
-            || type?.SpecialType == SpecialType.System_String;
     }
 
     private bool TryGetNonNegativeIntegerConstant(ExpressionSyntax expression, out long value)
