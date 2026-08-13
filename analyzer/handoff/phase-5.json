@@ -1,14 +1,16 @@
 {
   "delivery": "Phase 5 \u2014 Interprocedural Analysis",
-  "currentObjective": "Cycles, limits and concurrency hardening complete",
-  "completedStep": "6/9 \u2014 cycles, limits and concurrency hardening",
+  "currentObjective": "Diagnostic integration complete",
+  "completedStep": "7/9 \u2014 diagnostic integration",
   "decisions": [
     "Cycle, depth, method-budget, cancellation, and cache-in-progress boundaries collapse to Unknown for public complexity output in Phase 5; recursion complexity is not solved.",
     "Root methods count as depth 0. MaximumCallDepth = 5 allows five uncached callee expansions from a root and stops the sixth at an Unknown boundary.",
     "MaximumMethodsPerRootAnalysis counts uncached method expansion reservations per root analysis state, not per Compilation, so one root cannot permanently consume another root's budget.",
     "The per-compilation template cache treats missing entries as NotStarted, explicit InProgress entries as non-blocking Analyzing markers, and stores only Completed Known templates from production analysis in this step.",
     "Unknown caused exclusively by depth limit, method budget, cancellation, active call path cycle, or contextual InProgress cache races is not stored as a permanent cache entry.",
-    "When another root finds a callee InProgress, it analyzes the callee independently under its own root state instead of waiting, avoiding A-waits-for-B/B-waits-for-A cache deadlocks."
+    "When another root finds a callee InProgress, it analyzes the callee independently under its own root state instead of waiting, avoiding A-waits-for-B/B-waits-for-A cache deadlocks.",
+    "BIG0001 now uses the final interprocedural method complexity in the public analyzer and remains silent for Unknown results.",
+    "BIG1004 is implemented as an Info actionable diagnostic for safe source method calls with known input-dependent complexity inside analyzable iterations; it does not report for O(1), Unknown, unsafe dispatch, cycles, calls outside loops, or known BCL/LINQ operations already covered by BIG1001-BIG1003."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -34,6 +36,7 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperationComplexityAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/SourceMethodResolverTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InterproceduralAnalysisContextTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ArgumentComplexityBinderTests.cs",
@@ -57,14 +60,17 @@
     "Before cycles, limits and concurrency hardening, branch was main at c11a1259d726ded71df5b39dde1ccc8dd2b4707d.",
     "Release build passed for cycles, limits and concurrency hardening with existing style warnings only.",
     "Release tests passed for cycles, limits and concurrency hardening: 305 passed, 0 failed, 0 skipped.",
-    "Concurrent interprocedural tests were repeated 5 times with filter FullyQualifiedName~Concurrent: each run passed 6 tests, 0 failed, 0 skipped."
+    "Concurrent interprocedural tests were repeated 5 times with filter FullyQualifiedName~Concurrent: each run passed 6 tests, 0 failed, 0 skipped.",
+    "Before diagnostic integration, git status was clean on branch main at 48eb55aa136d0564c6b3f95267ed7c85c110320c.",
+    "Release build passed for diagnostic integration with existing style warnings only.",
+    "Release tests passed for diagnostic integration: 317 passed, 0 failed, 0 skipped.",
+    "Local pack passed for ComplexityAnalysis.Analyzers with PackageVersion=0.0.2-big1004-smoke.",
+    "Temporary package consumer smoke test passed and reported BIG1004, BIG0001, and BIG9000 from the packed analyzer."
   ],
-  "knownPendingItems": [
-    "Consider BIG1004 only in a later implementation step."
-  ],
-  "nextStep": "7/9 \u2014 diagnostic integration",
+  "knownPendingItems": [],
+  "nextStep": "8/9 \u2014 characterization, performance and documentation",
   "lastCommit": {
-    "hash": "c11a1259d726ded71df5b39dde1ccc8dd2b4707d",
-    "message": "feat: propagate source method complexity"
+    "hash": "48eb55aa136d0564c6b3f95267ed7c85c110320c",
+    "message": "fix: harden interprocedural analysis boundaries"
   }
 }

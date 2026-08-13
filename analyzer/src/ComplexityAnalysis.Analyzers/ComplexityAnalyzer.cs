@@ -26,6 +26,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.LinearLookupInsideIteration,
             DiagnosticDescriptors.MaterializationInsideIteration,
             DiagnosticDescriptors.OrderingInsideIteration,
+            DiagnosticDescriptors.InputDependentCallInsideIteration,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)
@@ -61,6 +62,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMethod(
             methodDeclaration,
             context.SemanticModel,
+            interproceduralContext,
             context.CancellationToken))
         {
             context.ReportDiagnostic(diagnostic);
