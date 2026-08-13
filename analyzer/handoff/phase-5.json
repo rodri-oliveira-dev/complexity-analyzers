@@ -1,17 +1,13 @@
 {
   "delivery": "Phase 5 \u2014 Interprocedural Analysis",
-  "currentObjective": "Source call-target resolution complete",
-  "completedStep": "2/9 \u2014 source call-target resolution",
+  "currentObjective": "Per-compilation context, cache and analysis budget complete",
+  "completedStep": "3/9 \u2014 per-compilation context, cache and analysis budget",
   "decisions": [
-    "Phase 5 is demand-driven and must not eagerly build a whole-compilation call graph.",
-    "BCL/LINQ known operations from Phase 4 keep precedence over source-method analysis.",
-    "Source calls must be resolved by IMethodSymbol and safe dispatch, not text-only names.",
-    "SourceMethodResolver classifies invocation targets as KnownOperation, SourceMethod, or Unsupported without analyzing callee bodies.",
-    "Source methods are considered available only through local DeclaringSyntaxReferences that resolve to MethodDeclarationSyntax.",
-    "Initial safe dispatch accepts static, private, ordinary nonvirtual, and proven sealed targets; virtual, interface, abstract, external, and unavailable-source calls remain Unsupported.",
-    "Cached method complexity is a template relative to the callee parameters, never a caller-bound expression.",
-    "Cycles are detected and return Unknown in Phase 5; recursion solving belongs to Phase 6.",
-    "Initial internal budgets are MaximumCallDepth = 5 and MaximumMethodsPerRootAnalysis = 32."
+    "InterproceduralAnalysisContext is created per Roslyn Compilation and owns its own template cache; no static or cross-compilation cache is used.",
+    "Template cache keys normalize to method OriginalDefinition through a SymbolEqualityComparer-based MethodSymbolKey so overloads and constructed generic calls keep semantic identity.",
+    "Cached values are MethodComplexityTemplate results relative to callee parameters only; caller argument binding and substitution remain pending.",
+    "The cache uses ConcurrentDictionary entries with explicit InProgress and Completed states instead of Lazy<T>, so future cycle handling does not need self-waiting cache initialization.",
+    "AnalysisBudget remains internal with MaximumCallDepth = 5 and MaximumMethodsPerRootAnalysis = 32; InterproceduralRootAnalysisState owns depth, expanded method count, active path, and CancellationToken per root."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -27,6 +23,7 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/CallTargetResolution.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/CallTargetResolutionKind.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/SourceMethodResolver.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodAnalysisContext.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/",
@@ -34,25 +31,27 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/SourceMethodResolverTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InterproceduralAnalysisContextTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/KnownOperationRegistryTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
   ],
   "validations": [
-    "Before this step, git status was clean on branch main at 2fe3652389e2f3ed98e9c7fd73f5218d2584c3ed.",
+    "Before this step, git status was clean on branch main at 7f701c49fa75e0c525d92c4f8cb999726fb78a0a.",
     "Phase 4 implementation was verified by code and tests: known-operation registry, semantic resolver, method extraction integration, actionable diagnostics, and BIG0001 are present.",
     "Release build passed for source call-target resolution.",
-    "Release tests passed for source call-target resolution: 252 passed, 0 failed, 0 skipped."
+    "Release tests passed for source call-target resolution: 252 passed, 0 failed, 0 skipped.",
+    "Release build passed for per-compilation context, cache and analysis budget.",
+    "Release tests passed for per-compilation context, cache and analysis budget: 263 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "Implement per-compilation interprocedural state and cache.",
     "Implement method complexity templates and argument substitution.",
     "Implement bounded traversal and cycle detection without recursion solving.",
     "Integrate known interprocedural results into BIG0001 and consider BIG1004 only in a later implementation step."
   ],
-  "nextStep": "3/9 \u2014 per-compilation context, cache and analysis budget",
+  "nextStep": "4/9 \u2014 argument binding and complexity substitution",
   "lastCommit": {
-    "hash": "2fe3652389e2f3ed98e9c7fd73f5218d2584c3ed",
-    "message": "docs: define phase 5 interprocedural analysis"
+    "hash": "7f701c49fa75e0c525d92c4f8cb999726fb78a0a",
+    "message": "feat: resolve source method call targets"
   }
 }
