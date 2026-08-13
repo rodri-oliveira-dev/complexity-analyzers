@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 4 - BCL, LINQ & Actionable Diagnostics",
-  "currentObjective": "LINQ execution semantics and mappings implemented without new diagnostics",
-  "completedStep": "4/9 - LINQ execution semantics and mappings",
+  "currentObjective": "Known operation invocation complexity integrated into Roslyn extraction without new diagnostics",
+  "completedStep": "5/9 — invocation integration",
   "decisions": [
     "Known operations must be resolved through Roslyn symbols, not text-only method names.",
     "Unsupported or unresolved invocations remain Unknown; the inherited conservative O(n) fallback is explicitly rejected.",
@@ -15,7 +15,9 @@
     "Count() specializes to O(1) only when the receiver semantic type safely exposes ICollection/ICollection<T> count or array length; generic IEnumerable remains O(n).",
     "LINQ lambdas are analyzed only locally; unresolved invocation work inside consumed predicates/selectors preserves Unknown.",
     "Foreach now has the minimal contract needed to account for consumed deferred LINQ pipelines without introducing diagnostics.",
-    "No public diagnostics were added in step 4."
+    "Known BCL/LINQ invocations are integrated with method extraction through KnownOperationResolver and contribute to ComplexityExpression only after semantic mapping resolution.",
+    "Invocation receiver/source dimensions are substituted from the actual receiver expression, so later parameters such as right map to their own canonical variable instead of always using n.",
+    "No public diagnostics were added in step 5."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -43,13 +45,12 @@
     "Known-operation infrastructure tests cover exact match, unknown lookup, overload distinction, custom same-name non-match, reduced extension resolution, deterministic registry ordering, concurrent read behavior, and Unknown not becoming O(n).",
     "Core BCL mapping tests cover List<T>.Count/indexer/Contains/IndexOf/Sort overloads, Dictionary<TKey,TValue>.ContainsKey/ContainsValue, HashSet<T>.Contains, Array.Length, string.Length, custom homonymous List<T>.Contains, verified or explicitly conservative provenance, and absence of LINQ mappings from the BCL-only registry.",
     "LINQ mapping tests cover semantic resolution and provenance for Where, Select, OrderBy, Distinct, GroupBy, ToList, Any, Count, and Contains plus custom homonymous extensions.",
-    "Method extraction tests cover Where without consumption, Where+ToList, Select+ToArray, OrderBy without consumption, OrderBy+ToList, Any, Contains, Count specialization, foreach over pipeline, custom Where/Any extensions, nested/chained operators, SelectMany with known inner receiver, and unresolved consumed predicate preserving Unknown.",
+    "Method extraction tests cover List.Contains, HashSet.Contains, Dictionary.ContainsValue, LINQ Any, LINQ ToList, Where+ToList, OrderBy+ToList, foreach Where, unknown custom methods, receiver-dimension substitution, foreach plus inner List.Contains composition, Count specialization, custom Where/Any extensions, nested/chained operators, SelectMany with known inner receiver, and unresolved consumed predicate preserving Unknown.",
     "dotnet build --configuration Release passed.",
     "dotnet test --configuration Release --no-build passed."
   ],
   "knownPendingItems": [
-    "Integrate invocation analysis with public diagnostics in the next Phase 4 step.",
     "Add BIG0001 and BIG100x diagnostics only after descriptor/release/documentation updates and tests."
   ],
-  "nextStep": "5/9 - invocation integration"
+  "nextStep": "6/9 — BIG0001 estimated complexity diagnostic"
 }
