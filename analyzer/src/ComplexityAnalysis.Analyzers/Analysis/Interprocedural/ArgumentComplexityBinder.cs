@@ -18,74 +18,107 @@ internal sealed class ArgumentComplexityBinder
 
     internal ImmutableDictionary<ComplexityVariable, ComplexityExpression> Bind(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol calleeMethodSymbol,
+        IMethodSymbol targetMethodSymbol,
+        MethodComplexityTemplate calleeTemplate,
         MethodAnalysisContext callerContext,
-        SemanticModel semanticModel,
         CancellationToken cancellationToken)
     {
         _ = invocation ?? throw new ArgumentNullException(nameof(invocation));
-        _ = calleeMethodSymbol ?? throw new ArgumentNullException(nameof(calleeMethodSymbol));
+        _ = targetMethodSymbol ?? throw new ArgumentNullException(nameof(targetMethodSymbol));
+        _ = calleeTemplate ?? throw new ArgumentNullException(nameof(calleeTemplate));
         _ = callerContext ?? throw new ArgumentNullException(nameof(callerContext));
-        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        ImmutableDictionary<ISymbol, ComplexityVariable> calleeParameterVariables =
-            new InputSizeResolver(semanticModel, cancellationToken)
-                .ResolveParameterVariables(calleeMethodSymbol);
-        ImmutableDictionary<IParameterSymbol, ArgumentSyntax> argumentsByParameter =
-            BindArgumentsToParameters(invocation, calleeMethodSymbol, cancellationToken);
+        ImmutableDictionary<IParameterSymbol, ExpressionSyntax> argumentsByParameter =
+            BindArgumentsToParameters(
+                invocation,
+                targetMethodSymbol,
+                calleeTemplate.ParameterVariables.Keys,
+                cancellationToken);
         ImmutableDictionary<ComplexityVariable, ComplexityExpression>.Builder bindings =
             ImmutableDictionary.CreateBuilder<ComplexityVariable, ComplexityExpression>();
 
-        foreach (KeyValuePair<ISymbol, ComplexityVariable> pair in calleeParameterVariables)
+        foreach (KeyValuePair<IParameterSymbol, ComplexityVariable> pair in calleeTemplate.ParameterVariables)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (pair.Key is not IParameterSymbol parameter)
-            {
-                continue;
-            }
-
-            bindings[pair.Value] = argumentsByParameter.TryGetValue(parameter, out ArgumentSyntax? argument)
-                ? ResolveArgumentComplexity(argument.Expression, callerContext, cancellationToken)
+            bindings[pair.Value] = argumentsByParameter.TryGetValue(pair.Key, out ExpressionSyntax? argument)
+                ? ResolveArgumentComplexity(argument, callerContext, cancellationToken)
                 : ComplexityFactory.Unknown();
         }
 
         return bindings.ToImmutable();
     }
 
-    private static ImmutableDictionary<IParameterSymbol, ArgumentSyntax> BindArgumentsToParameters(
+    private static ImmutableDictionary<IParameterSymbol, ExpressionSyntax> BindArgumentsToParameters(
         InvocationExpressionSyntax invocation,
-        IMethodSymbol calleeMethodSymbol,
+        IMethodSymbol targetMethodSymbol,
+        IEnumerable<IParameterSymbol> templateParameters,
         CancellationToken cancellationToken)
     {
-        ImmutableDictionary<IParameterSymbol, ArgumentSyntax>.Builder bindings =
-            ImmutableDictionary.CreateBuilder<IParameterSymbol, ArgumentSyntax>(ParameterSymbolComparer.Instance);
-        int nextPositionalParameter = 0;
+        ImmutableArray<IParameterSymbol> parameters = OrderTemplateParameters(templateParameters);
+        ImmutableDictionary<IParameterSymbol, ExpressionSyntax>.Builder bindings =
+            ImmutableDictionary.CreateBuilder<IParameterSymbol, ExpressionSyntax>(ParameterSymbolComparer.Instance);
+        int nextPositionalParameter = TryBindReducedExtensionReceiver(
+            invocation,
+            targetMethodSymbol,
+            parameters,
+            bindings,
+            cancellationToken)
+            ? 1
+            : 0;
 
         foreach (ArgumentSyntax argument in invocation.ArgumentList.Arguments)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             IParameterSymbol? parameter = argument.NameColon is not null
-                ? FindParameterByName(calleeMethodSymbol, argument.NameColon.Name.Identifier.ValueText)
-                : FindNextPositionalParameter(calleeMethodSymbol, bindings, ref nextPositionalParameter);
+                ? FindParameterByName(parameters, argument.NameColon.Name.Identifier.ValueText)
+                : FindNextPositionalParameter(parameters, bindings, ref nextPositionalParameter);
 
             if (parameter is not null)
             {
-                bindings[parameter] = argument;
+                bindings[parameter] = argument.Expression;
             }
         }
 
         return bindings.ToImmutable();
     }
 
+    private static ImmutableArray<IParameterSymbol> OrderTemplateParameters(
+        IEnumerable<IParameterSymbol> templateParameters)
+    {
+        List<IParameterSymbol> parameters = new(templateParameters);
+        parameters.Sort((left, right) => left.Ordinal.CompareTo(right.Ordinal));
+        return ImmutableArray.CreateRange(parameters);
+    }
+
+    private static bool TryBindReducedExtensionReceiver(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol targetMethodSymbol,
+        ImmutableArray<IParameterSymbol> parameters,
+        ImmutableDictionary<IParameterSymbol, ExpressionSyntax>.Builder bindings,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (targetMethodSymbol.ReducedFrom is null
+            || parameters.IsEmpty
+            || invocation.Expression is not MemberAccessExpressionSyntax memberAccess)
+        {
+            return false;
+        }
+
+        bindings[parameters[0]] = memberAccess.Expression;
+        return true;
+    }
+
     private static IParameterSymbol? FindParameterByName(
-        IMethodSymbol calleeMethodSymbol,
+        ImmutableArray<IParameterSymbol> parameters,
         string parameterName)
     {
-        foreach (IParameterSymbol parameter in calleeMethodSymbol.Parameters)
+        foreach (IParameterSymbol parameter in parameters)
         {
             if (StringComparer.Ordinal.Equals(parameter.Name, parameterName))
             {
@@ -97,13 +130,13 @@ internal sealed class ArgumentComplexityBinder
     }
 
     private static IParameterSymbol? FindNextPositionalParameter(
-        IMethodSymbol calleeMethodSymbol,
-        ImmutableDictionary<IParameterSymbol, ArgumentSyntax>.Builder bindings,
+        ImmutableArray<IParameterSymbol> parameters,
+        ImmutableDictionary<IParameterSymbol, ExpressionSyntax>.Builder bindings,
         ref int nextPositionalParameter)
     {
-        while (nextPositionalParameter < calleeMethodSymbol.Parameters.Length)
+        while (nextPositionalParameter < parameters.Length)
         {
-            IParameterSymbol parameter = calleeMethodSymbol.Parameters[nextPositionalParameter];
+            IParameterSymbol parameter = parameters[nextPositionalParameter];
             nextPositionalParameter++;
 
             if (!bindings.ContainsKey(parameter))

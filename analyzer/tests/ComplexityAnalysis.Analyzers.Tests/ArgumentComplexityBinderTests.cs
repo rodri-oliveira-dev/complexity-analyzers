@@ -173,6 +173,34 @@ public sealed class ArgumentComplexityBinderTests
         Assert.Equal("O(n)", result.ToBigONotation());
     }
 
+    [Fact]
+    public void Reduced_extension_receiver_binds_to_original_this_parameter_dimension()
+    {
+        BindingFacts facts = CreateFacts(
+            """
+            public static class Extensions
+            {
+                public static void Helper(this int[] values)
+                {
+                }
+            }
+
+            public sealed class Sample
+            {
+                void Caller(int[] items)
+                {
+                    items.Helper();
+                }
+            }
+            """);
+
+        ComplexityExpression result = SubstituteCalleeTemplate(
+            facts,
+            ComplexityFactory.Linear(ComplexityVariable.N));
+
+        Assert.Equal("O(n)", result.ToBigONotation());
+    }
+
     [Theory]
     [InlineData("count - 1")]
     [InlineData("count + 1")]
@@ -336,12 +364,27 @@ public sealed class ArgumentComplexityBinderTests
             facts.SemanticModel,
             facts.Caller,
             CancellationToken.None);
+        ImmutableDictionary<IParameterSymbol, ComplexityVariable>.Builder parameterVariables =
+            ImmutableDictionary.CreateBuilder<IParameterSymbol, ComplexityVariable>(SymbolEqualityComparer.Default);
+        foreach (KeyValuePair<ISymbol, ComplexityVariable> pair in new InputSizeResolver(
+            facts.SemanticModel,
+            CancellationToken.None).ResolveParameterVariables(facts.Callee))
+        {
+            if (pair.Key is IParameterSymbol parameter)
+            {
+                parameterVariables[parameter] = pair.Value;
+            }
+        }
+
+        MethodComplexityTemplate template = new(
+            calleeTemplate,
+            parameterVariables.ToImmutable());
         ImmutableDictionary<ComplexityVariable, ComplexityExpression> bindings =
             new ArgumentComplexityBinder().Bind(
                 facts.Invocation,
-                facts.Callee,
+                facts.Target,
+                template,
                 callerContext,
-                facts.SemanticModel,
                 CancellationToken.None);
 
         return ComplexitySubstitution.Substitute(
@@ -399,9 +442,13 @@ public sealed class ArgumentComplexityBinderTests
             .Single(invocationSyntax => semanticModel.GetSymbolInfo(
                 invocationSyntax,
                 CancellationToken.None).Symbol is IMethodSymbol target
-                && SymbolEqualityComparer.Default.Equals(target.OriginalDefinition, callee.OriginalDefinition));
+                && SymbolEqualityComparer.Default.Equals(
+                    (target.ReducedFrom ?? target).OriginalDefinition,
+                    callee.OriginalDefinition));
+        IMethodSymbol target = semanticModel.GetSymbolInfo(invocation, CancellationToken.None).Symbol as IMethodSymbol
+            ?? throw new InvalidOperationException("Expected invocation to resolve to a method symbol.");
 
-        return new BindingFacts(semanticModel, caller, callee, invocation);
+        return new BindingFacts(semanticModel, caller, callee, target, invocation);
     }
 
     private static IMethodSymbol GetMethodSymbol(
@@ -440,5 +487,6 @@ public sealed class ArgumentComplexityBinderTests
         SemanticModel SemanticModel,
         IMethodSymbol Caller,
         IMethodSymbol Callee,
+        IMethodSymbol Target,
         InvocationExpressionSyntax Invocation);
 }
