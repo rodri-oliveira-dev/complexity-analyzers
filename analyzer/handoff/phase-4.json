@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 4 - BCL, LINQ & Actionable Diagnostics",
-  "currentObjective": "Known operation invocation complexity integrated into Roslyn extraction without new diagnostics",
-  "completedStep": "5/9 — invocation integration",
+  "currentObjective": "Expose known Roslyn method extraction through the disabled-by-default BIG0001 informational diagnostic",
+  "completedStep": "6/9 — BIG0001 estimated complexity",
   "decisions": [
     "Known operations must be resolved through Roslyn symbols, not text-only method names.",
     "Unsupported or unresolved invocations remain Unknown; the inherited conservative O(n) fallback is explicitly rejected.",
@@ -17,7 +17,9 @@
     "Foreach now has the minimal contract needed to account for consumed deferred LINQ pipelines without introducing diagnostics.",
     "Known BCL/LINQ invocations are integrated with method extraction through KnownOperationResolver and contribute to ComplexityExpression only after semantic mapping resolution.",
     "Invocation receiver/source dimensions are substituted from the actual receiver expression, so later parameters such as right map to their own canonical variable instead of always using n.",
-    "No public diagnostics were added in step 5."
+    "BIG0001 exposes known method complexity estimates as an Info diagnostic and remains disabled by default.",
+    "BIG0001 reports at the method identifier and is not emitted when method extraction returns Unknown.",
+    "No BIG100x actionable diagnostics were added in step 6."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -46,11 +48,12 @@
     "Core BCL mapping tests cover List<T>.Count/indexer/Contains/IndexOf/Sort overloads, Dictionary<TKey,TValue>.ContainsKey/ContainsValue, HashSet<T>.Contains, Array.Length, string.Length, custom homonymous List<T>.Contains, verified or explicitly conservative provenance, and absence of LINQ mappings from the BCL-only registry.",
     "LINQ mapping tests cover semantic resolution and provenance for Where, Select, OrderBy, Distinct, GroupBy, ToList, Any, Count, and Contains plus custom homonymous extensions.",
     "Method extraction tests cover List.Contains, HashSet.Contains, Dictionary.ContainsValue, LINQ Any, LINQ ToList, Where+ToList, OrderBy+ToList, foreach Where, unknown custom methods, receiver-dimension substitution, foreach plus inner List.Contains composition, Count specialization, custom Where/Any extensions, nested/chained operators, SelectMany with known inner receiver, and unresolved consumed predicate preserving Unknown.",
+    "Public analyzer tests cover BIG0001 descriptor metadata, disabled-by-default behavior, enabled O(1)/O(n)/O(n²) reports, Unknown suppression, and unchanged BIG9000 behavior.",
     "dotnet build --configuration Release passed.",
     "dotnet test --configuration Release --no-build passed."
   ],
   "knownPendingItems": [
-    "Add BIG0001 and BIG100x diagnostics only after descriptor/release/documentation updates and tests."
+    "Add BIG100x actionable diagnostics only after descriptor/release/documentation updates and tests."
   ],
-  "nextStep": "6/9 — BIG0001 estimated complexity diagnostic"
+  "nextStep": "7/9 — actionable performance diagnostics"
 }

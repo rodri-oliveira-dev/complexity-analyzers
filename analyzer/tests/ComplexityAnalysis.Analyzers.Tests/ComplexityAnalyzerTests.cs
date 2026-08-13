@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Reflection;
 
 using Microsoft.CodeAnalysis;
@@ -11,6 +12,7 @@ namespace ComplexityAnalysis.Analyzers.Tests;
 
 public sealed class ComplexityAnalyzerTests
 {
+    private const string EstimatedAlgorithmicComplexityId = "BIG0001";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -23,23 +25,137 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
-    public void SupportedDiagnostics_contains_exactly_the_phase_one_probe()
+    public void SupportedDiagnostics_contains_estimated_complexity_and_the_phase_one_probe()
     {
         var analyzer = new ComplexityAnalyzer();
 
-        DiagnosticDescriptor descriptor = Assert.Single(analyzer.SupportedDiagnostics);
+        Assert.Equal(
+            [EstimatedAlgorithmicComplexityId, AnalyzerExecutionProbeId],
+            analyzer.SupportedDiagnostics.Select(descriptor => descriptor.Id));
+    }
 
-        Assert.Equal(AnalyzerExecutionProbeId, descriptor.Id);
+    [Fact]
+    public void EstimatedAlgorithmicComplexity_has_the_expected_public_descriptor_metadata()
+    {
+        DiagnosticDescriptor descriptor = new ComplexityAnalyzer()
+            .SupportedDiagnostics
+            .Single(descriptor => descriptor.Id == EstimatedAlgorithmicComplexityId);
+
+        Assert.Equal(EstimatedAlgorithmicComplexityId, descriptor.Id);
+        Assert.Equal("Estimated algorithmic complexity", descriptor.Title.ToString(CultureInfo.InvariantCulture));
+        Assert.Equal("Complexity", descriptor.Category);
+        Assert.Equal(DiagnosticSeverity.Info, descriptor.DefaultSeverity);
+        Assert.False(descriptor.IsEnabledByDefault);
     }
 
     [Fact]
     public void AnalyzerExecutionProbe_has_the_expected_public_descriptor_metadata()
     {
-        DiagnosticDescriptor descriptor = Assert.Single(new ComplexityAnalyzer().SupportedDiagnostics);
+        DiagnosticDescriptor descriptor = new ComplexityAnalyzer()
+            .SupportedDiagnostics
+            .Single(descriptor => descriptor.Id == AnalyzerExecutionProbeId);
 
         Assert.Equal(AnalyzerExecutionProbeId, descriptor.Id);
         Assert.Equal(DiagnosticSeverity.Info, descriptor.DefaultSeverity);
         Assert.False(descriptor.IsEnabledByDefault);
+    }
+
+    [Fact]
+    public async Task Analyzer_does_not_report_estimated_complexity_when_it_is_not_enabled()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public int M() => 42;
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public int M() => 42;
+        }
+        """,
+        "Estimated time complexity: O(1)")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public void M(int[] values)
+            {
+                foreach (var value in values)
+                {
+                    var x = value + 1;
+                }
+            }
+        }
+        """,
+        "Estimated time complexity: O(n)")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public void M(int[] values)
+            {
+                foreach (var outer in values)
+                {
+                    foreach (var inner in values)
+                    {
+                        var x = outer + inner;
+                    }
+                }
+            }
+        }
+        """,
+        "Estimated time complexity: O(n\u00b2)")]
+    public async Task Analyzer_reports_estimated_complexity_when_explicitly_enabled(
+        string source,
+        string expectedMessage)
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            source,
+            enableComplexity: true);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
+        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(expectedMessage, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        Assert.True(diagnostic.Location.IsInSource);
+
+        SyntaxTree sourceTree = diagnostic.Location.SourceTree
+            ?? throw new System.InvalidOperationException("Expected a source location.");
+        string diagnosticText = sourceTree
+            .GetText()
+            .GetSubText(diagnostic.Location.SourceSpan)
+            .ToString();
+        Assert.Equal("M", diagnosticText);
+    }
+
+    [Fact]
+    public async Task Analyzer_does_not_report_estimated_complexity_for_unknown_methods()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public interface CustomCollection
+            {
+                bool Probe(int value);
+            }
+
+            public sealed class Sample
+            {
+                public bool M(CustomCollection values) => values.Probe(42);
+            }
+            """,
+            enableComplexity: true);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
     }
 
     [Fact]
@@ -153,16 +269,18 @@ public sealed class ComplexityAnalyzerTests
 
     private static Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
         string source,
-        bool enableProbe = false)
+        bool enableProbe = false,
+        bool enableComplexity = false)
     {
-        return GetAnalyzerDiagnosticsAsync([Parse(source)], enableProbe);
+        return GetAnalyzerDiagnosticsAsync([Parse(source)], enableProbe, enableComplexity);
     }
 
     private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
         ImmutableArray<SyntaxTree> syntaxTrees,
-        bool enableProbe = false)
+        bool enableProbe = false,
+        bool enableComplexity = false)
     {
-        CSharpCompilation compilation = CreateCompilation(syntaxTrees, enableProbe);
+        CSharpCompilation compilation = CreateCompilation(syntaxTrees, enableProbe, enableComplexity);
         var analyzer = new ComplexityAnalyzer();
         ImmutableArray<DiagnosticAnalyzer> analyzers = [analyzer];
         CompilationWithAnalyzers compilationWithAnalyzers = compilation.WithAnalyzers(analyzers);
@@ -172,15 +290,25 @@ public sealed class ComplexityAnalyzerTests
 
     private static CSharpCompilation CreateCompilation(
         ImmutableArray<SyntaxTree> syntaxTrees,
-        bool enableProbe)
+        bool enableProbe,
+        bool enableComplexity)
     {
-        ImmutableDictionary<string, ReportDiagnostic> specificDiagnosticOptions = enableProbe
-            ? [KeyValuePair.Create(AnalyzerExecutionProbeId, ReportDiagnostic.Info)]
-            : [];
+        ImmutableDictionary<string, ReportDiagnostic>.Builder specificDiagnosticOptions =
+            ImmutableDictionary.CreateBuilder<string, ReportDiagnostic>();
+
+        if (enableProbe)
+        {
+            specificDiagnosticOptions.Add(AnalyzerExecutionProbeId, ReportDiagnostic.Info);
+        }
+
+        if (enableComplexity)
+        {
+            specificDiagnosticOptions.Add(EstimatedAlgorithmicComplexityId, ReportDiagnostic.Info);
+        }
 
         var compilationOptions = new CSharpCompilationOptions(
             OutputKind.DynamicallyLinkedLibrary,
-            specificDiagnosticOptions: specificDiagnosticOptions);
+            specificDiagnosticOptions: specificDiagnosticOptions.ToImmutable());
 
         return CSharpCompilation.Create(
             assemblyName: "AnalyzerInfrastructureTests",
