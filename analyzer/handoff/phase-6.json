@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 6 \u2014 Recursion & Recurrence Solving",
   "currentObjective": "Extract and solve bounded direct-recursion recurrence patterns",
-  "completedStep": "3/11 \u2014 recursive call shape and base-case extraction",
+  "completedStep": "4/11 \u2014 direct recurrence extraction",
   "decisions": [
     "Phase 6 starts from Phase 5 cycle boundaries and may solve only supported direct recursion with sufficient base-case evidence.",
     "Recurrence extraction and recurrence solving remain separate responsibilities.",
@@ -51,12 +51,11 @@
     "Step 3 Release tests passed with dotnet test --configuration Release --no-build: 383 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "Direct recurrence extraction is not implemented yet.",
     "Recurrence solving is not implemented yet.",
     "BIG1005 is specified but not implemented in step 2.",
     "Mutual recursion remains Unknown in Phase 6."
   ],
-  "nextStep": "4/11 \u2014 direct recurrence extraction",
+  "nextStep": "5/11 \u2014 summation and decrement recurrence solver",
   "lastCommit": {
     "hash": "c2dc23bb8f0b1fa1133d8f3dce433490a45504e9",
     "message": "feat: add recurrence domain model"
