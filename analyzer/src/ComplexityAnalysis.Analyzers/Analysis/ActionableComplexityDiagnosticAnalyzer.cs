@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 
+using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Analysis.KnownOperations;
 using ComplexityAnalysis.Analyzers.Diagnostics;
 using ComplexityAnalysis.Analyzers.Model;
@@ -19,16 +20,25 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
     internal ImmutableArray<Diagnostic> AnalyzeMethod(
         MethodDeclarationSyntax methodDeclaration,
         SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
         CancellationToken cancellationToken)
     {
         _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
         _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
 
         cancellationToken.ThrowIfCancellationRequested();
 
+        IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken) as IMethodSymbol
+            ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+            methodSymbol,
+            cancellationToken);
         MethodAnalysisContext context = MethodAnalysisContext.Create(
-            methodDeclaration,
             semanticModel,
+            methodSymbol,
+            interproceduralContext,
+            rootState,
             cancellationToken);
         ImmutableArray<Diagnostic>.Builder diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
@@ -47,10 +57,38 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         MethodAnalysisContext context,
         ImmutableArray<Diagnostic>.Builder diagnostics)
     {
-        if (!KnownOperationInvocation.TryResolve(invocation, context, Resolver, out IMethodSymbol? methodSymbol, out KnownOperationMapping? mapping)
-            || methodSymbol is null
-            || mapping is null
-            || !TryGetContainingIterationComplexity(invocation, context, out ComplexityExpression iterationComplexity))
+        if (!TryGetContainingIterationComplexity(invocation, context, out ComplexityExpression iterationComplexity))
+        {
+            return;
+        }
+
+        CallTargetResolution resolution = context.InterproceduralContext?.SourceMethodResolver.Resolve(
+            invocation,
+            context.SemanticModel,
+            context.CancellationToken)
+            ?? CallTargetResolution.Unsupported();
+        if (resolution.Kind == CallTargetResolutionKind.KnownOperation)
+        {
+            AnalyzeKnownOperationInvocation(invocation, context, iterationComplexity, resolution, diagnostics);
+            return;
+        }
+
+        if (resolution.Kind == CallTargetResolutionKind.SourceMethod)
+        {
+            AnalyzeSourceMethodInvocation(invocation, context, iterationComplexity, resolution, diagnostics);
+        }
+    }
+
+    private static void AnalyzeKnownOperationInvocation(
+        InvocationExpressionSyntax invocation,
+        MethodAnalysisContext context,
+        ComplexityExpression iterationComplexity,
+        CallTargetResolution resolution,
+        ImmutableArray<Diagnostic>.Builder diagnostics)
+    {
+        IMethodSymbol? methodSymbol = resolution.TargetMethodSymbol;
+        KnownOperationMapping? mapping = resolution.KnownOperationMapping;
+        if (methodSymbol is null || mapping is null)
         {
             return;
         }
@@ -97,6 +135,33 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
                 ReportOrdering(invocation, methodSymbol, iterationComplexity, consumedComplexity, diagnostics);
             }
         }
+    }
+
+    private static void AnalyzeSourceMethodInvocation(
+        InvocationExpressionSyntax invocation,
+        MethodAnalysisContext context,
+        ComplexityExpression iterationComplexity,
+        CallTargetResolution resolution,
+        ImmutableArray<Diagnostic>.Builder diagnostics)
+    {
+        if (resolution.TargetMethodSymbol is null)
+        {
+            return;
+        }
+
+        ComplexityExpression invocationComplexity = new InterproceduralInvocationAnalyzer(context)
+            .AnalyzeInvocation(invocation);
+        if (invocationComplexity is UnknownComplexity or ConstantComplexity)
+        {
+            return;
+        }
+
+        ReportInputDependentCall(
+            invocation,
+            resolution.TargetMethodSymbol,
+            iterationComplexity,
+            invocationComplexity,
+            diagnostics);
     }
 
     private static bool IsActionableLinearLookup(
@@ -232,6 +297,26 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
             DiagnosticDescriptors.OrderingInsideIteration,
             invocation.GetLocation(),
             FormatOperation(methodSymbol),
+            iterationComplexity.ToBigONotation(),
+            combinedComplexity.ToBigONotation()));
+    }
+
+    private static void ReportInputDependentCall(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol methodSymbol,
+        ComplexityExpression iterationComplexity,
+        ComplexityExpression invocationComplexity,
+        ImmutableArray<Diagnostic>.Builder diagnostics)
+    {
+        ComplexityExpression combinedComplexity = ComplexityComposer.Nested(
+            iterationComplexity,
+            invocationComplexity);
+
+        diagnostics.Add(Diagnostic.Create(
+            DiagnosticDescriptors.InputDependentCallInsideIteration,
+            invocation.GetLocation(),
+            FormatOperation(methodSymbol),
+            invocationComplexity.ToBigONotation(),
             iterationComplexity.ToBigONotation(),
             combinedComplexity.ToBigONotation()));
     }

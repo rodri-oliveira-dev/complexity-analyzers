@@ -2,8 +2,10 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 
 using ComplexityAnalysis.Analyzers.Analysis;
+using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -143,7 +145,7 @@ public sealed class MethodComplexityExtractorTests
                 """,
                 "O(n\u00b2)"),
             (
-                "unresolved-invocation",
+                "source-invocation",
                 """
                 public sealed class Sample
                 {
@@ -157,7 +159,7 @@ public sealed class MethodComplexityExtractorTests
                     }
                 }
                 """,
-                "Unknown"),
+                "O(1)"),
             (
                 "unknown-while-bound",
                 """
@@ -505,7 +507,7 @@ public sealed class MethodComplexityExtractorTests
             bool M(CustomCollection values) => values.Probe(42);
         }
         """,
-        "Unknown")]
+        "O(1)")]
     public void Known_invocations_integrate_with_method_extraction(
         string scenario,
         string source,
@@ -551,7 +553,7 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
-    public void Custom_collection_contains_remains_unknown()
+    public void Custom_collection_contains_resolves_as_safe_source_call()
     {
         AssertMethodComplexity(
             """
@@ -565,7 +567,790 @@ public sealed class MethodComplexityExtractorTests
                 bool M(CustomCollection values) => values.Contains(42);
             }
             """,
+            "O(1)");
+    }
+
+    [Fact]
+    public void Direct_source_call_propagates_callee_complexity()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    Helper(items);
+                }
+
+                private void Helper(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Two_level_source_chain_propagates_callee_complexity()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    First(items);
+                }
+
+                private void First(int[] values)
+                {
+                    Second(values);
+                }
+
+                private void Second(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Three_level_source_chain_propagates_callee_complexity()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    A(items);
+                }
+
+                private void A(int[] values)
+                {
+                    B(values);
+                }
+
+                private void B(int[] values)
+                {
+                    C(values);
+                }
+
+                private void C(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Source_callee_in_different_syntax_tree_uses_callee_semantic_model()
+    {
+        AssertMethodComplexity(
+            [
+                """
+                public sealed class Sample
+                {
+                    void M(int[] items)
+                    {
+                        Helpers.Helper(items);
+                    }
+                }
+                """,
+                """
+                public static class Helpers
+                {
+                    public static void Helper(int[] values)
+                    {
+                        foreach (var value in values)
+                        {
+                            var x = value + 1;
+                        }
+                    }
+                }
+                """
+            ],
+            "O(n)");
+    }
+
+    [Fact]
+    public void Same_source_callee_twice_uses_one_cached_template()
+    {
+        AssertMethodComplexityAndCacheCount(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    Helper(items);
+                    Helper(items);
+                }
+
+                private void Helper(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)",
+            expectedCacheCount: 1);
+    }
+
+    [Fact]
+    public void Same_source_callee_with_different_inputs_substitutes_per_call_site()
+    {
+        AssertMethodComplexityAndCacheCount(
+            """
+            public sealed class Sample
+            {
+                void M(int[] left, int[] right)
+                {
+                    Helper(left);
+                    Helper(right);
+                }
+
+                private void Helper(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n + m)",
+            expectedCacheCount: 1);
+    }
+
+    [Fact]
+    public void Source_call_inside_loop_composes_multiplicatively()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    foreach (var item in items)
+                    {
+                        Check(items);
+                    }
+                }
+
+                private void Check(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n\u00b2)");
+    }
+
+    [Fact]
+    public void Source_call_inside_loop_preserves_independent_input_dimension()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] left, int[] right)
+                {
+                    foreach (var x in left)
+                    {
+                        Search(right);
+                    }
+                }
+
+                private void Search(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var y = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n \u00b7 m)");
+    }
+
+    [Fact]
+    public void Known_bcl_mapping_keeps_precedence_over_source_analysis_cache()
+    {
+        AssertMethodComplexityAndCacheCount(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                bool M(List<int> values) => values.Contains(42);
+            }
+            """,
+            "O(n)",
+            expectedCacheCount: 0);
+    }
+
+    [Fact]
+    public void External_unresolved_call_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M()
+                {
+                    System.Console.WriteLine("value");
+                }
+            }
+            """,
             "Unknown");
+    }
+
+    [Fact]
+    public void Unsafe_virtual_source_target_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            public class Worker
+            {
+                public virtual void Check(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+
+            public sealed class Sample
+            {
+                void M(Worker worker, int[] items)
+                {
+                    worker.Check(items);
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Unsafe_interface_source_target_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            public interface IWorker
+            {
+                void Check(int[] values);
+            }
+
+            public sealed class Worker : IWorker
+            {
+                public void Check(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+
+            public sealed class Sample
+            {
+                void M(IWorker worker, int[] items)
+                {
+                    worker.Check(items);
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Constant_argument_reduces_source_callee_complexity_to_constant()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M()
+                {
+                    Helper(10);
+                }
+
+                private void Helper(int count)
+                {
+                    for (var i = 0; i < count; i++)
+                    {
+                        var x = i + 1;
+                    }
+                }
+            }
+            """,
+            "O(1)");
+    }
+
+    [Fact]
+    public void Direct_recursion_stops_at_cycle_boundary()
+    {
+        AssertMethodComplexityAndCacheCount(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    M(items);
+                }
+            }
+            """,
+            "Unknown",
+            expectedCacheCount: 0);
+    }
+
+    [Fact]
+    public void Two_method_cycle_stops_at_active_path_boundary()
+    {
+        AssertMethodComplexityAndCacheCount(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    A(items);
+                }
+
+                private void A(int[] values)
+                {
+                    B(values);
+                }
+
+                private void B(int[] values)
+                {
+                    A(values);
+                }
+            }
+            """,
+            "Unknown",
+            expectedCacheCount: 0);
+    }
+
+    [Fact]
+    public void Three_method_cycle_stops_at_active_path_boundary()
+    {
+        AssertMethodComplexityAndCacheCount(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    A(items);
+                }
+
+                private void A(int[] values)
+                {
+                    B(values);
+                }
+
+                private void B(int[] values)
+                {
+                    C(values);
+                }
+
+                private void C(int[] values)
+                {
+                    A(values);
+                }
+            }
+            """,
+            "Unknown",
+            expectedCacheCount: 0);
+    }
+
+    [Fact]
+    public void Depth_limit_counts_root_as_depth_zero_and_allows_fifth_callee()
+    {
+        AssertMethodComplexityAndCacheCount(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    A1(items);
+                }
+
+                private void A1(int[] values) => A2(values);
+                private void A2(int[] values) => A3(values);
+                private void A3(int[] values) => A4(values);
+                private void A4(int[] values) => A5(values);
+
+                private void A5(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)",
+            expectedCacheCount: 5);
+    }
+
+    [Fact]
+    public void Depth_limit_plus_one_stops_at_boundary_without_caching_contextual_unknown()
+    {
+        AssertMethodComplexityAndCacheCount(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    A1(items);
+                }
+
+                private void A1(int[] values) => A2(values);
+                private void A2(int[] values) => A3(values);
+                private void A3(int[] values) => A4(values);
+                private void A4(int[] values) => A5(values);
+                private void A5(int[] values) => A6(values);
+
+                private void A6(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "Unknown",
+            expectedCacheCount: 0);
+    }
+
+    [Fact]
+    public void Method_budget_stops_expansion_for_current_root_only()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                void M1(int[] items)
+                {
+                    BudgetEater(items);
+                    Target(items);
+                }
+
+                void M2(int[] items)
+                {
+                    Target(items);
+                }
+
+                private void BudgetEater(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+
+                private void Target(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """);
+        InterproceduralAnalysisContext context = InterproceduralAnalysisContext.Create(
+            facts.Compilation,
+            new AnalysisBudget(maximumCallDepth: 5, maximumMethodsPerRootAnalysis: 1),
+            CancellationToken.None);
+
+        ComplexityExpression first = AnalyzeMethod(facts, "M1", context, CancellationToken.None);
+        ComplexityExpression second = AnalyzeMethod(facts, "M2", context, CancellationToken.None);
+
+        Assert.Equal("Unknown", first.ToBigONotation());
+        Assert.Equal("O(n)", second.ToBigONotation());
+        Assert.Equal(2, context.TemplateCache.Count);
+    }
+
+    [Fact]
+    public void Budget_boundary_does_not_poison_cache_for_later_root()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                void M1(int[] items)
+                {
+                    BudgetEater(items);
+                    Target(items);
+                }
+
+                void M2(int[] items)
+                {
+                    Target(items);
+                }
+
+                private void BudgetEater(int[] values)
+                {
+                }
+
+                private void Target(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """);
+        InterproceduralAnalysisContext context = InterproceduralAnalysisContext.Create(
+            facts.Compilation,
+            new AnalysisBudget(maximumCallDepth: 5, maximumMethodsPerRootAnalysis: 1),
+            CancellationToken.None);
+
+        Assert.Equal("Unknown", AnalyzeMethod(facts, "M1", context, CancellationToken.None).ToBigONotation());
+        Assert.Equal("O(n)", AnalyzeMethod(facts, "M2", context, CancellationToken.None).ToBigONotation());
+    }
+
+    [Fact]
+    public void Abandoned_cancelled_cache_reservation_does_not_poison_later_analysis()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    Helper(items);
+                }
+
+                private void Helper(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """);
+        InterproceduralAnalysisContext context = InterproceduralAnalysisContext.Create(
+            facts.Compilation,
+            CancellationToken.None);
+        IMethodSymbol helper = GetMethodSymbol(facts, "Helper");
+        using var cancellationTokenSource = new CancellationTokenSource();
+
+        Assert.True(context.TemplateCache.TryReserveAnalysis(
+            helper,
+            CancellationToken.None,
+            out InterproceduralAnalysisResult? completed));
+        Assert.Null(completed);
+
+        cancellationTokenSource.Cancel();
+        _ = Assert.Throws<OperationCanceledException>(() =>
+            context.TemplateCache.StoreCompleted(
+                helper,
+                InterproceduralAnalysisResult.Unknown("Cancelled analysis."),
+                cancellationTokenSource.Token));
+        Assert.True(context.TemplateCache.AbandonAnalysis(helper, CancellationToken.None));
+
+        ComplexityExpression result = AnalyzeMethod(facts, "M", context, CancellationToken.None);
+
+        Assert.Equal("O(n)", result.ToBigONotation());
+        Assert.True(context.TemplateCache.TryGetCompleted(helper, CancellationToken.None, out InterproceduralAnalysisResult cached));
+        Assert.Equal(InterproceduralAnalysisResultKind.Known, cached.Kind);
+    }
+
+    [Fact]
+    public async Task Concurrent_roots_analyzing_same_callee_are_deterministic()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                void M1(int[] items)
+                {
+                    Shared(items);
+                }
+
+                void M2(int[] items)
+                {
+                    Shared(items);
+                }
+
+                private void Shared(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """);
+        InterproceduralAnalysisContext context = InterproceduralAnalysisContext.Create(
+            facts.Compilation,
+            CancellationToken.None);
+
+        string[] results = await RunConcurrentAnalysesWithTimeout(
+            () => AnalyzeMethod(facts, "M1", context, CancellationToken.None).ToBigONotation(),
+            () => AnalyzeMethod(facts, "M2", context, CancellationToken.None).ToBigONotation());
+
+        Assert.Equal(["O(n)", "O(n)"], results);
+        Assert.Equal(1, context.TemplateCache.Count);
+    }
+
+    [Fact]
+    public async Task Concurrent_roots_analyzing_different_callees_are_deterministic()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                void M1(int[] items)
+                {
+                    Left(items);
+                }
+
+                void M2(int[] items)
+                {
+                    Right(items);
+                }
+
+                private void Left(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+
+                private void Right(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """);
+        InterproceduralAnalysisContext context = InterproceduralAnalysisContext.Create(
+            facts.Compilation,
+            CancellationToken.None);
+
+        string[] results = await RunConcurrentAnalysesWithTimeout(
+            () => AnalyzeMethod(facts, "M1", context, CancellationToken.None).ToBigONotation(),
+            () => AnalyzeMethod(facts, "M2", context, CancellationToken.None).ToBigONotation());
+
+        Assert.Equal(["O(n)", "O(n)"], results);
+        Assert.Equal(2, context.TemplateCache.Count);
+    }
+
+    [Fact]
+    public async Task Concurrent_roots_analyzing_overlapping_graph_are_deterministic()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                void M1(int[] items)
+                {
+                    Left(items);
+                }
+
+                void M2(int[] items)
+                {
+                    Right(items);
+                }
+
+                private void Left(int[] values)
+                {
+                    Shared(values);
+                }
+
+                private void Right(int[] values)
+                {
+                    Shared(values);
+                }
+
+                private void Shared(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """);
+        InterproceduralAnalysisContext context = InterproceduralAnalysisContext.Create(
+            facts.Compilation,
+            CancellationToken.None);
+
+        string[] results = await RunConcurrentAnalysesWithTimeout(
+            () => AnalyzeMethod(facts, "M1", context, CancellationToken.None).ToBigONotation(),
+            () => AnalyzeMethod(facts, "M2", context, CancellationToken.None).ToBigONotation());
+
+        Assert.Equal(["O(n)", "O(n)"], results);
+        Assert.Equal(3, context.TemplateCache.Count);
+    }
+
+    [Fact]
+    public async Task Concurrent_mutual_cycle_does_not_deadlock_on_cache_entries()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                void M1(int[] items)
+                {
+                    A(items);
+                }
+
+                void M2(int[] items)
+                {
+                    B(items);
+                }
+
+                private void A(int[] values)
+                {
+                    B(values);
+                }
+
+                private void B(int[] values)
+                {
+                    A(values);
+                }
+            }
+            """);
+        InterproceduralAnalysisContext context = InterproceduralAnalysisContext.Create(
+            facts.Compilation,
+            CancellationToken.None);
+
+        string[] results = await RunConcurrentAnalysesWithTimeout(
+            () => AnalyzeMethod(facts, "M1", context, CancellationToken.None).ToBigONotation(),
+            () => AnalyzeMethod(facts, "M2", context, CancellationToken.None).ToBigONotation());
+
+        Assert.Equal(["Unknown", "Unknown"], results);
+        Assert.Equal(0, context.TemplateCache.Count);
     }
 
     [Fact]
@@ -795,7 +1580,7 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
-    public void Custom_extension_named_where_remains_unknown()
+    public void Custom_extension_named_where_resolves_as_safe_source_call()
     {
         AssertMethodComplexity(
             """
@@ -814,11 +1599,11 @@ public sealed class MethodComplexityExtractorTests
                 }
             }
             """,
-            "Unknown");
+            "O(1)");
     }
 
     [Fact]
-    public void Custom_extension_named_any_remains_unknown()
+    public void Custom_extension_named_any_resolves_as_safe_source_call()
     {
         AssertMethodComplexity(
             """
@@ -837,7 +1622,7 @@ public sealed class MethodComplexityExtractorTests
                 }
             }
             """,
-            "Unknown");
+            "O(1)");
     }
 
     [Fact]
@@ -896,7 +1681,7 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
-    public void Consumed_linq_pipeline_with_unresolved_predicate_is_unknown()
+    public void Consumed_linq_pipeline_with_source_predicate_is_linear()
     {
         AssertMethodComplexity(
             """
@@ -910,7 +1695,7 @@ public sealed class MethodComplexityExtractorTests
                 bool IsPositive(int value) => value > 0;
             }
             """,
-            "Unknown");
+            "O(n)");
     }
 
     [Fact]
@@ -1838,7 +2623,7 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
-    public void Branch_containing_unresolved_invocation_is_unknown()
+    public void Branch_containing_source_invocation_uses_branch_composition()
     {
         AssertMethodComplexity(
             """
@@ -1864,11 +2649,11 @@ public sealed class MethodComplexityExtractorTests
                 }
             }
             """,
-            "Unknown");
+            "O(n)");
     }
 
     [Fact]
-    public void Condition_containing_unresolved_invocation_is_unknown()
+    public void Condition_containing_source_invocation_is_known()
     {
         AssertMethodComplexity(
             """
@@ -1885,13 +2670,13 @@ public sealed class MethodComplexityExtractorTests
                 bool IsEnabled() => true;
             }
             """,
-            "Unknown");
+            "O(1)");
     }
 
     [Theory]
     [InlineData("custom-property-getter")]
     [InlineData("custom-indexer")]
-    [InlineData("unknown-invocation")]
+    [InlineData("external-invocation")]
     [InlineData("while-without-progression")]
     [InlineData("conditional-while-progression")]
     [InlineData("conditional-do-while-progression")]
@@ -1925,17 +2710,13 @@ public sealed class MethodComplexityExtractorTests
                     int M(Indexed indexed) => indexed[0];
                 }
                 """,
-            "unknown-invocation" =>
+            "external-invocation" =>
                 """
                 public sealed class Sample
                 {
                     void M()
                     {
-                        Visit();
-                    }
-
-                    void Visit()
-                    {
+                        System.Console.WriteLine("value");
                     }
                 }
                 """,
@@ -2275,33 +3056,127 @@ public sealed class MethodComplexityExtractorTests
             + actual);
     }
 
+    private static void AssertMethodComplexity(string[] sources, string expected)
+    {
+        string actual = AnalyzeMethod(sources, out _).ToBigONotation();
+
+        Assert.True(
+            StringComparer.Ordinal.Equals(expected, actual),
+            "expected " + expected + " but got " + actual);
+    }
+
+    private static void AssertMethodComplexityAndCacheCount(
+        string source,
+        string expected,
+        int expectedCacheCount)
+    {
+        string actual = AnalyzeMethod([source], out InterproceduralAnalysisContext interproceduralContext)
+            .ToBigONotation();
+
+        Assert.True(
+            StringComparer.Ordinal.Equals(expected, actual),
+            "expected " + expected + " but got " + actual);
+        Assert.Equal(expectedCacheCount, interproceduralContext.TemplateCache.Count);
+    }
+
     private static ComplexityExpression AnalyzeMethod(string source)
     {
-        MethodFacts facts = CreateFacts(source);
+        return AnalyzeMethod([source], out _);
+    }
+
+    private static ComplexityExpression AnalyzeMethod(
+        string[] sources,
+        out InterproceduralAnalysisContext interproceduralContext)
+    {
+        CompilationFacts compilationFacts = CreateCompilationFacts(sources);
+        MethodFacts facts = GetMethodFacts(compilationFacts, "M");
         var extractor = new MethodComplexityExtractor();
+        interproceduralContext = InterproceduralAnalysisContext.Create(
+            facts.SemanticModel.Compilation,
+            CancellationToken.None);
 
         return extractor.AnalyzeMethod(
             facts.MethodDeclaration,
             facts.SemanticModel,
+            interproceduralContext,
             CancellationToken.None);
+    }
+
+    private static ComplexityExpression AnalyzeMethod(
+        CompilationFacts facts,
+        string methodName,
+        InterproceduralAnalysisContext interproceduralContext,
+        CancellationToken cancellationToken)
+    {
+        MethodFacts methodFacts = GetMethodFacts(facts, methodName);
+        return new MethodComplexityExtractor().AnalyzeMethod(
+            methodFacts.MethodDeclaration,
+            methodFacts.SemanticModel,
+            interproceduralContext,
+            cancellationToken);
     }
 
     private static MethodFacts CreateFacts(string source)
     {
-        SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(source);
+        return CreateFactsFromSources("M", source);
+    }
+
+    private static MethodFacts CreateFactsFromSources(string methodName, params string[] sources)
+    {
+        return GetMethodFacts(CreateCompilationFacts(sources), methodName);
+    }
+
+    private static CompilationFacts CreateCompilationFacts(params string[] sources)
+    {
+        SyntaxTree[] syntaxTrees =
+        [
+            .. sources.Select(source => CSharpSyntaxTree.ParseText(source))
+        ];
         CSharpCompilation compilation = CSharpCompilation.Create(
             assemblyName: "MethodComplexityExtractorTests",
-            syntaxTrees: [syntaxTree],
+            syntaxTrees: syntaxTrees,
             references: BasicReferences,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
-        MethodDeclarationSyntax methodDeclaration = syntaxTree
-            .GetRoot()
-            .DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .Single(method => method.Identifier.ValueText == "M");
+
+        return new CompilationFacts(compilation, [.. syntaxTrees]);
+    }
+
+    private static MethodFacts GetMethodFacts(
+        CompilationFacts facts,
+        string methodName)
+    {
+        MethodDeclarationSyntax methodDeclaration = facts.SyntaxTrees
+            .SelectMany(syntaxTree => syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())
+            .Single(method => StringComparer.Ordinal.Equals(method.Identifier.ValueText, methodName));
+        SemanticModel semanticModel = facts.Compilation.GetSemanticModel(methodDeclaration.SyntaxTree);
 
         return new MethodFacts(semanticModel, methodDeclaration);
+    }
+
+    private static IMethodSymbol GetMethodSymbol(
+        CompilationFacts facts,
+        string methodName)
+    {
+        MethodFacts methodFacts = GetMethodFacts(facts, methodName);
+        return methodFacts.SemanticModel.GetDeclaredSymbol(
+            methodFacts.MethodDeclaration,
+            CancellationToken.None)
+            ?? throw new InvalidOperationException("Expected method declaration to resolve to a symbol.");
+    }
+
+    private static async Task<string[]> RunConcurrentAnalysesWithTimeout(
+        params Func<string>[] analyses)
+    {
+        Task<string>[] tasks =
+        [
+            .. analyses.Select(analysis => Task.Run(analysis))
+        ];
+        Task<string[]> analysisTask = Task.WhenAll(tasks);
+        Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
+        Task completedTask = await Task.WhenAny(analysisTask, timeoutTask);
+
+        Assert.Same(analysisTask, completedTask);
+        return await analysisTask;
     }
 
     private static ImmutableArray<MetadataReference> BasicReferences
@@ -2315,14 +3190,20 @@ public sealed class MethodComplexityExtractorTests
             (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
             ?? string.Empty;
 
-        return trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Where(path => path.Length > 0)
-            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
-            .ToImmutableArray();
+        return
+        [
+            .. trustedPlatformAssemblies
+                .Split(Path.PathSeparator)
+                .Where(path => path.Length > 0)
+                .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
+        ];
     }
 
     private sealed record MethodFacts(
         SemanticModel SemanticModel,
         MethodDeclarationSyntax MethodDeclaration);
+
+    private sealed record CompilationFacts(
+        CSharpCompilation Compilation,
+        ImmutableArray<SyntaxTree> SyntaxTrees);
 }

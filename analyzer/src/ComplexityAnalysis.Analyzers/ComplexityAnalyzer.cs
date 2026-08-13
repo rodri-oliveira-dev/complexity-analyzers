@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Linq;
 
 using ComplexityAnalysis.Analyzers.Analysis;
+using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Diagnostics;
 using ComplexityAnalysis.Analyzers.Model;
 
@@ -25,24 +26,43 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.LinearLookupInsideIteration,
             DiagnosticDescriptors.MaterializationInsideIteration,
             DiagnosticDescriptors.OrderingInsideIteration,
+            DiagnosticDescriptors.InputDependentCallInsideIteration,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
-        context.RegisterCompilationAction(AnalyzeCompilation);
-        context.RegisterSyntaxNodeAction(AnalyzeMethodDeclaration, SyntaxKind.MethodDeclaration);
+        context.RegisterCompilationStartAction(InitializeCompilationAnalysis);
     }
 
-    private static void AnalyzeMethodDeclaration(SyntaxNodeAnalysisContext context)
+    private static void InitializeCompilationAnalysis(CompilationStartAnalysisContext context)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        InterproceduralAnalysisContext interproceduralContext = InterproceduralAnalysisContext.Create(
+            context.Compilation,
+            context.CancellationToken);
+
+        context.RegisterCompilationEndAction(AnalyzeCompilation);
+        context.RegisterSyntaxNodeAction(
+            syntaxContext => AnalyzeMethodDeclaration(syntaxContext, interproceduralContext),
+            SyntaxKind.MethodDeclaration);
+    }
+
+    private static void AnalyzeMethodDeclaration(
+        SyntaxNodeAnalysisContext context,
+        InterproceduralAnalysisContext interproceduralContext)
+    {
+        _ = interproceduralContext ?? throw new System.ArgumentNullException(nameof(interproceduralContext));
+
         context.CancellationToken.ThrowIfCancellationRequested();
 
         MethodDeclarationSyntax methodDeclaration = (MethodDeclarationSyntax)context.Node;
         foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMethod(
             methodDeclaration,
             context.SemanticModel,
+            interproceduralContext,
             context.CancellationToken))
         {
             context.ReportDiagnostic(diagnostic);
@@ -51,6 +71,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         ComplexityExpression complexity = new MethodComplexityExtractor().AnalyzeMethod(
             methodDeclaration,
             context.SemanticModel,
+            interproceduralContext,
             context.CancellationToken);
 
         if (complexity is UnknownComplexity)

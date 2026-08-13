@@ -2,9 +2,9 @@
 
 [English](../en/analyzers.md) | Portugues (Brasil)
 
-Esta pagina e o catalogo publico dos diagnostics expostos por `ComplexityAnalysis.Analyzers` na Phase 4.
+Esta pagina e o catalogo publico dos diagnostics expostos por `ComplexityAnalysis.Analyzers` na Phase 5.
 
-O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn. Metodos customizados com o mesmo nome nao sao tratados como operacoes conhecidas. Operacoes nao suportadas ou nao resolvidas continuam como `Unknown`.
+O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, e pode propagar complexidade de metodos fonte seguros na mesma compilation. Metodos customizados com o mesmo nome nao sao tratados como operacoes BCL/LINQ conhecidas. Operacoes nao suportadas, inseguras, ciclicas, limitadas por budget ou nao resolvidas continuam como `Unknown`.
 
 ## Resumo
 
@@ -14,6 +14,7 @@ O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn. Metod
 | `BIG1001` | Linear lookup inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1002` | Materialization inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1003` | Ordering inside iteration | `Complexity` | `Info` | `true` |
+| `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## BIG0001 - Estimated Algorithmic Complexity
@@ -30,7 +31,7 @@ O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn. Metod
 
 ### Problema Detectado
 
-`BIG0001` e informational. Ele expoe a estimativa conhecida do analyzer para um metodo suportado, como `O(1)`, `O(n)`, `O(n log n)` ou `O(n^2)`.
+`BIG0001` e informational. Ele expoe a estimativa conhecida do analyzer para um metodo suportado, como `O(1)`, `O(n)`, `O(n log n)` ou `O(n^2)`. Na Phase 5, essa estimativa pode incluir complexidade propagada de callees fonte seguros.
 
 ### Exemplo
 
@@ -49,13 +50,35 @@ public sealed class Sample
 
 Quando habilitado, o diagnostic e reportado em `M` com `Estimated time complexity: O(n)`.
 
+Exemplo interprocedural com chamada fonte:
+
+```csharp
+public sealed class Sample
+{
+    public void M(int[] values)
+    {
+        Helper(values);
+    }
+
+    private void Helper(int[] items)
+    {
+        foreach (var item in items)
+        {
+            var x = item + 1;
+        }
+    }
+}
+```
+
+Quando `BIG0001` esta habilitado, `M` reporta `Estimated time complexity: O(n)`.
+
 ### Casos Que Nao Geram Diagnostic
 
 Nenhum diagnostic e reportado quando:
 
 - `BIG0001` nao esta habilitado pela configuracao do consumidor;
 - o resultado do metodo e `Unknown`;
-- o metodo depende de chamadas locais de projeto nao suportadas ou operacoes nao resolvidas.
+- o metodo depende de operacoes nao suportadas, inseguras, ciclicas, limitadas por budget ou nao resolvidas.
 
 ### Configuracao
 
@@ -259,6 +282,74 @@ Desabilite com:
 dotnet_diagnostic.BIG1003.severity = none
 ```
 
+## BIG1004 - Input-Dependent Method Call Inside Iteration
+
+| Propriedade | Valor |
+| --- | --- |
+| ID | `BIG1004` |
+| Titulo | `Input-dependent method call inside iteration` |
+| Categoria | `Complexity` |
+| Severidade padrao | `Info` |
+| Habilitado por padrao | `true` |
+| Localizacao | Invocacao de metodo fonte |
+| Mensagem | Metodo fonte, estimativa do callee, estimativa da iteracao externa e estimativa combinada |
+
+### Problema Detectado
+
+`BIG1004` reporta uma chamada de metodo fonte suportada com complexidade conhecida dependente de entrada quando essa chamada executa dentro de um loop analisavel.
+
+### Exemplo
+
+```csharp
+public sealed class Sample
+{
+    void M(int[] customers, int[] blocked)
+    {
+        foreach (var customer in customers)
+        {
+            CheckAgainstBlacklist(customer, blocked);
+        }
+    }
+
+    private void CheckAgainstBlacklist(int customer, int[] blocked)
+    {
+        foreach (var value in blocked)
+        {
+            var x = value + customer;
+        }
+    }
+}
+```
+
+O diagnostic aponta para `CheckAgainstBlacklist(customer, blocked)` e reporta o padrao combinado `O(n * m)`.
+
+### Casos Que Nao Geram Diagnostic
+
+Nenhum diagnostic e reportado para:
+
+- chamadas fonte fora de loops;
+- chamadas fonte cuja complexidade substituida e `O(1)`;
+- dispatch virtual ou de interface inseguro;
+- callees ciclicos ou limitados por budget;
+- bindings de argumentos desconhecidos;
+- operacoes BCL/LINQ conhecidas ja tratadas por `BIG1001`, `BIG1002` ou `BIG1003`.
+
+### Configuracao
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1004.severity = warning
+```
+
+Desabilite com:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1004.severity = none
+```
+
 ## BIG9000 - Analyzer Execution Probe
 
 | Propriedade | Valor |
@@ -308,10 +399,25 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## Subconjunto Suportado de Operacoes Conhecidas
 
-A Phase 4 inclui um subconjunto pequeno e documentado:
+A Phase 5 inclui um subconjunto pequeno e documentado:
 
 - BCL: operacoes selecionadas de `List<T>`, `Dictionary<TKey,TValue>`, `HashSet<T>`, arrays e string.
 - LINQ imediatas ou terminais: `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max` e `Aggregate`.
 - LINQ deferred: `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct` e `GroupBy`.
 
 A criacao de pipeline LINQ deferred e tratada como trabalho de setup. O custo de enumeracao so e contado quando uma operacao terminal suportada ou `foreach` consome a pipeline.
+
+## Escopo Suportado de Metodos Fonte
+
+A analise interprocedural de metodos fonte e limitada a metodos ordinarios na mesma Roslyn `Compilation` com dispatch seguro:
+
+- metodos static;
+- metodos private;
+- metodos ordinarios nao virtuais;
+- dispatch sealed quando o alvo de runtime e comprovado.
+
+A travessia e demand-driven: um callee fonte e analisado somente quando um caller analisado alcanca aquela invocacao. O analyzer nao constroi um call graph obrigatorio da compilation inteira e nao pre-analisa todas as syntax trees para propagacao interprocedural.
+
+A expansao e limitada por budgets internos: a profundidade maxima de chamadas e `5`, e o maximo de expansoes uncached de metodos fonte por analise raiz e `32`. Quando um boundary de budget e alcancado, a chamada afetada permanece `Unknown`; raizes independentes posteriores ainda podem analisar e cachear o mesmo metodo fonte quando o proprio budget permitir.
+
+Continuam fora de escopo: solucao de recursao, dispatch virtual/interface completo, assemblies externos, construtores, propriedades, operadores, local functions, lambdas como alvos independentes, call graph de compilation inteira e analise de solution inteira. Ciclos sao detectados mas tratados internamente como `Unknown`; recursao nao e resolvida na Phase 5. A Phase 6 e responsavel por solucao de recorrencias e chamadas recursivas.

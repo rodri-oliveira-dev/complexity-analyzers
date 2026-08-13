@@ -40,6 +40,15 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports known ordering operations whose deferred work is consumed inside an analyzable iteration.");
 
+    internal static readonly DiagnosticDescriptor InputDependentCallInsideIteration = new(
+        id: "BIG1004",
+        title: "Input-dependent method call inside iteration",
+        messageFormat: "Method '{0}' contributes {1} work inside a {2} iteration. Estimated combined complexity: {3}.",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports source method calls with known input-dependent complexity executed inside an analyzable iteration.");
+
     internal static readonly DiagnosticDescriptor AnalyzerExecutionProbe = new(
         id: "BIG9000",
         title: "Analyzer execution probe",

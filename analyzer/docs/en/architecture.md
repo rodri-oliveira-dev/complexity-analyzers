@@ -2,7 +2,7 @@
 
 [English](architecture.md) | [Portugues (Brasil)](../pt-BR/architecture.md)
 
-`ComplexityAnalysis.Analyzers` is an isolated Roslyn analyzer package workspace. Through Phase 4, it contains analyzer infrastructure, a Roslyn-free complexity model, intraprocedural extraction, semantic known-operation mapping, and public diagnostics.
+`ComplexityAnalysis.Analyzers` is an isolated Roslyn analyzer package workspace. Through Phase 5, it contains analyzer infrastructure, a Roslyn-free complexity model, method extraction, semantic known-operation mapping, bounded source-method interprocedural analysis, and public diagnostics.
 
 ## Current Pipeline
 
@@ -19,6 +19,7 @@ Analysis
     +-- basic operations
     +-- loop bounds
     +-- known BCL/LINQ operations
+    +-- safe source-method calls
     +-- method extraction
     |
     v
@@ -36,6 +37,7 @@ DiagnosticAnalyzer
     +-- BIG1001 linear lookup inside iteration
     +-- BIG1002 materialization inside iteration
     +-- BIG1003 ordering inside iteration
+    +-- BIG1004 source call inside iteration
     `-- BIG9000 infrastructure probe
 ```
 
@@ -95,7 +97,7 @@ The analysis layer lives under:
 analyzer/src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-It analyzes one method at a time. The extractor does not build a call graph, follow project-local calls, solve recursion, or inspect other method bodies.
+It starts from one method at a time. Phase 5 can follow supported source-method calls on demand, but it does not build a whole-compilation call graph, solve recursion, or inspect unrelated method bodies.
 
 Main responsibilities are split across:
 
@@ -105,6 +107,48 @@ Main responsibilities are split across:
 - `BasicOperationAnalyzer`: classifies proven constant-time statements and expressions and delegates supported known operations.
 - `LoopBoundAnalyzer`: recognizes supported constant, linear, logarithmic, and known enumerable loop bounds.
 - `KnownOperationComplexityAnalyzer`: composes known BCL/LINQ invocation, property, element-access, terminal operation, and consumed deferred-pipeline costs.
+
+## Interprocedural Source Calls
+
+Interprocedural analysis means the analyzer can include the cost of a supported source callee in the caller's estimate. The callee result is cached as a template relative to the callee's own parameters, then argument substitution maps that template back to the caller's dimensions.
+
+Conceptual flow:
+
+```text
+Caller
+  |
+  v
+Invocation resolution
+  |
+  +-- Known BCL/LINQ
+  |
+  `-- Source method
+          |
+      cache/template
+          |
+      substitution
+          |
+          v
+Caller complexity
+```
+
+Cycle boundary:
+
+```text
+Cycle detected
+      |
+      v
+Unknown
+      |
+      v
+Phase 6 responsibility
+```
+
+Traversal is demand-driven. A source callee is analyzed only when an invocation is visited from the current root method, BCL/LINQ known-operation resolution does not apply, dispatch is safe, and the internal budget allows expansion. The analyzer does not pre-analyze every method and does not create a complete compilation graph.
+
+Safe source dispatch includes static methods, private methods, non-virtual ordinary methods, and sealed dispatch when the runtime target is proven. Interface dispatch, unsafe virtual dispatch, dynamic dispatch, delegate invocation, reflection, external metadata-only methods, constructors, properties, operators, local functions, and lambdas as independent call targets remain out of scope.
+
+Internal limits bound call depth and methods expanded per root analysis. Unknown results remain conservative for unresolved calls, unsafe dispatch, unavailable source, unproven argument binding, budget boundaries, cancellation, and cycles. Direct and mutual recursion are recognized, but recurrence solving is not implemented in Phase 5.
 
 ## Known Operations
 
@@ -128,10 +172,11 @@ Unsupported or unresolved invocations remain `Unknown`.
 - `BIG1001` at a linear lookup invocation inside an analyzable iteration.
 - `BIG1002` at a materializing invocation inside an analyzable iteration.
 - `BIG1003` at a deferred ordering invocation only when supported consumption is proven inside an analyzable iteration.
+- `BIG1004` at a supported source-method call with known input-dependent complexity inside an analyzable iteration.
 - `BIG9000` once per compilation when explicitly enabled.
 
 Generated code analysis is disabled, concurrent execution is enabled, and analyzer hot paths must remain free of I/O, network access, process execution, and reflection-heavy behavior.
 
 ## Why No Workspaces
 
-`Microsoft.CodeAnalysis.Workspaces` is intentionally absent. Phase 4 does not implement a `CodeFixProvider`, project-wide analysis, solution loading, or IDE workspace features that would justify that dependency.
+`Microsoft.CodeAnalysis.Workspaces` is intentionally absent. Phase 5 does not implement a `CodeFixProvider`, whole-project graph analysis, solution loading, or IDE workspace features that would justify that dependency.

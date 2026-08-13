@@ -16,6 +16,7 @@ public sealed class ComplexityAnalyzerTests
     private const string LinearLookupInsideIterationId = "BIG1001";
     private const string MaterializationInsideIterationId = "BIG1002";
     private const string OrderingInsideIterationId = "BIG1003";
+    private const string InputDependentCallInsideIterationId = "BIG1004";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -38,6 +39,7 @@ public sealed class ComplexityAnalyzerTests
                 LinearLookupInsideIterationId,
                 MaterializationInsideIterationId,
                 OrderingInsideIterationId,
+                InputDependentCallInsideIterationId,
                 AnalyzerExecutionProbeId
             ],
             analyzer.SupportedDiagnostics.Select(descriptor => descriptor.Id));
@@ -61,6 +63,7 @@ public sealed class ComplexityAnalyzerTests
     [InlineData(LinearLookupInsideIterationId, "Linear lookup inside iteration")]
     [InlineData(MaterializationInsideIterationId, "Materialization inside iteration")]
     [InlineData(OrderingInsideIterationId, "Ordering inside iteration")]
+    [InlineData(InputDependentCallInsideIterationId, "Input-dependent method call inside iteration")]
     public void Actionable_diagnostics_have_expected_public_descriptor_metadata(
         string diagnosticId,
         string expectedTitle)
@@ -164,6 +167,122 @@ public sealed class ComplexityAnalyzerTests
             .GetSubText(diagnostic.Location.SourceSpan)
             .ToString();
         Assert.Equal("M", diagnosticText);
+    }
+
+    [Fact]
+    public async Task Analyzer_reports_interprocedural_estimated_complexity_when_enabled()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public void M(int[] values)
+                {
+                    Helper(values);
+                }
+
+                private void Helper(int[] items)
+                {
+                    foreach (var item in items)
+                    {
+                        var x = item + 1;
+                    }
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Diagnostic diagnostic = diagnostics
+            .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+            .Single(diagnostic => GetDiagnosticText(diagnostic) == "M");
+
+        Assert.Equal("Estimated time complexity: O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task Analyzer_reports_chained_interprocedural_estimated_complexity_when_enabled()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public void M(int[] values)
+                {
+                    First(values);
+                }
+
+                private void First(int[] items)
+                {
+                    Second(items);
+                }
+
+                private void Second(int[] items)
+                {
+                    foreach (var item in items)
+                    {
+                        var x = item + 1;
+                    }
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Diagnostic diagnostic = diagnostics
+            .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+            .Single(diagnostic => GetDiagnosticText(diagnostic) == "M");
+
+        Assert.Equal("Estimated time complexity: O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task Analyzer_preserves_independent_inputs_in_interprocedural_estimated_complexity()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public void M(int[] left, int[] right)
+                {
+                    foreach (var value in left)
+                    {
+                        Search(right);
+                    }
+                }
+
+                private void Search(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Diagnostic diagnostic = diagnostics
+            .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+            .Single(diagnostic => GetDiagnosticText(diagnostic) == "M");
+
+        Assert.Equal("Estimated time complexity: O(n \u00b7 m)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task Analyzer_does_not_report_estimated_complexity_for_interprocedural_cycles()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public void M(int[] values)
+                {
+                    M(values);
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
     }
 
     [Fact]
@@ -462,6 +581,227 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
+    public async Task Big1004_reports_linear_source_call_inside_foreach()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void M(int[] customers)
+                {
+                    foreach (var customer in customers)
+                    {
+                        Check(customers);
+                    }
+                }
+
+                private void Check(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
+
+        Assert.Equal(
+            "Method 'Sample.Check' contributes O(n) work inside a O(n) iteration. Estimated combined complexity: O(n\u00b2).",
+            diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertDiagnosticText(diagnostic, "Check(customers)");
+    }
+
+    [Fact]
+    public async Task Big1004_reports_independent_source_dimension_inside_foreach()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void M(int[] customers, int[] blocked)
+                {
+                    foreach (var customer in customers)
+                    {
+                        CheckAgainstBlacklist(customer, blocked);
+                    }
+                }
+
+                private void CheckAgainstBlacklist(int customer, int[] blocked)
+                {
+                    foreach (var value in blocked)
+                    {
+                        var x = value + customer;
+                    }
+                }
+            }
+            """);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
+
+        Assert.Equal(
+            "Method 'Sample.CheckAgainstBlacklist' contributes O(m) work inside a O(n) iteration. Estimated combined complexity: O(n \u00b7 m).",
+            diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertDiagnosticText(diagnostic, "CheckAgainstBlacklist(customer, blocked)");
+    }
+
+    [Fact]
+    public async Task Big1004_does_not_report_constant_source_call_inside_foreach()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void M(int[] customers)
+                {
+                    foreach (var customer in customers)
+                    {
+                        Check(customer);
+                    }
+                }
+
+                private int Check(int value) => value + 1;
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
+    }
+
+    [Fact]
+    public async Task Big1004_does_not_report_source_call_outside_loop()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void M(int[] values)
+                {
+                    Check(values);
+                }
+
+                private void Check(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
+    }
+
+    [Fact]
+    public async Task Big1004_does_not_report_unknown_source_call_inside_foreach()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void M(int[] customers, int[] values)
+                {
+                    foreach (var customer in customers)
+                    {
+                        Check(values);
+                    }
+                }
+
+                private void Check(int[] values)
+                {
+                    System.Console.WriteLine(values.Length);
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
+    }
+
+    [Fact]
+    public async Task Big1004_does_not_report_virtual_unsafe_dispatch_inside_foreach()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public class Worker
+            {
+                public virtual void Check(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+
+            public sealed class Sample
+            {
+                void M(int[] customers, int[] values, Worker worker)
+                {
+                    foreach (var customer in customers)
+                    {
+                        worker.Check(values);
+                    }
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
+    }
+
+    [Fact]
+    public async Task Big1004_does_not_report_cycle_boundary_inside_foreach()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void M(int[] customers, int[] values)
+                {
+                    foreach (var customer in customers)
+                    {
+                        Check(values);
+                    }
+                }
+
+                private void Check(int[] values)
+                {
+                    Check(values);
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
+    }
+
+    [Fact]
+    public async Task Big1004_does_not_duplicate_known_list_contains_inside_foreach()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                void M(List<int> customers, List<int> blockedCustomers)
+                {
+                    foreach (var customer in customers)
+                    {
+                        _ = blockedCustomers.Contains(customer);
+                    }
+                }
+            }
+            """);
+
+        Assert.Equal(1, diagnostics.Count(diagnostic => diagnostic.Id == LinearLookupInsideIterationId));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
+    }
+
+    [Fact]
     public async Task Actionable_diagnostics_coexist_without_duplicate_reports()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
@@ -485,6 +825,7 @@ public sealed class ComplexityAnalyzerTests
         Assert.Equal(1, diagnostics.Count(diagnostic => diagnostic.Id == LinearLookupInsideIterationId));
         Assert.Equal(1, diagnostics.Count(diagnostic => diagnostic.Id == MaterializationInsideIterationId));
         Assert.Equal(1, diagnostics.Count(diagnostic => diagnostic.Id == OrderingInsideIterationId));
+        Assert.Equal(0, diagnostics.Count(diagnostic => diagnostic.Id == InputDependentCallInsideIterationId));
     }
 
     [Fact]
@@ -531,6 +872,7 @@ public sealed class ComplexityAnalyzerTests
             Assert.Contains(actual, diagnostic => diagnostic.StartsWith(LinearLookupInsideIterationId + "|", StringComparison.Ordinal));
             Assert.Contains(actual, diagnostic => diagnostic.StartsWith(MaterializationInsideIterationId + "|", StringComparison.Ordinal));
             Assert.Contains(actual, diagnostic => diagnostic.StartsWith(OrderingInsideIterationId + "|", StringComparison.Ordinal));
+            Assert.DoesNotContain(actual, diagnostic => diagnostic.StartsWith(InputDependentCallInsideIterationId + "|", StringComparison.Ordinal));
             Assert.Contains(actual, diagnostic => diagnostic.StartsWith(AnalyzerExecutionProbeId + "|", StringComparison.Ordinal));
         }
     }
@@ -701,14 +1043,17 @@ public sealed class ComplexityAnalyzerTests
 
     private static void AssertDiagnosticText(Diagnostic diagnostic, string expectedText)
     {
+        Assert.Equal(expectedText, GetDiagnosticText(diagnostic));
+    }
+
+    private static string GetDiagnosticText(Diagnostic diagnostic)
+    {
         SyntaxTree sourceTree = diagnostic.Location.SourceTree
             ?? throw new System.InvalidOperationException("Expected a source location.");
-        string diagnosticText = sourceTree
+        return sourceTree
             .GetText()
             .GetSubText(diagnostic.Location.SourceSpan)
             .ToString();
-
-        Assert.Equal(expectedText, diagnosticText);
     }
 
     private static string FormatDeterministicDiagnostic(Diagnostic diagnostic)

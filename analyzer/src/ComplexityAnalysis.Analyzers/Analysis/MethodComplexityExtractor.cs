@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 
+using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -21,13 +22,108 @@ internal sealed class MethodComplexityExtractor
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        MethodAnalysisContext context = MethodAnalysisContext.Create(
-            methodDeclaration,
-            semanticModel,
+        IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken)
+            ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        InterproceduralAnalysisContext interproceduralContext = InterproceduralAnalysisContext.Create(
+            semanticModel.Compilation,
+            cancellationToken);
+        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+            methodSymbol,
             cancellationToken);
 
+        return AnalyzeMethod(
+            methodDeclaration,
+            methodSymbol,
+            semanticModel,
+            interproceduralContext,
+            rootState,
+            cancellationToken);
+    }
+
+    internal ComplexityExpression AnalyzeMethod(
+        MethodDeclarationSyntax methodDeclaration,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
+        CancellationToken cancellationToken)
+    {
+        _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken)
+            ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+            methodSymbol,
+            cancellationToken);
+
+        return AnalyzeMethod(
+            methodDeclaration,
+            methodSymbol,
+            semanticModel,
+            interproceduralContext,
+            rootState,
+            cancellationToken);
+    }
+
+    internal InterproceduralAnalysisResult AnalyzeSourceMethod(
+        MethodDeclarationSyntax methodDeclaration,
+        IMethodSymbol methodSymbol,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
+        InterproceduralRootAnalysisState rootState,
+        CancellationToken cancellationToken)
+    {
+        _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
+        _ = methodSymbol ?? throw new ArgumentNullException(nameof(methodSymbol));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
+        _ = rootState ?? throw new ArgumentNullException(nameof(rootState));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        MethodAnalysisContext context = MethodAnalysisContext.Create(
+            semanticModel,
+            methodSymbol,
+            interproceduralContext,
+            rootState,
+            cancellationToken);
+        ComplexityExpression complexity = AnalyzeMethodCore(methodDeclaration, context);
+
+        return complexity is UnknownComplexity
+            ? InterproceduralAnalysisResult.Unknown("The source method complexity is unknown.")
+            : InterproceduralAnalysisResult.Known(
+                MethodComplexityTemplate.Create(
+                    complexity,
+                    context,
+                    cancellationToken));
+    }
+
+    private static ComplexityExpression AnalyzeMethod(
+        MethodDeclarationSyntax methodDeclaration,
+        IMethodSymbol methodSymbol,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
+        InterproceduralRootAnalysisState rootState,
+        CancellationToken cancellationToken)
+    {
+        MethodAnalysisContext context = MethodAnalysisContext.Create(
+            semanticModel,
+            methodSymbol,
+            interproceduralContext,
+            rootState,
+            cancellationToken);
+
+        return AnalyzeMethodCore(methodDeclaration, context);
+    }
+
+    private static ComplexityExpression AnalyzeMethodCore(
+        MethodDeclarationSyntax methodDeclaration,
+        MethodAnalysisContext context)
+    {
         return methodDeclaration.Body is not null
-            ? AnalyzeBlock(methodDeclaration.Body, context)
+            ? AnalyzeBlockCore(methodDeclaration.Body, context)
             : methodDeclaration.ExpressionBody is null
             ? ComplexityFactory.Unknown()
             : new BasicOperationAnalyzer(context).AnalyzeExpression(methodDeclaration.ExpressionBody.Expression);

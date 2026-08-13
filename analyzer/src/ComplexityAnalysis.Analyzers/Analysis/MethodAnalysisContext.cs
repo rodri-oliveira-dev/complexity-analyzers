@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Threading;
 
+using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -16,12 +17,16 @@ internal sealed class MethodAnalysisContext
         IMethodSymbol methodSymbol,
         ImmutableDictionary<ISymbol, ComplexityVariable> inputSizeVariables,
         ImmutableDictionary<ISymbol, LoopBoundExpression> localLoopBounds,
+        InterproceduralAnalysisContext? interproceduralContext,
+        InterproceduralRootAnalysisState? interproceduralRootState,
         CancellationToken cancellationToken)
     {
         SemanticModel = semanticModel;
         MethodSymbol = methodSymbol;
         InputSizeVariables = inputSizeVariables;
         LocalLoopBounds = localLoopBounds;
+        InterproceduralContext = interproceduralContext;
+        InterproceduralRootState = interproceduralRootState;
         CancellationToken = cancellationToken;
     }
 
@@ -41,6 +46,16 @@ internal sealed class MethodAnalysisContext
     }
 
     internal ImmutableDictionary<ISymbol, LoopBoundExpression> LocalLoopBounds
+    {
+        get;
+    }
+
+    internal InterproceduralAnalysisContext? InterproceduralContext
+    {
+        get;
+    }
+
+    internal InterproceduralRootAnalysisState? InterproceduralRootState
     {
         get;
     }
@@ -71,6 +86,21 @@ internal sealed class MethodAnalysisContext
         IMethodSymbol methodSymbol,
         CancellationToken cancellationToken)
     {
+        return Create(
+            semanticModel,
+            methodSymbol,
+            interproceduralContext: null,
+            interproceduralRootState: null,
+            cancellationToken);
+    }
+
+    internal static MethodAnalysisContext Create(
+        SemanticModel semanticModel,
+        IMethodSymbol methodSymbol,
+        InterproceduralAnalysisContext? interproceduralContext,
+        InterproceduralRootAnalysisState? interproceduralRootState,
+        CancellationToken cancellationToken)
+    {
         _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         _ = methodSymbol ?? throw new ArgumentNullException(nameof(methodSymbol));
 
@@ -85,6 +115,8 @@ internal sealed class MethodAnalysisContext
             methodSymbol,
             inputSizeVariables,
             ImmutableDictionary.Create<ISymbol, LoopBoundExpression>(SymbolEqualityComparer.Default),
+            interproceduralContext,
+            interproceduralRootState,
             cancellationToken);
     }
 
@@ -117,6 +149,8 @@ internal sealed class MethodAnalysisContext
             MethodSymbol,
             InputSizeVariables,
             LocalLoopBounds.SetItem(symbol, bound),
+            InterproceduralContext,
+            InterproceduralRootState,
             CancellationToken);
     }
 
@@ -132,6 +166,8 @@ internal sealed class MethodAnalysisContext
                 MethodSymbol,
                 InputSizeVariables,
                 LocalLoopBounds.Remove(symbol),
+                InterproceduralContext,
+                InterproceduralRootState,
                 CancellationToken)
             : this;
     }

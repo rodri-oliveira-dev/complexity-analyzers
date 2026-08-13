@@ -1,0 +1,51 @@
+{
+  "delivery": "Phase 5 \u2014 Interprocedural Analysis",
+  "currentObjective": "Phase 5 complete",
+  "completedStep": "9/9 \u2014 validation and closure",
+  "decisions": [
+    "Source calls are resolved through Roslyn symbols after Phase 4 known-operation resolution keeps BCL/LINQ precedence.",
+    "Safe dispatch is limited to static, private, non-virtual ordinary methods, and proven sealed dispatch in the same Compilation.",
+    "Interprocedural traversal is demand-driven and bounded by MaximumCallDepth = 5 and MaximumMethodsPerRootAnalysis = 32.",
+    "Cached method complexity templates are Compilation-scoped and caller-independent; call-site argument binding performs substitution per invocation.",
+    "Cycle, budget, cancellation, unsafe dispatch, unavailable source, and unproven binding boundaries remain Unknown in Phase 5.",
+    "BIG1004 is implemented as an Info diagnostic for known input-dependent source calls inside analyzable iterations."
+  ],
+  "constraints": [
+    "Do not modify inherited projects outside analyzer/.",
+    "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
+    "Do not add Microsoft.CodeAnalysis.Workspaces, MathNet, or SymPy.",
+    "Do not implement recursion solving, recurrence extraction, Master Theorem, Akra-Bazzi, whole-solution call graph, external decompilation, or full virtual hierarchy analysis before Phase 6."
+  ],
+  "relevantFiles": [
+    "analyzer/specs/phase-5/interprocedural-analysis.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/SourceMethodResolver.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/ActionableComplexityDiagnosticAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/PhaseFiveInterproceduralContractTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InterproceduralAnalysisContextTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ArgumentComplexityBinderTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
+  ],
+  "validations": [
+    "All Phase 5 acceptance criteria were checked against code, tests, diagnostics, documentation, build, test, pack, package inspection, and upstream isolation.",
+    "Functional matrix covers direct calls, A -> B -> C, different syntax trees, independent substitutions, callees inside loops, independent inputs, constant arguments, BCL/LINQ precedence, external Unknown, and unsafe dispatch Unknown.",
+    "Cycle matrix covers A -> A, A -> B -> A, and A -> B -> C -> A as terminating Unknown boundaries without recursion solving.",
+    "Budget matrix covers MaximumCallDepth 5/6 and MaximumMethodsPerRootAnalysis 32/33, including non-poisoning boundary behavior.",
+    "Concurrency and cancellation checks cover Compilation-scoped cache, independent root state, deterministic concurrent roots, cache race behavior, and cancellation without permanent cache poisoning.",
+    "Analyzer restore/build/test passed in Release; full analyzer test suite reported 326 passed, 0 failed, 0 skipped.",
+    "Local Release pack 0.5.0-phase5-final was inspected: analyzer DLL is under analyzers/dotnet/cs, README.md is packaged, nuspec has no dependency groups, and no forbidden assemblies are included.",
+    "Inherited upstream restore/build passed with isolated NuGet cache and redirected MkDocs output after the default build path hit an existing docs-file lock; no upstream files were modified."
+  ],
+  "knownPendingItems": [
+    "Recursive calls are detected but not solved.",
+    "Mutual cycles are detected but not solved."
+  ],
+  "nextStep": "Phase 6 \u2014 Recursion & Solver",
+  "lastCommit": {
+    "hash": "b5894809969b93159ac698aab19ca2c7d4b0e9ef",
+    "message": "test: harden interprocedural analysis behavior"
+  }
+}
