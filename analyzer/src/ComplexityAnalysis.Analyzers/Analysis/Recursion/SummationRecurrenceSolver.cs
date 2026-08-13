@@ -52,42 +52,18 @@ internal sealed class SummationRecurrenceSolver
         RecurrenceTerm term = relation.RecursiveTerms[0];
         return term.Multiplicity == 1
             && term.Reduction.Kind == RecurrenceReductionKind.SubtractConstant
-            && TryClassifySupportedLocalWork(
+            && RecurrencePolyLogWork.TryClassify(
                 relation.NonRecursiveWork,
                 relation.ComplexityVariable,
-                out PolyLogWork? localWork)
+                out RecurrencePolyLogWork? localWork)
             && localWork is not null
             ? Applicability.Applicable(localWork)
             : Applicability.Unsupported();
     }
 
-    private static bool TryClassifySupportedLocalWork(
-        ComplexityExpression localWork,
-        ComplexityVariable variable,
-        out PolyLogWork? polyLogWork)
-    {
-        polyLogWork = null;
-
-        switch (localWork)
-        {
-            case ConstantComplexity:
-                polyLogWork = new PolyLogWork(polynomialDegree: 0, logExponent: 0);
-                return true;
-
-            case PolynomialLogComplexity polynomialLog when polynomialLog.Variable.Equals(variable):
-                polyLogWork = new PolyLogWork(
-                    polynomialLog.PolynomialDegree,
-                    polynomialLog.LogExponent);
-                return true;
-
-            default:
-                return false;
-        }
-    }
-
     private sealed class Applicability
     {
-        private Applicability(ApplicabilityKind kind, PolyLogWork? localWork)
+        private Applicability(ApplicabilityKind kind, RecurrencePolyLogWork? localWork)
         {
             if (!Enum.IsDefined(typeof(ApplicabilityKind), kind))
             {
@@ -103,12 +79,12 @@ internal sealed class SummationRecurrenceSolver
             get;
         }
 
-        internal PolyLogWork? LocalWork
+        internal RecurrencePolyLogWork? LocalWork
         {
             get;
         }
 
-        internal static Applicability Applicable(PolyLogWork localWork)
+        internal static Applicability Applicable(RecurrencePolyLogWork localWork)
         {
             return new Applicability(
                 ApplicabilityKind.Applicable,
@@ -123,25 +99,6 @@ internal sealed class SummationRecurrenceSolver
         internal static Applicability Invalid()
         {
             return new Applicability(ApplicabilityKind.Invalid, localWork: null);
-        }
-    }
-
-    private sealed class PolyLogWork
-    {
-        internal PolyLogWork(double polynomialDegree, int logExponent)
-        {
-            PolynomialDegree = polynomialDegree;
-            LogExponent = logExponent;
-        }
-
-        internal double PolynomialDegree
-        {
-            get;
-        }
-
-        internal int LogExponent
-        {
-            get;
         }
     }
 

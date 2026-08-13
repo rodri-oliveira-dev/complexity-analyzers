@@ -19,7 +19,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
         }
 
         double normalizedPolynomialDegree = PolynomialExponentNormalizer.Normalize(polynomialDegree);
-        if (normalizedPolynomialDegree == 0 && logExponent == 0)
+        if (IsZero(normalizedPolynomialDegree) && logExponent == 0)
         {
             throw new ArgumentException("Use ConstantComplexity for O(1).", nameof(polynomialDegree));
         }
@@ -46,7 +46,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
     public bool Equals(PolynomialLogComplexity? other)
     {
         return other is not null
-            && PolynomialDegree == other.PolynomialDegree
+            && Math.Abs(PolynomialDegree - other.PolynomialDegree) <= PolynomialExponentNormalizer.IntegerTolerance
             && LogExponent == other.LogExponent
             && Variable.Equals(other.Variable);
     }
@@ -69,7 +69,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
 
     internal override string ToBigOBody()
     {
-        return PolynomialDegree == 0
+        return IsZero(PolynomialDegree)
             ? FormatLogTerm()
             : FormatPolynomialLogBody();
     }
@@ -83,13 +83,13 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
 
     private string FormatPolynomialTerm()
     {
-        return PolynomialDegree switch
-        {
-            1 => Variable.Name,
-            2 => Variable.Name + "\u00b2",
-            3 => Variable.Name + "\u00b3",
-            _ => Variable.Name + "^" + PolynomialExponentNormalizer.Format(PolynomialDegree),
-        };
+        return IsEquivalentDegree(1)
+            ? Variable.Name
+            : IsEquivalentDegree(2)
+            ? Variable.Name + "\u00b2"
+            : IsEquivalentDegree(3)
+            ? Variable.Name + "\u00b3"
+            : Variable.Name + "^" + PolynomialExponentNormalizer.Format(PolynomialDegree);
     }
 
     private string FormatLogTerm()
@@ -97,5 +97,15 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
         return LogExponent == 1
             ? "log " + Variable.Name
             : "log^" + LogExponent.ToString(System.Globalization.CultureInfo.InvariantCulture) + " " + Variable.Name;
+    }
+
+    private bool IsEquivalentDegree(double degree)
+    {
+        return Math.Abs(PolynomialDegree - degree) <= PolynomialExponentNormalizer.IntegerTolerance;
+    }
+
+    private static bool IsZero(double value)
+    {
+        return Math.Abs(value) <= PolynomialExponentNormalizer.IntegerTolerance;
     }
 }
