@@ -2,7 +2,7 @@
 
 [English](../en/architecture.md) | Portugues (Brasil)
 
-`ComplexityAnalysis.Analyzers` e um workspace isolado de pacote Roslyn analyzer. Ate a Phase 4, ele contem infraestrutura do analyzer, modelo de complexidade sem Roslyn, extracao intraprocedural, mapping semantico de operacoes conhecidas e diagnostics publicos.
+`ComplexityAnalysis.Analyzers` e um workspace isolado de pacote Roslyn analyzer. Ate a Phase 5, ele contem infraestrutura do analyzer, modelo de complexidade sem Roslyn, extracao de metodos, mapping semantico de operacoes conhecidas, analise interprocedural limitada de metodos fonte e diagnostics publicos.
 
 ## Pipeline Atual
 
@@ -19,6 +19,7 @@ Analysis
     +-- operacoes basicas
     +-- limites de loop
     +-- operacoes conhecidas BCL/LINQ
+    +-- chamadas seguras de metodos fonte
     +-- extracao de metodo
     |
     v
@@ -36,6 +37,7 @@ DiagnosticAnalyzer
     +-- BIG1001 lookup linear dentro de iteracao
     +-- BIG1002 materializacao dentro de iteracao
     +-- BIG1003 ordenacao dentro de iteracao
+    +-- BIG1004 chamada fonte dentro de iteracao
     `-- BIG9000 probe de infraestrutura
 ```
 
@@ -95,7 +97,7 @@ A camada de analise fica em:
 analyzer/src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-Ela analisa um metodo por vez. O extractor nao cria call graph, nao segue chamadas locais do projeto, nao resolve recursao e nao inspeciona corpos de outros metodos.
+Ela parte de um metodo por vez. A Phase 5 pode seguir chamadas de metodos fonte suportados sob demanda, mas nao cria call graph da compilation inteira, nao resolve recursao e nao inspeciona corpos de metodos nao relacionados.
 
 Responsabilidades principais:
 
@@ -105,6 +107,48 @@ Responsabilidades principais:
 - `BasicOperationAnalyzer`: classifica statements e expressoes comprovadas como constantes e delega operacoes conhecidas suportadas.
 - `LoopBoundAnalyzer`: reconhece limites de loop constantes, lineares, logaritmicos e enumerables conhecidos.
 - `KnownOperationComplexityAnalyzer`: compoe custos de invocacoes BCL/LINQ conhecidas, propriedades, acesso por indice, operacoes terminais e pipelines deferred consumidas.
+
+## Chamadas Fonte Interprocedurais
+
+Analise interprocedural significa que o analyzer pode incluir o custo de um callee fonte suportado na estimativa do caller. O resultado do callee e cacheado como template relativo aos parametros do proprio callee, e depois a substituicao de argumentos mapeia esse template de volta para as dimensoes do caller.
+
+Fluxo conceitual:
+
+```text
+Caller
+  |
+  v
+Invocation resolution
+  |
+  +-- Known BCL/LINQ
+  |
+  `-- Source method
+          |
+      cache/template
+          |
+      substitution
+          |
+          v
+Caller complexity
+```
+
+Fronteira de ciclo:
+
+```text
+Cycle detected
+      |
+      v
+Unknown
+      |
+      v
+Phase 6 responsibility
+```
+
+O traversal e sob demanda. Um callee fonte e analisado apenas quando uma invocacao e visitada a partir do metodo raiz atual, a resolucao de operacao conhecida BCL/LINQ nao se aplica, o dispatch e seguro e o budget interno permite expansao. O analyzer nao pre-analisa todos os metodos e nao cria graph completo da compilation.
+
+Dispatch fonte seguro inclui metodos static, private, ordinarios nao virtuais e dispatch sealed quando o alvo de runtime e comprovado. Dispatch de interface, dispatch virtual inseguro, dynamic dispatch, invocacao de delegate, reflection, metodos externos apenas em metadata, construtores, propriedades, operadores, local functions e lambdas como alvos independentes continuam fora de escopo.
+
+Limites internos restringem profundidade de chamada e metodos expandidos por analise raiz. Resultados `Unknown` continuam conservadores para chamadas nao resolvidas, dispatch inseguro, fonte indisponivel, binding de argumento nao comprovado, fronteiras de budget, cancellation e ciclos. Recursao direta e mutua sao reconhecidas, mas solucao de recorrencias nao e implementada na Phase 5.
 
 ## Operacoes Conhecidas
 
@@ -128,10 +172,11 @@ Invocacoes nao suportadas ou nao resolvidas continuam como `Unknown`.
 - `BIG1001` na invocacao de lookup linear dentro de iteracao analisavel.
 - `BIG1002` na invocacao de materializacao dentro de iteracao analisavel.
 - `BIG1003` na invocacao de ordenacao deferred somente quando consumo suportado e comprovado dentro de iteracao analisavel.
+- `BIG1004` na chamada de metodo fonte suportada com complexidade conhecida dependente de entrada dentro de iteracao analisavel.
 - `BIG9000` uma vez por compilation quando habilitado explicitamente.
 
 Analise de codigo gerado e desabilitada, execucao concorrente e habilitada, e hot paths do analyzer devem continuar livres de I/O, rede, execucao de processos e comportamento pesado baseado em reflection.
 
 ## Por Que Nao Ha Workspaces
 
-`Microsoft.CodeAnalysis.Workspaces` esta intencionalmente ausente. A Phase 4 nao implementa `CodeFixProvider`, analise em nivel de projeto, carregamento de solution ou recursos de workspace de IDE que justificariam essa dependencia.
+`Microsoft.CodeAnalysis.Workspaces` esta intencionalmente ausente. A Phase 5 nao implementa `CodeFixProvider`, analise de graph de projeto inteiro, carregamento de solution ou recursos de workspace de IDE que justificariam essa dependencia.

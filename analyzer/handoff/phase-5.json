@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 5 \u2014 Interprocedural Analysis",
-  "currentObjective": "Diagnostic integration complete",
-  "completedStep": "7/9 \u2014 diagnostic integration",
+  "currentObjective": "Characterization, performance and documentation complete",
+  "completedStep": "8/9 \u2014 characterization, performance and documentation",
   "decisions": [
     "Cycle, depth, method-budget, cancellation, and cache-in-progress boundaries collapse to Unknown for public complexity output in Phase 5; recursion complexity is not solved.",
     "Root methods count as depth 0. MaximumCallDepth = 5 allows five uncached callee expansions from a root and stops the sixth at an Unknown boundary.",
@@ -65,12 +65,23 @@
     "Release build passed for diagnostic integration with existing style warnings only.",
     "Release tests passed for diagnostic integration: 317 passed, 0 failed, 0 skipped.",
     "Local pack passed for ComplexityAnalysis.Analyzers with PackageVersion=0.0.2-big1004-smoke.",
-    "Temporary package consumer smoke test passed and reported BIG1004, BIG0001, and BIG9000 from the packed analyzer."
+    "Temporary package consumer smoke test passed and reported BIG1004, BIG0001, and BIG9000 from the packed analyzer.",
+    "Before characterization, performance and documentation hardening, git status was clean on branch main at c872b8c1568bc0aae0bd1d8e78ea1c37f9c58ad0.",
+    "Phase 5 characterization and performance contract tests were added for source call shapes, substitution, precedence, Unknown boundaries, cache reuse under budget, demand-driven traversal, adversarial budget limits, moderate compilation traversal, and cycle termination.",
+    "Focused Release test filter FullyQualifiedName~PhaseFiveInterproceduralContractTests passed: 8 passed, 0 failed, 0 skipped.",
+    "Structural audit found no whole-compilation interprocedural graph construction: source callees resolve through DeclaringSyntaxReferences and GetSemanticModel on demanded syntax trees; Compilation.SyntaxTrees is used only by BIG9000 probe location selection.",
+    "Release validation passed: dotnet restore, dotnet build --configuration Release --no-restore, and dotnet test --configuration Release --no-build with 325 passed, 0 failed, 0 skipped.",
+    "Local pack passed for ComplexityAnalysis.Analyzers with PackageVersion=0.5.0-phase5-local.",
+    "Package audit confirmed analyzer DLL under analyzers/dotnet/cs/, no nuspec dependencies, no Workspaces, no MathNet, no inherited DLLs, and README.md from Phase 5 packaged.",
+    "Temporary MSBuild package consumer under analyzer/artifacts/tmp validated package analyzer loading, .editorconfig severity control, BIG0001 enablement on a known method, BIG1001 package diagnostics, and disabled-by-default BIG9000 behavior; source-helper BIG0001 and BIG1004 remain covered by analyzer tests."
   ],
-  "knownPendingItems": [],
-  "nextStep": "8/9 \u2014 characterization, performance and documentation",
+  "knownPendingItems": [
+    "Direct and mutual recursion are detected but unresolved.",
+    "Recurrence solving is deferred to Phase 6."
+  ],
+  "nextStep": "9/9 \u2014 phase validation and closure",
   "lastCommit": {
-    "hash": "48eb55aa136d0564c6b3f95267ed7c85c110320c",
-    "message": "fix: harden interprocedural analysis boundaries"
+    "hash": "c872b8c1568bc0aae0bd1d8e78ea1c37f9c58ad0",
+    "message": "feat: report interprocedural complexity patterns"
   }
 }
