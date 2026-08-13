@@ -1,14 +1,19 @@
 {
   "delivery": "Phase 6 \u2014 Recursion & Recurrence Solving",
   "currentObjective": "Extract and solve bounded direct-recursion recurrence patterns",
-  "completedStep": "1/11 \u2014 specification",
+  "completedStep": "2/11 \u2014 recurrence model and fractional power support",
   "decisions": [
     "Phase 6 starts from Phase 5 cycle boundaries and may solve only supported direct recursion with sufficient base-case evidence.",
     "Recurrence extraction and recurrence solving remain separate responsibilities.",
     "The recurrence model is internal to the analyzer and independent from ComplexityExpression and inherited solver projects.",
     "Recursive calls must be counted per execution path, so mutually exclusive branches do not add multiplicity while sequential calls on the same path may.",
     "Supported initial reductions are constant positive decrements and constant scale reductions proven from syntax and semantics.",
-    "Unsupported, invalid, unsafe, numerically inconclusive, and mutually recursive patterns remain Unknown."
+    "Unsupported, invalid, unsafe, numerically inconclusive, and mutually recursive patterns remain Unknown.",
+    "RecurrenceRelation stores ComplexityVariable, immutable recursive terms, and NonRecursiveWork as ComplexityExpression without Roslyn syntax or symbols.",
+    "RecurrenceTerm stores integer positive Multiplicity and a RecurrenceReduction with either SubtractConstant c > 0 or Scale q where 0 < q < 1.",
+    "RecurrenceSolution is a future solver outcome value with Solved, Unsupported, Invalid, and NumericallyInconclusive states; no solver is implemented in step 2.",
+    "PolynomialLogComplexity now stores normalized double polynomial degrees so fractional powers such as O(n^1.585) share the existing polylog model.",
+    "Polynomial exponents normalize near integers within 1e-9 and format non-integers with three deterministic decimal places, trimming trailing zeros with invariant culture."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -20,6 +25,7 @@
   "relevantFiles": [
     "analyzer/specs/phase-6/recursion-solving.md",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Recursion/",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/",
     "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
@@ -31,16 +37,21 @@
   "validations": [
     "Before the specification edit, Release analyzer tests passed: 334 passed, 0 failed, 0 skipped.",
     "Phase 5 was checked against code and tests: source calls propagate, BCL/LINQ precedence holds, cache is Compilation-scoped, budgets are enforced, and direct/mutual cycles terminate as Unknown.",
-    "The current model stores polynomial/log exponents as integers and exponential bases as invariant doubles, so Phase 6 must specify minimal fractional polynomial power support."
+    "The current model stored polynomial/log exponents as integers and exponential bases as invariant doubles before step 2.",
+    "Step 2 Release build passed with dotnet build --configuration Release.",
+    "Step 2 Release tests passed with dotnet test --configuration Release --no-build: 362 passed, 0 failed, 0 skipped.",
+    "Model folder was checked for Roslyn syntax and symbol APIs; no Microsoft.CodeAnalysis, SyntaxNode, SemanticModel, or symbol references were found."
   ],
   "knownPendingItems": [
-    "Step 2/11 must implement the recurrence model and fractional power support without adding forbidden dependencies.",
-    "BIG1005 is specified but not implemented in this specification-only step.",
+    "Recursive call shape extraction is not implemented yet.",
+    "Base-case evidence extraction is not implemented yet.",
+    "Recurrence solving is not implemented yet.",
+    "BIG1005 is specified but not implemented in step 2.",
     "Mutual recursion remains Unknown in Phase 6."
   ],
-  "nextStep": "2/11 \u2014 recurrence model and fractional power support",
+  "nextStep": "3/11 \u2014 recursive call shape and base-case extraction",
   "lastCommit": {
-    "hash": "a5abc89a7b8bcae4382c3304239646d1388020c2",
-    "message": "Merge pull request #4 from rodri-oliveira-dev/feature/Phase5"
+    "hash": "9cf090d6bfa2c570faec0835b571abe040772cac",
+    "message": "docs: define phase 6 recurrence solving"
   }
 }

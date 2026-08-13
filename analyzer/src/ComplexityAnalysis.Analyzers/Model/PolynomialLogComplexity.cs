@@ -5,25 +5,26 @@ namespace ComplexityAnalysis.Analyzers.Model;
 internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable<PolynomialLogComplexity>
 {
     internal PolynomialLogComplexity(ComplexityVariable variable, int polynomialDegree, int logExponent)
+        : this(variable, (double)polynomialDegree, logExponent)
+    {
+    }
+
+    internal PolynomialLogComplexity(ComplexityVariable variable, double polynomialDegree, int logExponent)
     {
         Variable = variable ?? throw new ArgumentNullException(nameof(variable));
-
-        if (polynomialDegree < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(polynomialDegree), "Polynomial degree must be non-negative.");
-        }
 
         if (logExponent < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(logExponent), "Log exponent must be non-negative.");
         }
 
-        if (polynomialDegree == 0 && logExponent == 0)
+        double normalizedPolynomialDegree = PolynomialExponentNormalizer.Normalize(polynomialDegree);
+        if (normalizedPolynomialDegree == 0 && logExponent == 0)
         {
             throw new ArgumentException("Use ConstantComplexity for O(1).", nameof(polynomialDegree));
         }
 
-        PolynomialDegree = polynomialDegree;
+        PolynomialDegree = normalizedPolynomialDegree;
         LogExponent = logExponent;
     }
 
@@ -32,7 +33,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
         get;
     }
 
-    internal int PolynomialDegree
+    internal double PolynomialDegree
     {
         get;
     }
@@ -60,7 +61,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
         unchecked
         {
             int hash = Variable.GetHashCode();
-            hash = (hash * 397) ^ PolynomialDegree;
+            hash = (hash * 397) ^ PolynomialDegree.GetHashCode();
             hash = (hash * 397) ^ LogExponent;
             return hash;
         }
@@ -87,7 +88,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
             1 => Variable.Name,
             2 => Variable.Name + "\u00b2",
             3 => Variable.Name + "\u00b3",
-            _ => Variable.Name + "^" + PolynomialDegree.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            _ => Variable.Name + "^" + PolynomialExponentNormalizer.Format(PolynomialDegree),
         };
     }
 
