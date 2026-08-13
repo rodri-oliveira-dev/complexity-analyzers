@@ -8,7 +8,7 @@ O analyzer e desenvolvido em `analyzer/` como uma fronteira de pacote separada d
 
 ## Estado Atual
 
-Phase 1 ate Phase 5 estao implementadas.
+Phase 1 ate Phase 6 estao implementadas.
 
 | Phase | Estado | Entrega |
 | --- | --- | --- |
@@ -17,8 +17,9 @@ Phase 1 ate Phase 5 estao implementadas.
 | Phase 3 - Roslyn Extraction | Completa | Extracao intraprocedural de metodos a partir de sintaxe e semantica Roslyn. |
 | Phase 4 - BCL, LINQ and Actionable Diagnostics | Completa | Mapeamentos semanticos de um subconjunto documentado de BCL/LINQ, `BIG0001` e diagnostics acionaveis `BIG100x`. |
 | Phase 5 - Interprocedural Analysis | Completa | Propagacao limitada e sob demanda a partir de metodos fonte seguros na mesma compilation, diagnostic de chamada fonte em loop `BIG1004`, deteccao de ciclos, cache e limites internos. |
+| Phase 6 - Recursion & Recurrence Solving | Completa | Extracao limitada de recursao direta, recorrencias de soma, recursao exponencial simples, Master Theorem, subconjunto restrito/limitado de Akra-Bazzi, potencias fracionarias e `BIG1005`. |
 
-O analyzer pode seguir metodos fonte suportados na mesma compilation quando o dispatch e seguro e a chamada e alcancada a partir do metodo raiz atual. Ele nao cria call graph da compilation inteira, nao resolve recursao e nao usa `Microsoft.CodeAnalysis.Workspaces`.
+O analyzer pode seguir metodos fonte suportados na mesma compilation quando o dispatch e seguro e a chamada e alcancada a partir do metodo raiz atual. Ele tambem pode resolver metodos diretamente recursivos selecionados quando evidencia de base case, reducao de argumento, trabalho local e formato da recorrencia sao comprovados. Ele nao cria call graph da compilation inteira, nao resolve recursao mutua e nao usa `Microsoft.CodeAnalysis.Workspaces`.
 
 ## Diagnostics
 
@@ -29,9 +30,12 @@ O analyzer pode seguir metodos fonte suportados na mesma compilation quando o di
 | `BIG1002` | Materialization inside iteration | `Complexity` | `Info` | Sim |
 | `BIG1003` | Ordering inside iteration | `Complexity` | `Info` | Sim |
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | Sim |
+| `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | Sim |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | Nao |
 
 `BIG0001` e informational e desabilitado por padrao. Ele reporta uma estimativa conhecida de complexidade do metodo no identificador do metodo quando habilitado explicitamente.
+
+`BIG1005` reporta metodos diretamente recursivos suportados cuja recorrencia resolvida e exponencial, como recursao estilo Fibonacci.
 
 `BIG9000` e um probe de infraestrutura. Ele prova que o pacote do analyzer foi carregado e executado quando habilitado explicitamente; ele nao e uma recomendacao de performance.
 
@@ -45,7 +49,7 @@ Metodos fonte suportados sao metodos C# ordinarios com dispatch seguro, incluind
 
 O traversal e sob demanda. Um callee e analisado apenas quando o metodo raiz atual alcanca aquela invocacao. O analyzer nao pre-varre todas as syntax trees e nao cria um call graph completo. Limites internos restringem profundidade de chamada e quantidade de metodos expandidos por analise raiz.
 
-Chamadas nao suportadas, nao resolvidas, inseguras, limitadas por budget, canceladas ou ciclicas continuam `Unknown`. Ciclos diretos e mutuos sao reconhecidos para a analise terminar, mas solucao de recorrencias fica para a Phase 6.
+Chamadas nao suportadas, nao resolvidas, inseguras, limitadas por budget, canceladas ou ciclicas continuam `Unknown`. Recursao direta pode ser resolvida apenas pelo pipeline limitado de recorrencias da Phase 6. Recursao mutua e detectada, mas nao resolvida.
 
 Exemplos:
 
@@ -57,6 +61,19 @@ B(left) + B(right)   => O(n + m)
 B(constant)          => O(1)
 A -> B -> C O(log n) => O(log n)
 ```
+
+## Recursao Direta e Recorrencias
+
+A Phase 6 reconhece chamadas diretamente recursivas por identidade de simbolos Roslyn e exige evidencia compativel de base case antes de resolver. Chamadas recursivas em branches mutuamente exclusivos sao contadas por caminho, entao codigo estilo binary search com duas chamadas sintaticas em branches exclusivos continua `O(log n)`, nao `O(n)`.
+
+Familias de recorrencia suportadas incluem:
+
+- recorrencias de soma/decremento como `T(n)=T(n-1)+1`, `T(n)=T(n-1)+n` e `T(n)=T(n-1)+log n`;
+- recursao direta exponencial simples como `2T(n-1)+1` e Fibonacci `T(n-1)+T(n-2)+1`;
+- formas de Master Theorem como `T(n)=T(n/2)+1`, `2T(n/2)+n`, `2T(n/2)+n^2` e `3T(n/2)+n`;
+- um subconjunto restrito/limitado de Akra-Bazzi com termos recursivos apenas por escala e toll polylogaritmico, por exemplo `T(n)=T(n/3)+T(2n/3)+n`.
+
+Potencias polinomiais fracionarias sao representadas de forma deterministica, entao `3T(n/2)+n` reporta `O(n^1.585)`. Trabalho local desconhecido, base case ausente, argumentos nao redutores, formatos de recorrencia nao suportados, solucao numericamente inconclusiva, cancellation e recursao mutua continuam `Unknown`. O analyzer nao afirma suporte completo a Akra-Bazzi, solucao simbolica geral de recorrencias, deteccao de memoization ou prova geral de terminacao.
 
 ## Escopo de Operacoes Conhecidas
 
@@ -87,7 +104,7 @@ cd analyzer
 dotnet restore ComplexityAnalysis.Analyzers.slnx
 dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
 dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.5.0-phase5-local
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.6.0-phase6-local
 ```
 
 O pacote e documentado como build/fonte de pacote local. Nao assuma publicacao no NuGet.org sem evidencia independente.
@@ -96,7 +113,7 @@ Veja [Primeiros Passos](docs/pt-BR/getting-started.md).
 
 ## Configuracao
 
-Diagnostics usam a configuracao padrao de severidade Roslyn via `.editorconfig`. Nao ha opcoes customizadas do analyzer na Phase 5.
+Diagnostics usam a configuracao padrao de severidade Roslyn via `.editorconfig`. Nao ha opcoes customizadas do analyzer na Phase 6.
 
 ```ini
 [*.cs]
@@ -106,6 +123,7 @@ dotnet_diagnostic.BIG1001.severity = warning
 dotnet_diagnostic.BIG1002.severity = warning
 dotnet_diagnostic.BIG1003.severity = warning
 dotnet_diagnostic.BIG1004.severity = warning
+dotnet_diagnostic.BIG1005.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
@@ -147,8 +165,10 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 
 - A analise de metodos fonte e limitada a metodos ordinarios com dispatch seguro na mesma compilation.
 - Nao ha call graph de compilation inteira ou solution inteira.
-- Recursao e detectada, mas nao resolvida; solucao de recorrencias fica para a Phase 6.
-- Master Theorem e Akra-Bazzi nao estao implementados no analyzer isolado.
+- Solucao de recorrencias e limitada a formatos de recursao direta suportados com evidencia de base case.
+- Recursao mutua e detectada, mas nao resolvida.
+- Akra-Bazzi e apenas um subconjunto restrito/limitado de Akra-Bazzi, nao o teorema completo.
+- Polinomios caracteristicos gerais, integracao numerica geral, MathNet, SymPy e projetos solver herdados nao sao usados.
 - Nao ha `CodeFixProvider`.
 - `Microsoft.CodeAnalysis.Workspaces` nao e usado.
 - Comportamento nao suportado ou nao comprovado prefere `Unknown` em vez de palpites inseguros.

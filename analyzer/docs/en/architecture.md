@@ -2,7 +2,7 @@
 
 [English](architecture.md) | [Portugues (Brasil)](../pt-BR/architecture.md)
 
-`ComplexityAnalysis.Analyzers` is an isolated Roslyn analyzer package workspace. Through Phase 5, it contains analyzer infrastructure, a Roslyn-free complexity model, method extraction, semantic known-operation mapping, bounded source-method interprocedural analysis, and public diagnostics.
+`ComplexityAnalysis.Analyzers` is an isolated Roslyn analyzer package workspace. Through Phase 6, it contains analyzer infrastructure, a Roslyn-free complexity model, method extraction, semantic known-operation mapping, bounded source-method interprocedural analysis, bounded direct-recursion recurrence solving, and public diagnostics.
 
 ## Current Pipeline
 
@@ -20,6 +20,8 @@ Analysis
     +-- loop bounds
     +-- known BCL/LINQ operations
     +-- safe source-method calls
+    +-- direct-recursion extraction
+    +-- recurrence solving
     +-- method extraction
     |
     v
@@ -38,6 +40,7 @@ DiagnosticAnalyzer
     +-- BIG1002 materialization inside iteration
     +-- BIG1003 ordering inside iteration
     +-- BIG1004 source call inside iteration
+    +-- BIG1005 exponential recursive growth
     `-- BIG9000 infrastructure probe
 ```
 
@@ -84,7 +87,7 @@ It is intentionally Roslyn-free. It represents complexity values independently f
 Implemented model behavior includes:
 
 - atomic forms such as constant, polynomial-logarithmic, exponential, factorial, and `Unknown`;
-- formatting for common Big-O forms;
+- formatting for common Big-O forms, including deterministic fractional powers such as `O(n^1.585)`;
 - growth comparison for same-variable expressions;
 - conservative incomparability for independent variables;
 - sequential, nested, and branching composition.
@@ -97,7 +100,7 @@ The analysis layer lives under:
 analyzer/src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-It starts from one method at a time. Phase 5 can follow supported source-method calls on demand, but it does not build a whole-compilation call graph, solve recursion, or inspect unrelated method bodies.
+It starts from one method at a time. Phase 6 can follow supported source-method calls on demand and solve selected direct recursion, but it does not build a whole-compilation call graph, solve mutual recursion, or inspect unrelated method bodies.
 
 Main responsibilities are split across:
 
@@ -141,14 +144,30 @@ Cycle detected
 Unknown
       |
       v
-Phase 6 responsibility
+Unknown unless direct recursion is separately extracted and solved
 ```
 
 Traversal is demand-driven. A source callee is analyzed only when an invocation is visited from the current root method, BCL/LINQ known-operation resolution does not apply, dispatch is safe, and the internal budget allows expansion. The analyzer does not pre-analyze every method and does not create a complete compilation graph.
 
 Safe source dispatch includes static methods, private methods, non-virtual ordinary methods, and sealed dispatch when the runtime target is proven. Interface dispatch, unsafe virtual dispatch, dynamic dispatch, delegate invocation, reflection, external metadata-only methods, constructors, properties, operators, local functions, and lambdas as independent call targets remain out of scope.
 
-Internal limits bound call depth and methods expanded per root analysis. Unknown results remain conservative for unresolved calls, unsafe dispatch, unavailable source, unproven argument binding, budget boundaries, cancellation, and cycles. Direct and mutual recursion are recognized, but recurrence solving is not implemented in Phase 5.
+Internal limits bound call depth and methods expanded per root analysis. Unknown results remain conservative for unresolved calls, unsafe dispatch, unavailable source, unproven argument binding, budget boundaries, cancellation, and cycles. Direct recursion can be solved only by the recurrence pipeline below. Mutual recursion is detected but not solved.
+
+## Direct Recursion and Recurrence Solving
+
+Recurrence infrastructure lives under:
+
+```text
+analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Recursion/
+```
+
+The extractor and solvers are separate. `RecursiveCallAnalyzer` identifies semantically direct recursive invocations and summarizes recursive execution paths. `RecurrenceExtractor` requires base-case evidence, selects the recurrence dimension, excludes direct recursive invocations from local-work cost, and builds an internal `RecurrenceRelation`. `RecurrenceSolver` tries bounded solvers and returns explicit solved, unsupported, invalid, or numerically inconclusive results.
+
+Implemented solver families are summation/decrement recurrences, a simple constant-coefficient exponential subset, Master Theorem, and a restricted/bounded Akra-Bazzi subset. Numerical work is deterministic and bounded by internal iteration caps. The analyzer does not perform general numerical integration, subprocess execution, reflection-based solving, I/O, network access, MathNet, SymPy, Workspaces, whole-compilation recurrence scans, or inherited solver project calls.
+
+Mutually exclusive recursive branches are path-sensitive: binary-search-style branches with one recursive call per branch produce one recursive term per path. Sequential recursive calls on the same path may add multiplicity.
+
+Unsupported recurrence shapes, unknown local work, missing base cases, non-reducing arguments, cancellation, numerical inconclusiveness, and mutual recursion remain `Unknown`.
 
 ## Known Operations
 
@@ -173,10 +192,11 @@ Unsupported or unresolved invocations remain `Unknown`.
 - `BIG1002` at a materializing invocation inside an analyzable iteration.
 - `BIG1003` at a deferred ordering invocation only when supported consumption is proven inside an analyzable iteration.
 - `BIG1004` at a supported source-method call with known input-dependent complexity inside an analyzable iteration.
+- `BIG1005` at a supported recursive method whose solved direct recurrence is exponential.
 - `BIG9000` once per compilation when explicitly enabled.
 
 Generated code analysis is disabled, concurrent execution is enabled, and analyzer hot paths must remain free of I/O, network access, process execution, and reflection-heavy behavior.
 
 ## Why No Workspaces
 
-`Microsoft.CodeAnalysis.Workspaces` is intentionally absent. Phase 5 does not implement a `CodeFixProvider`, whole-project graph analysis, solution loading, or IDE workspace features that would justify that dependency.
+`Microsoft.CodeAnalysis.Workspaces` is intentionally absent. Phase 6 does not implement a `CodeFixProvider`, whole-project graph analysis, solution loading, or IDE workspace features that would justify that dependency.
