@@ -1,0 +1,50 @@
+{
+  "delivery": "Phase 4 — BCL, LINQ & Actionable Diagnostics",
+  "currentObjective": "Phase 4 complete",
+  "completedStep": "9/9 — validation and closure",
+  "decisions": [
+    "Known operations are resolved through Roslyn symbols and exact operation identities, not text-only method names.",
+    "Unsupported or unresolved invocations remain Unknown; there is no fallback to O(n).",
+    "Known operation mappings carry complexity, execution semantics, provenance, complexity-case metadata, and diagnostic metadata.",
+    "KnownOperationRegistry.Bcl remains BCL-only; KnownOperationRegistry.Default combines BCL and LINQ mappings for extraction.",
+    "Deferred LINQ pipeline creation is O(1); enumeration cost is counted only when a supported terminal operation or foreach consumes the pipeline.",
+    "OrderBy, OrderByDescending, ThenBy, and ThenByDescending remain deferred at creation and count sorting only when consumed.",
+    "BIG0001 and BIG9000 are Info diagnostics disabled by default; BIG1001, BIG1002, and BIG1003 are Info diagnostics enabled by default.",
+    "BIG1003 reports deferred ordering only when supported consumption is proven inside an analyzable loop."
+  ],
+  "constraints": [
+    "Do not modify inherited projects outside analyzer/.",
+    "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
+    "Do not add Microsoft.CodeAnalysis.Workspaces, MathNet, or SymPy to the isolated analyzer.",
+    "Do not implement call graph, interprocedural analysis, recursion, recurrence solving, CodeFix, memory complexity, parallel complexity, or probabilistic complexity in Phase 4.",
+    "Keep analyzer hot paths deterministic, cancellation-aware, and free from I/O, network access, process execution, and reflection-heavy behavior."
+  ],
+  "relevantFiles": [
+    "analyzer/specs/phase-4/bcl-linq-diagnostics.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperationComplexityAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/ActionableComplexityDiagnosticAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
+    "analyzer/docs/en/analyzers.md",
+    "analyzer/docs/pt-BR/analyzers.md",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/KnownOperationRegistryTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
+  ],
+  "validations": [
+    "Analyzer restore, Release build, Release test, and Release pack pass.",
+    "Tests cover semantic BCL/LINQ resolution, custom homonymous non-matches, Unknown preservation, deferred and immediate LINQ semantics, actionable diagnostics, and BIG9000 behavior.",
+    "Package inspection confirms the analyzer DLL under analyzers/dotnet/cs/, README.md, no lib assembly, no dependency groups, no inherited assemblies, no Workspaces, and no MathNet.",
+    "SupportedDiagnostics, DiagnosticDescriptors, AnalyzerReleases.Unshipped.md, and EN/pt-BR analyzer docs expose the same public diagnostics.",
+    "Inherited solution restore/build were checked without editing upstream; a cache issue and documentation-file lock required isolated package cache and redirected documentation output for a clean build."
+  ],
+  "knownPendingItems": [
+    "Project-local calls remain Unknown until interprocedural analysis.",
+    "Call graph, recursion detection, and recurrence solving remain unsupported.",
+    "The known-operation registry intentionally covers a documented subset rather than full BCL/LINQ parity."
+  ],
+  "nextStep": "Phase 5 — Interprocedural Analysis"
+}

@@ -1,5 +1,6 @@
+using System;
 using System.Collections.Immutable;
-using System.Reflection;
+using System.IO;
 using System.Threading;
 
 using ComplexityAnalysis.Analyzers.Analysis;
@@ -391,8 +392,184 @@ public sealed class MethodComplexityExtractorTests
             "Unknown");
     }
 
+    [Theory]
+    [InlineData(
+        "list-contains",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(List<int> values) => values.Contains(42);
+        }
+        """,
+        "O(n)")]
+    [InlineData(
+        "hashset-contains",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(HashSet<int> values) => values.Contains(42);
+        }
+        """,
+        "O(1)")]
+    [InlineData(
+        "dictionary-contains-value",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(Dictionary<int, string> values) => values.ContainsValue("needle");
+        }
+        """,
+        "O(n)")]
+    [InlineData(
+        "linq-any",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            bool M(IEnumerable<int> values) => values.Any(value => value > 0);
+        }
+        """,
+        "O(n)")]
+    [InlineData(
+        "linq-to-list",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            List<int> M(IEnumerable<int> values) => values.ToList();
+        }
+        """,
+        "O(n)")]
+    [InlineData(
+        "linq-where-to-list",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            List<int> M(IEnumerable<int> values) => values.Where(value => value > 0).ToList();
+        }
+        """,
+        "O(n)")]
+    [InlineData(
+        "linq-orderby-to-list",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            List<int> M(IEnumerable<int> values) => values.OrderBy(value => value).ToList();
+        }
+        """,
+        "O(n log n)")]
+    [InlineData(
+        "foreach-where",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            void M(IEnumerable<int> values)
+            {
+                foreach (var value in values.Where(value => value > 0))
+                {
+                    var x = value + 1;
+                }
+            }
+        }
+        """,
+        "O(n)")]
+    [InlineData(
+        "unknown-custom-method",
+        """
+        public sealed class CustomCollection
+        {
+            public bool Probe(int value) => true;
+        }
+
+        public sealed class Sample
+        {
+            bool M(CustomCollection values) => values.Probe(42);
+        }
+        """,
+        "Unknown")]
+    public void Known_invocations_integrate_with_method_extraction(
+        string scenario,
+        string source,
+        string expected)
+    {
+        AssertMethodComplexity(source, expected, scenario);
+    }
+
     [Fact]
-    public void Invocation_is_unknown_even_when_it_is_linq_count()
+    public void Known_invocation_substitutes_receiver_dimension_instead_of_first_parameter()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                bool M(List<int> left, List<int> right) => right.Contains(42);
+            }
+            """,
+            "O(m)");
+    }
+
+    [Fact]
+    public void Known_invocation_inside_loop_composes_with_loop_dimension()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                void M(List<int> outer, List<int> inner)
+                {
+                    foreach (var value in outer)
+                    {
+                        inner.Contains(value);
+                    }
+                }
+            }
+            """,
+            "O(n \u00b7 m)");
+    }
+
+    [Fact]
+    public void Custom_collection_contains_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class CustomCollection
+            {
+                public bool Contains(int value) => true;
+            }
+
+            public sealed class Sample
+            {
+                bool M(CustomCollection values) => values.Contains(42);
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Linq_count_on_list_receiver_uses_known_constant_count()
     {
         AssertMethodComplexity(
             """
@@ -402,6 +579,335 @@ public sealed class MethodComplexityExtractorTests
             public sealed class Sample
             {
                 int M(List<int> values) => values.Count();
+            }
+            """,
+            "O(1)");
+    }
+
+    [Fact]
+    public void Linq_count_on_generic_enumerable_receiver_enumerates()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                int M(IEnumerable<int> values) => values.Count();
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Linq_count_on_icollection_receiver_uses_known_constant_count()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                int M(ICollection<int> values) => values.Count();
+            }
+            """,
+            "O(1)");
+    }
+
+    [Fact]
+    public void Linq_where_without_consumption_only_creates_pipeline()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                void M(IEnumerable<int> values)
+                {
+                    var query = values.Where(value => value > 0);
+                }
+            }
+            """,
+            "O(1)");
+    }
+
+    [Fact]
+    public void Linq_where_consumed_by_to_list_enumerates_once()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values) => values.Where(value => value > 0).ToList();
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Linq_select_consumed_by_to_array_enumerates_once()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                int[] M(IEnumerable<int> values) => values.Select(value => value + 1).ToArray();
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Linq_orderby_without_consumption_only_creates_pipeline()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                void M(IEnumerable<int> values)
+                {
+                    var query = values.OrderBy(value => value);
+                }
+            }
+            """,
+            "O(1)");
+    }
+
+    [Fact]
+    public void Linq_orderby_consumed_by_to_list_counts_sorting()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values) => values.OrderBy(value => value).ToList();
+            }
+            """,
+            "O(n log n)");
+    }
+
+    [Fact]
+    public void Linq_any_without_predicate_is_constant()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                bool M(IEnumerable<int> values) => values.Any();
+            }
+            """,
+            "O(1)");
+    }
+
+    [Fact]
+    public void Linq_any_with_predicate_is_linear_worst_case()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                bool M(IEnumerable<int> values) => values.Any(value => value > 0);
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Linq_contains_on_enumerable_is_linear()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                bool M(IEnumerable<int> values) => values.Contains(1);
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Linq_pipeline_in_foreach_is_counted_when_enumerated()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                void M(IEnumerable<int> values)
+                {
+                    foreach (var value in values.Where(value => value > 0))
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Linq_ordering_pipeline_in_foreach_counts_sorting_when_enumerated()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                void M(IEnumerable<int> values)
+                {
+                    foreach (var value in values.OrderBy(value => value))
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n log n)");
+    }
+
+    [Fact]
+    public void Custom_extension_named_where_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+
+            namespace MyCompany
+            {
+                public static class QueryExtensions
+                {
+                    public static IEnumerable<T> Where<T>(this IEnumerable<T> source, System.Func<T, bool> predicate) => source;
+                }
+
+                public sealed class Sample
+                {
+                    IEnumerable<int> M(IEnumerable<int> values) => values.Where(value => value > 0);
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Custom_extension_named_any_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+
+            namespace MyCompany
+            {
+                public static class QueryExtensions
+                {
+                    public static bool Any<T>(this IEnumerable<T> source) => true;
+                }
+
+                public sealed class Sample
+                {
+                    bool M(IEnumerable<int> values) => values.Any();
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Chained_linq_pipeline_consumed_once_remains_linear()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                int[] M(IEnumerable<int> values) => values
+                    .Where(value => value > 0)
+                    .Select(value => value + 1)
+                    .ToArray();
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Chained_ordering_pipeline_consumed_once_keeps_sorting_complexity()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values) => values
+                    .OrderBy(value => value)
+                    .ThenBy(value => value)
+                    .Where(value => value > 0)
+                    .ToList();
+            }
+            """,
+            "O(n log n)");
+    }
+
+    [Fact]
+    public void Select_many_with_known_inner_receiver_preserves_nested_size()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> outer, int[] inner) => outer.SelectMany(_ => inner).ToList();
+            }
+            """,
+            "O(n \u00b7 m)");
+    }
+
+    [Fact]
+    public void Consumed_linq_pipeline_with_unresolved_predicate_is_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values) => values.Where(value => IsPositive(value)).ToList();
+
+                bool IsPositive(int value) => value > 0;
             }
             """,
             "Unknown");
@@ -1801,13 +2307,20 @@ public sealed class MethodComplexityExtractorTests
     private static ImmutableArray<MetadataReference> BasicReferences
     {
         get;
-    } =
-        [
-            MetadataReference.CreateFromFile(typeof(object).GetTypeInfo().Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Enumerable).GetTypeInfo().Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(List<>).GetTypeInfo().Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(CancellationToken).GetTypeInfo().Assembly.Location)
-        ];
+    } = CreateTrustedPlatformReferences();
+
+    private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferences()
+    {
+        string trustedPlatformAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
+            ?? string.Empty;
+
+        return trustedPlatformAssemblies
+            .Split(Path.PathSeparator)
+            .Where(path => path.Length > 0)
+            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
+            .ToImmutableArray();
+    }
 
     private sealed record MethodFacts(
         SemanticModel SemanticModel,

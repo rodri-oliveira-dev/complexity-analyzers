@@ -1,8 +1,8 @@
 # Architecture
 
-[English](architecture.md) | [Português (Brasil)](../pt-BR/architecture.md)
+[English](architecture.md) | [Portugues (Brasil)](../pt-BR/architecture.md)
 
-`ComplexityAnalysis.Analyzers` is an isolated Roslyn analyzer package workspace. Through Phase 3, it contains three layers: analyzer infrastructure, a Roslyn-free complexity model, and intraprocedural extraction from C# syntax and semantics into that model.
+`ComplexityAnalysis.Analyzers` is an isolated Roslyn analyzer package workspace. Through Phase 4, it contains analyzer infrastructure, a Roslyn-free complexity model, intraprocedural extraction, semantic known-operation mapping, and public diagnostics.
 
 ## Current Pipeline
 
@@ -18,6 +18,7 @@ Analysis
     +-- input-size resolution
     +-- basic operations
     +-- loop bounds
+    +-- known BCL/LINQ operations
     +-- method extraction
     |
     v
@@ -28,14 +29,15 @@ Complexity Model
     +-- composition
     +-- Unknown
     |
-    | implemented internally
-    X product Big-O diagnostics not wired yet
-    |
+    v
 DiagnosticAnalyzer
+    |
+    +-- BIG0001 estimated complexity
+    +-- BIG1001 linear lookup inside iteration
+    +-- BIG1002 materialization inside iteration
+    +-- BIG1003 ordering inside iteration
     `-- BIG9000 infrastructure probe
 ```
-
-The extraction layer currently returns internal `ComplexityExpression` values. It does not report product diagnostics to users.
 
 ## Analyzer Package Boundary
 
@@ -53,7 +55,7 @@ Roslyn compiler / IDE host
 ComplexityAnalysis.Analyzers
 ```
 
-The analyzer project targets `netstandard2.0` for broad host compatibility. It is packed as an analyzer asset under:
+The analyzer project targets `netstandard2.0` for host compatibility. It is packed as an analyzer asset under:
 
 ```text
 analyzers/dotnet/cs/
@@ -63,17 +65,9 @@ It is not packed as a normal runtime library. Consumer applications do not call 
 
 ## Project Isolation
 
-The inherited `complexity-hints` implementation remains a conceptual reference:
+The inherited `complexity-hints` implementation remains a conceptual reference. There is no `ProjectReference`, binary dependency, or local package dependency from the isolated analyzer to inherited projects.
 
-```text
-inherited implementation
-        |
-        | conceptual/reference source
-        v
-ComplexityAnalysis.Analyzers
-```
-
-There is no `ProjectReference`, binary dependency, or local package dependency from the isolated analyzer to inherited projects. This keeps the analyzer package small, deterministic, and independent.
+This keeps the analyzer package small, deterministic, and independent. Roslyn dependencies used to author the analyzer are private package assets and should not become transitive consumer dependencies.
 
 ## Complexity Model
 
@@ -83,7 +77,7 @@ The model lives under:
 analyzer/src/ComplexityAnalysis.Analyzers/Model/
 ```
 
-It is intentionally Roslyn-free. It represents complexity values independently from C# syntax so the mathematical operations can remain small, immutable, deterministic, and testable without compiler APIs.
+It is intentionally Roslyn-free. It represents complexity values independently from C# syntax so mathematical operations remain immutable, deterministic, and testable without compiler APIs.
 
 Implemented model behavior includes:
 
@@ -101,70 +95,43 @@ The analysis layer lives under:
 analyzer/src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-It analyzes one method at a time. This is intraprocedural by design in Phase 3. The extractor does not build a call graph, follow project-local calls, solve recursion, or inspect other method bodies.
+It analyzes one method at a time. The extractor does not build a call graph, follow project-local calls, solve recursion, or inspect other method bodies.
 
 Main responsibilities are split across:
 
 - `MethodComplexityExtractor`: coordinates method, block, statement, loop, branch, and switch analysis.
 - `MethodAnalysisContext`: stores method-local semantic context, canonical input-size variables, local loop-bound facts, and cancellation.
 - `InputSizeResolver`: maps eligible parameters to deterministic variables such as `n`, `m`, `k`, `p`, and `v5`.
-- `BasicOperationAnalyzer`: classifies only proven constant-time statements and expressions.
-- `LoopBoundAnalyzer`: recognizes supported constant, linear, and logarithmic loop bounds.
+- `BasicOperationAnalyzer`: classifies proven constant-time statements and expressions and delegates supported known operations.
+- `LoopBoundAnalyzer`: recognizes supported constant, linear, logarithmic, and known enumerable loop bounds.
+- `KnownOperationComplexityAnalyzer`: composes known BCL/LINQ invocation, property, element-access, terminal operation, and consumed deferred-pipeline costs.
 
-## Extraction Examples
+## Known Operations
 
-These examples describe internal extraction results covered by tests. They are not user-facing diagnostics in Phase 3.
+Known operation infrastructure lives under:
 
-```csharp
-void M(int[] items)
-{
-    foreach (var item in items)
-    {
-        var x = item + 1;
-    }
-}
+```text
+analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/
 ```
 
-Internal result: `O(n)`.
+Mappings carry semantic identity, complexity, execution kind, provenance, metadata, and case information where relevant. Resolution uses Roslyn symbols and operation identities, not text-only method names.
 
-```csharp
-void M(int[] items)
-{
-    foreach (var outer in items)
-    {
-        foreach (var inner in items)
-        {
-            var x = outer + inner;
-        }
-    }
-}
-```
+Deferred LINQ operations such as `Where` and `OrderBy` are charged as setup when created. Their enumeration or sorting cost is counted when a supported terminal operation or `foreach` consumes the pipeline.
 
-Internal result: `O(n^2)`.
+Unsupported or unresolved invocations remain `Unknown`.
 
-```csharp
-void M()
-{
-    Visit();
-}
-```
+## Diagnostic Layer
 
-Internal result: `Unknown`, because project-local method calls are not resolved in Phase 3.
+`ComplexityAnalyzer` exposes:
 
-## Unknown
+- `BIG0001` at the method identifier when the estimated method complexity is known and the diagnostic is enabled.
+- `BIG1001` at a linear lookup invocation inside an analyzable iteration.
+- `BIG1002` at a materializing invocation inside an analyzable iteration.
+- `BIG1003` at a deferred ordering invocation only when supported consumption is proven inside an analyzable iteration.
+- `BIG9000` once per compilation when explicitly enabled.
 
-`Unknown` is a safety decision. It means the analyzer could not prove a safe asymptotic complexity for the construct.
-
-`Unknown` does not mean `O(1)`, does not mean `O(n)`, and does not by itself represent a performance problem. It prevents unsupported behavior from being turned into unsafe guesses.
-
-## Current Diagnostic Layer
-
-The current `DiagnosticAnalyzer` exposes exactly one diagnostic:
-
-- `BIG9000` - analyzer execution probe.
-
-It is registered through a compilation action, disabled by default, and reports at most once per compilation when explicitly enabled. It is infrastructure-only and does not consume the Phase 3 complexity extraction result.
+Generated code analysis is disabled, concurrent execution is enabled, and analyzer hot paths must remain free of I/O, network access, process execution, and reflection-heavy behavior.
 
 ## Why No Workspaces
 
-`Microsoft.CodeAnalysis.Workspaces` is intentionally absent. Phase 3 does not implement a `CodeFixProvider`, project-wide analysis, solution loading, or IDE workspace features that would justify that dependency.
+`Microsoft.CodeAnalysis.Workspaces` is intentionally absent. Phase 4 does not implement a `CodeFixProvider`, project-wide analysis, solution loading, or IDE workspace features that would justify that dependency.

@@ -1,12 +1,263 @@
 # Analyzer Catalog
 
-[English](analyzers.md) | [Português (Brasil)](../pt-BR/analyzers.md)
+[English](analyzers.md) | [Portugues (Brasil)](../pt-BR/analyzers.md)
 
-This page is the canonical user-facing catalog of diagnostics currently exposed by `ComplexityAnalysis.Analyzers`.
+This page is the public catalog of diagnostics exposed by `ComplexityAnalysis.Analyzers` in Phase 4.
 
-The implementation was inventoried from `DiagnosticDescriptor`, `SupportedDiagnostics`, `Diagnostic.Create`, and `BIG` rule IDs in the current code. Through Phase 3, only `BIG9000` exists as a public diagnostic.
+The analyzer resolves known BCL and LINQ operations through Roslyn symbols. Same-name custom methods are not treated as known operations. Unsupported or unresolved operations remain `Unknown`.
 
-Internal analysis capabilities are documented separately from diagnostics. The internal model and Roslyn extraction can derive several asymptotic forms, but product diagnostics that surface those results to developers are not part of Phase 3.
+## Summary
+
+| ID | Title | Category | Default severity | Enabled by default |
+| --- | --- | --- | --- | --- |
+| `BIG0001` | Estimated algorithmic complexity | `Complexity` | `Info` | `false` |
+| `BIG1001` | Linear lookup inside iteration | `Complexity` | `Info` | `true` |
+| `BIG1002` | Materialization inside iteration | `Complexity` | `Info` | `true` |
+| `BIG1003` | Ordering inside iteration | `Complexity` | `Info` | `true` |
+| `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
+
+## BIG0001 - Estimated Algorithmic Complexity
+
+| Property | Value |
+| --- | --- |
+| ID | `BIG0001` |
+| Title | `Estimated algorithmic complexity` |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `false` |
+| Location | Method identifier |
+| Message | `Estimated time complexity: {complexity}` |
+
+### Problem Detected
+
+`BIG0001` is informational. It exposes the analyzer's known estimate for a supported method, such as `O(1)`, `O(n)`, `O(n log n)`, or `O(n^2)`.
+
+### Example
+
+```csharp
+public sealed class Sample
+{
+    public void M(int[] values)
+    {
+        foreach (var value in values)
+        {
+            var x = value + 1;
+        }
+    }
+}
+```
+
+When enabled, the diagnostic is reported on `M` with `Estimated time complexity: O(n)`.
+
+### Non-Trigger Cases
+
+No diagnostic is reported when:
+
+- `BIG0001` is not enabled by consumer configuration;
+- the method result is `Unknown`;
+- the method depends on unsupported project-local method calls or unresolved operations.
+
+### Configuration
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG0001.severity = suggestion
+```
+
+Use `none` to keep it disabled:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG0001.severity = none
+```
+
+## BIG1001 - Linear Lookup Inside Iteration
+
+| Property | Value |
+| --- | --- |
+| ID | `BIG1001` |
+| Title | `Linear lookup inside iteration` |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Lookup invocation |
+| Message | Linear lookup operation, containing iteration estimate, and combined estimate |
+
+### Problem Detected
+
+`BIG1001` reports a semantically known linear lookup that executes inside an analyzable loop. The main Phase 4 example is `List<T>.Contains` inside a loop over another input.
+
+### Example
+
+```csharp
+using System.Collections.Generic;
+
+public sealed class Sample
+{
+    void M(List<int> customers, List<int> blockedCustomers)
+    {
+        foreach (var customer in customers)
+        {
+            if (blockedCustomers.Contains(customer))
+            {
+            }
+        }
+    }
+}
+```
+
+The diagnostic points at `blockedCustomers.Contains(customer)`.
+
+### Non-Trigger Cases
+
+No diagnostic is reported for:
+
+- the same lookup outside a loop;
+- `HashSet<T>.Contains`, because the supported mapping is average-case constant lookup;
+- custom `Contains` methods with the same name;
+- loops whose iteration count cannot be analyzed;
+- lookups whose receiver size cannot be resolved safely.
+
+### Configuration
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1001.severity = warning
+```
+
+Disable it:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1001.severity = none
+```
+
+## BIG1002 - Materialization Inside Iteration
+
+| Property | Value |
+| --- | --- |
+| ID | `BIG1002` |
+| Title | `Materialization inside iteration` |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Materializing invocation |
+| Message | Materialization operation, containing iteration estimate, and combined estimate |
+
+### Problem Detected
+
+`BIG1002` reports repeated supported LINQ materialization inside an analyzable loop. Supported materializers include `ToList`, `ToArray`, `ToDictionary`, and `ToHashSet`.
+
+### Example
+
+```csharp
+using System.Collections.Generic;
+using System.Linq;
+
+public sealed class Sample
+{
+    void M(List<int> customers, IEnumerable<int> items)
+    {
+        foreach (var customer in customers)
+        {
+            var copy = items.ToList();
+        }
+    }
+}
+```
+
+The diagnostic points at `items.ToList()`.
+
+### Non-Trigger Cases
+
+No diagnostic is reported for:
+
+- materialization outside a loop;
+- custom `ToList` or `ToArray` methods;
+- loops whose iteration count cannot be analyzed;
+- materializers whose source size cannot be resolved safely.
+
+### Configuration
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1002.severity = warning
+```
+
+Disable it:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1002.severity = none
+```
+
+## BIG1003 - Ordering Inside Iteration
+
+| Property | Value |
+| --- | --- |
+| ID | `BIG1003` |
+| Title | `Ordering inside iteration` |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Deferred ordering invocation |
+| Message | Ordering operation, containing iteration estimate, and combined estimate |
+
+### Problem Detected
+
+`BIG1003` reports supported deferred ordering work when it is proven to be consumed inside an analyzable loop. Supported ordering operations include `OrderBy`, `OrderByDescending`, `ThenBy`, and `ThenByDescending`.
+
+### Example
+
+```csharp
+using System.Collections.Generic;
+using System.Linq;
+
+public sealed class Sample
+{
+    void M(List<int> customers, IEnumerable<int> items)
+    {
+        foreach (var customer in customers)
+        {
+            var sorted = items.OrderBy(item => item).ToList();
+        }
+    }
+}
+```
+
+The diagnostic points at `items.OrderBy(item => item)`, not at `ToList()`.
+
+### Non-Trigger Cases
+
+No diagnostic is reported for:
+
+- creating an `OrderBy` pipeline inside a loop without consuming it;
+- consuming the ordered pipeline outside the loop;
+- custom `OrderBy` methods;
+- loops whose iteration count cannot be analyzed;
+- ordering chains whose source size cannot be resolved safely.
+
+### Configuration
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1003.severity = warning
+```
+
+Disable it:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1003.severity = none
+```
 
 ## BIG9000 - Analyzer Execution Probe
 
@@ -17,40 +268,16 @@ Internal analysis capabilities are documented separately from diagnostics. The i
 | Category | `Infrastructure` |
 | Default severity | `Info` |
 | Enabled by default | `false` |
+| Location | Start of a source file when one is available; otherwise no source location |
 | Message | `ComplexityAnalysis.Analyzers execution probe is active` |
-| Description | Reports once per compilation when explicitly enabled to prove the analyzer executed. |
-| Introduced | Phase 1 - Analyzer Foundation |
 
-## What It Detects
+### Problem Detected
 
-`BIG9000` detects analyzer execution infrastructure, not application-code behavior.
+`BIG9000` does not detect a code problem. It is an infrastructure probe used to prove that the analyzer package was loaded, initialized, and able to report diagnostics.
 
-It proves that the analyzer package was:
+### Example
 
-- loaded by the compiler or host;
-- initialized;
-- executed;
-- able to emit diagnostics.
-
-The analyzer registers a compilation action and reports the probe at a source location when source is available. Tests cover that it is emitted at most once per compilation when explicitly enabled.
-
-## Why It Matters
-
-The probe is useful when validating packaging, local consumption, CI smoke tests, or editor/compiler integration.
-
-If `BIG9000` appears, it does not mean your code has a problem. It means the execution probe was explicitly enabled and the analyzer successfully ran.
-
-`BIG9000` does not:
-
-- identify inefficient code;
-- calculate Big-O;
-- inspect loops for a public warning;
-- represent a product performance rule;
-- indicate a bug in the consumer project.
-
-## Example
-
-Any C# compilation can produce the probe when it is explicitly enabled:
+Any C# source can produce the probe when explicitly enabled:
 
 ```csharp
 public sealed class Sample
@@ -59,27 +286,11 @@ public sealed class Sample
 }
 ```
 
-The diagnostic is independent from this method's complexity. It is reported by compilation-level analyzer infrastructure.
+### Non-Trigger Cases
 
-## Configuration
+No diagnostic is reported when `BIG9000` is not enabled. It reports at most once per compilation when enabled.
 
-Keep the probe disabled:
-
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG9000.severity = none
-```
-
-Enable it for a local smoke test:
-
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG9000.severity = suggestion
-```
-
-Make it highly visible in a temporary CI or package-consumption test:
+### Configuration
 
 ```ini
 [*.cs]
@@ -87,10 +298,20 @@ Make it highly visible in a temporary CI or package-consumption test:
 dotnet_diagnostic.BIG9000.severity = warning
 ```
 
-Setting `warning` changes the consumer-configured severity. The analyzer descriptor still defines `BIG9000` as `Info` and disabled by default.
+Disable it:
 
-Do not keep `BIG9000` enabled permanently in normal projects unless you intentionally want a recurring infrastructure signal.
+```ini
+[*.cs]
 
-## Planned / Not Yet Available
+dotnet_diagnostic.BIG9000.severity = none
+```
 
-Product diagnostics based on extracted Big-O complexity are planned for a later phase. No future rule IDs are documented as available here because they are not present in the current code.
+## Supported Known-Operation Subset
+
+Phase 4 includes a small documented subset:
+
+- BCL: selected `List<T>`, `Dictionary<TKey,TValue>`, `HashSet<T>`, array, and string operations.
+- LINQ immediate or terminal operations: `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max`, and `Aggregate`.
+- LINQ deferred operations: `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct`, and `GroupBy`.
+
+Deferred LINQ pipeline creation is treated as setup work. Enumeration cost is counted only when a supported terminal operation or `foreach` consumes the pipeline.

@@ -1,8 +1,8 @@
 # Getting Started
 
-[English](getting-started.md) | [Português (Brasil)](../pt-BR/getting-started.md)
+[English](getting-started.md) | [Portugues (Brasil)](../pt-BR/getting-started.md)
 
-This page explains how to build, test, pack, and consume the isolated analyzer workspace through Phase 3.
+This page explains how to build, test, pack, and consume the isolated analyzer workspace through Phase 4.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ Create a local analyzer package:
 
 ```bash
 cd analyzer
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.3.0-docs-local
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.4.0-phase4-local
 ```
 
 The package is a Roslyn analyzer package. The analyzer assembly is packed under:
@@ -44,20 +44,20 @@ The project sets `PackageReadmeFile` to `README.md`, and the packed README is th
 
 ## Local Consumption
 
-The package is currently consumed from a local build/package source. Do not treat this documentation as evidence of a NuGet.org publication.
+The package is currently consumed from a local package source. Do not treat this documentation as evidence of a NuGet.org publication.
 
 One local workflow is:
 
 ```bash
 cd analyzer
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.3.0-docs-local --output artifacts/local-packages
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.4.0-phase4-local --output artifacts/local-packages
 dotnet new console -o artifacts/tmp/AnalyzerConsumer
 cd artifacts/tmp/AnalyzerConsumer
 dotnet nuget add source ../../local-packages --name complexity-analysis-local
-dotnet add package ComplexityAnalysis.Analyzers --version 0.3.0-docs-local --source complexity-analysis-local
+dotnet add package ComplexityAnalysis.Analyzers --version 0.4.0-phase4-local --source complexity-analysis-local
 ```
 
-The exact package output directory can vary by SDK and repository configuration. If needed, point the local NuGet source at the directory containing the generated `.nupkg`.
+If needed, point the local NuGet source at the directory containing the generated `.nupkg`.
 
 ## PackageReference
 
@@ -72,21 +72,25 @@ Analyzer packages are normally referenced with `PrivateAssets="all"` so they aff
 
 The analyzer is not a runtime library. Application code does not call its types.
 
-```text
-application
-    |
-    | compiled by
-    v
-Roslyn compiler
-    |
-    | loads
-    v
-ComplexityAnalysis.Analyzers
+## Smoke Test Diagnostics
+
+`BIG1001`, `BIG1002`, and `BIG1003` are enabled by default as `Info` diagnostics. Build output visibility depends on the consuming project and SDK settings. You can promote one locally:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1001.severity = warning
 ```
 
-## Smoke Test With BIG9000
+`BIG0001` is disabled by default. Enable it when you want method complexity estimates:
 
-`BIG9000` is disabled by default. To prove the analyzer was loaded by a consumer project, create or edit `.editorconfig` in the consumer:
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG0001.severity = suggestion
+```
+
+`BIG9000` is disabled by default. To prove the analyzer loaded, enable it temporarily:
 
 ```ini
 [*.cs]
@@ -94,9 +98,7 @@ ComplexityAnalysis.Analyzers
 dotnet_diagnostic.BIG9000.severity = warning
 ```
 
-Then build the consumer project. If `BIG9000` appears, it does not mean your code has a problem. It means the execution probe was explicitly enabled and the analyzer successfully ran.
-
-After the smoke test, disable it again:
+Disable the probe after the smoke test:
 
 ```ini
 [*.cs]

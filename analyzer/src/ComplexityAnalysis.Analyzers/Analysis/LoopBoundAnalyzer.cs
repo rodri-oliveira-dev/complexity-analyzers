@@ -42,6 +42,13 @@ internal sealed class LoopBoundAnalyzer
 
         context.CancellationToken.ThrowIfCancellationRequested();
 
+        if (new KnownOperationComplexityAnalyzer(context).TryAnalyzeForEachSequence(
+            forEachStatement.Expression,
+            out LoopBoundAnalysisResult knownOperationResult))
+        {
+            return knownOperationResult;
+        }
+
         return !TryResolveInputDimension(forEachStatement.Expression, out ComplexityVariable? variable)
             || variable is null
             ? LoopBoundAnalysisResult.Unknown()
@@ -484,40 +491,8 @@ internal sealed class LoopBoundAnalyzer
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        expression = UnwrapParentheses(expression);
-        variable = null;
-
-        if (expression is IdentifierNameSyntax)
-        {
-            SymbolInfo symbolInfo = context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken);
-            if (symbolInfo.Symbol is not null
-                && context.TryGetInputSizeVariable(symbolInfo.Symbol, out ComplexityVariable directVariable))
-            {
-                variable = directVariable;
-                return true;
-            }
-
-            if (symbolInfo.Symbol is not null
-                && context.TryGetLocalLoopBound(symbolInfo.Symbol, out LoopBoundExpression localBound)
-                && localBound.IsVariable)
-            {
-                variable = localBound.Variable;
-                return true;
-            }
-
-            return false;
-        }
-
-        if (expression is MemberAccessExpressionSyntax memberAccess
-            && StringComparer.Ordinal.Equals(memberAccess.Name.Identifier.ValueText, "Length")
-            && TryResolveInputDimension(memberAccess.Expression, out ComplexityVariable? receiverVariable)
-            && IsArrayOrString(memberAccess.Expression))
-        {
-            variable = receiverVariable;
-            return true;
-        }
-
-        return false;
+        return new KnownOperationComplexityAnalyzer(context).TryResolveInputDimension(expression, out variable)
+            && variable is not null;
     }
 
     private bool TargetsLoopVariableMutation(ExpressionSyntax expression, ISymbol loopVariable)
@@ -562,15 +537,6 @@ internal sealed class LoopBoundAnalyzer
 
         return symbolInfo.Symbol is not null
             && SymbolEqualityComparer.Default.Equals(symbolInfo.Symbol, symbol);
-    }
-
-    private bool IsArrayOrString(ExpressionSyntax expression)
-    {
-        context.CancellationToken.ThrowIfCancellationRequested();
-
-        ITypeSymbol? type = context.SemanticModel.GetTypeInfo(expression, context.CancellationToken).Type;
-        return type?.TypeKind == TypeKind.Array
-            || type?.SpecialType == SpecialType.System_String;
     }
 
     private bool TryGetNonNegativeIntegerConstant(ExpressionSyntax expression, out long value)
@@ -790,12 +756,14 @@ internal sealed class LoopBoundAnalysisResult
     private LoopBoundAnalysisResult(
         bool isAnalyzable,
         ComplexityExpression iterationComplexity,
+        ComplexityExpression enumerationComplexity,
         ComplexityVariable? dimension,
         LoopBoundPattern pattern,
         bool isConstantBound)
     {
         IsAnalyzable = isAnalyzable;
         IterationComplexity = iterationComplexity;
+        EnumerationComplexity = enumerationComplexity;
         Dimension = dimension;
         Pattern = pattern;
         IsConstantBound = isConstantBound;
@@ -807,6 +775,11 @@ internal sealed class LoopBoundAnalysisResult
     }
 
     internal ComplexityExpression IterationComplexity
+    {
+        get;
+    }
+
+    internal ComplexityExpression EnumerationComplexity
     {
         get;
     }
@@ -833,6 +806,7 @@ internal sealed class LoopBoundAnalysisResult
         return new LoopBoundAnalysisResult(
             true,
             ComplexityFactory.Linear(variable),
+            ComplexityFactory.Constant(),
             variable,
             LoopBoundPattern.Linear,
             false);
@@ -845,8 +819,25 @@ internal sealed class LoopBoundAnalysisResult
         return new LoopBoundAnalysisResult(
             true,
             ComplexityFactory.LogN(variable),
+            ComplexityFactory.Constant(),
             variable,
             LoopBoundPattern.Logarithmic,
+            false);
+    }
+
+    internal static LoopBoundAnalysisResult Enumerable(
+        ComplexityExpression iterationComplexity,
+        ComplexityExpression enumerationComplexity)
+    {
+        _ = iterationComplexity ?? throw new ArgumentNullException(nameof(iterationComplexity));
+        _ = enumerationComplexity ?? throw new ArgumentNullException(nameof(enumerationComplexity));
+
+        return new LoopBoundAnalysisResult(
+            true,
+            iterationComplexity,
+            enumerationComplexity,
+            null,
+            LoopBoundPattern.Linear,
             false);
     }
 
@@ -854,6 +845,7 @@ internal sealed class LoopBoundAnalysisResult
     {
         return new LoopBoundAnalysisResult(
             true,
+            ComplexityFactory.Constant(),
             ComplexityFactory.Constant(),
             null,
             LoopBoundPattern.Linear,
@@ -864,6 +856,7 @@ internal sealed class LoopBoundAnalysisResult
     {
         return new LoopBoundAnalysisResult(
             false,
+            ComplexityFactory.Unknown(),
             ComplexityFactory.Unknown(),
             null,
             LoopBoundPattern.Unknown,
