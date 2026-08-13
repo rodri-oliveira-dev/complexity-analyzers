@@ -1,17 +1,14 @@
 {
   "delivery": "Phase 5 \u2014 Interprocedural Analysis",
-  "currentObjective": "Demand-driven interprocedural propagation complete",
-  "completedStep": "5/9 \u2014 demand-driven interprocedural propagation",
+  "currentObjective": "Cycles, limits and concurrency hardening complete",
+  "completedStep": "6/9 \u2014 cycles, limits and concurrency hardening",
   "decisions": [
-    "InterproceduralAnalysisContext is created per Roslyn Compilation and owns its own template cache; no static or cross-compilation cache is used.",
-    "Template cache keys normalize to method OriginalDefinition through a SymbolEqualityComparer-based MethodSymbolKey so overloads and constructed generic calls keep semantic identity.",
-    "Cached values are MethodComplexityTemplate results relative to callee parameters only; caller-specific argument substitution is performed outside the template cache.",
-    "The cache uses ConcurrentDictionary entries with explicit InProgress and Completed states instead of Lazy<T>, so future cycle handling does not need self-waiting cache initialization.",
-    "AnalysisBudget remains internal with MaximumCallDepth = 5 and MaximumMethodsPerRootAnalysis = 32; InterproceduralRootAnalysisState owns depth, expanded method count, active path, and CancellationToken per root.",
-    "ArgumentComplexityBinder maps eligible callee parameter variables to caller-side ComplexityExpression values through proven direct arguments, known Length/Count size properties, constants, and simple constant affine/scaled transformations.",
-    "ComplexitySubstitution rewrites the closed Phase 2 model without mutating cached templates; unknown or unproven variable bindings remain Unknown.",
-    "MethodComplexityExtractor now analyzes safe source invocations on demand after known-operation resolution, caches caller-independent callee templates, substitutes arguments per call site, and composes the substituted result with the caller through ComplexityComposer.",
-    "Callee methods may live in a different SyntaxTree; source callee analysis obtains the correct SemanticModel from the per-compilation Compilation."
+    "Cycle, depth, method-budget, cancellation, and cache-in-progress boundaries collapse to Unknown for public complexity output in Phase 5; recursion complexity is not solved.",
+    "Root methods count as depth 0. MaximumCallDepth = 5 allows five uncached callee expansions from a root and stops the sixth at an Unknown boundary.",
+    "MaximumMethodsPerRootAnalysis counts uncached method expansion reservations per root analysis state, not per Compilation, so one root cannot permanently consume another root's budget.",
+    "The per-compilation template cache treats missing entries as NotStarted, explicit InProgress entries as non-blocking Analyzing markers, and stores only Completed Known templates from production analysis in this step.",
+    "Unknown caused exclusively by depth limit, method budget, cancellation, active call path cycle, or contextual InProgress cache races is not stored as a permanent cache entry.",
+    "When another root finds a callee InProgress, it analyzes the callee independently under its own root state instead of waiting, avoiding A-waits-for-B/B-waits-for-A cache deadlocks."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -56,15 +53,18 @@
     "Release tests passed for argument binding and complexity substitution: 279 passed, 0 failed, 0 skipped.",
     "Before demand-driven propagation, git status was clean on branch main at 62fddb1a933aa992f7c4fae48edc7b2adab6dcd0.",
     "Release build passed for demand-driven interprocedural propagation.",
-    "Release tests passed for demand-driven interprocedural propagation: 293 passed, 0 failed, 0 skipped."
+    "Release tests passed for demand-driven interprocedural propagation: 293 passed, 0 failed, 0 skipped.",
+    "Before cycles, limits and concurrency hardening, branch was main at c11a1259d726ded71df5b39dde1ccc8dd2b4707d.",
+    "Release build passed for cycles, limits and concurrency hardening with existing style warnings only.",
+    "Release tests passed for cycles, limits and concurrency hardening: 305 passed, 0 failed, 0 skipped.",
+    "Concurrent interprocedural tests were repeated 5 times with filter FullyQualifiedName~Concurrent: each run passed 6 tests, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "Harden cycle, budget, and concurrency behavior without recursion solving.",
     "Consider BIG1004 only in a later implementation step."
   ],
-  "nextStep": "6/9 \u2014 cycles, limits and concurrency hardening",
+  "nextStep": "7/9 \u2014 diagnostic integration",
   "lastCommit": {
-    "hash": "62fddb1a933aa992f7c4fae48edc7b2adab6dcd0",
-    "message": "feat: bind interprocedural complexity arguments"
+    "hash": "c11a1259d726ded71df5b39dde1ccc8dd2b4707d",
+    "message": "feat: propagate source method complexity"
   }
 }

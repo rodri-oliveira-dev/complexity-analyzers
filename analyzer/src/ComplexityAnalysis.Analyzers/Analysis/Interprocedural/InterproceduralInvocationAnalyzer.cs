@@ -79,6 +79,24 @@ internal sealed class InterproceduralInvocationAnalyzer
         }
 
         IMethodSymbol sourceMethodDefinition = resolution.SourceMethodDefinition;
+        if (rootState.ContainsActiveMethod(sourceMethodDefinition))
+        {
+            return InterproceduralAnalysisResult
+                .CycleBoundary("The method is already active in the current root call path.")
+                .Complexity;
+        }
+
+        if (interproceduralContext.TemplateCache.TryGetCompleted(
+            sourceMethodDefinition,
+            callerContext.CancellationToken,
+            out InterproceduralAnalysisResult cachedResult))
+        {
+            return SubstituteCallSiteArguments(
+                invocation,
+                resolution.TargetMethodSymbol,
+                cachedResult);
+        }
+
         if (!rootState.TryEnterMethod(
             sourceMethodDefinition,
             out InterproceduralRootAnalysisState calleeState,
@@ -87,11 +105,19 @@ internal sealed class InterproceduralInvocationAnalyzer
             return boundaryResult.Complexity;
         }
 
-        InterproceduralAnalysisResult calleeResult = GetOrAnalyzeCallee(
-            sourceMethodDefinition,
-            resolution.SourceMethodDeclaration,
-            interproceduralContext,
-            calleeState);
+        InterproceduralAnalysisResult calleeResult;
+        try
+        {
+            calleeResult = GetOrAnalyzeCallee(
+                sourceMethodDefinition,
+                resolution.SourceMethodDeclaration,
+                interproceduralContext,
+                calleeState);
+        }
+        finally
+        {
+            _ = calleeState.ExitMethod(sourceMethodDefinition);
+        }
 
         return SubstituteCallSiteArguments(
             invocation,
@@ -107,42 +133,37 @@ internal sealed class InterproceduralInvocationAnalyzer
     {
         callerContext.CancellationToken.ThrowIfCancellationRequested();
 
-        if (interproceduralContext.TemplateCache.TryGetCompleted(
-            sourceMethodDefinition,
-            callerContext.CancellationToken,
-            out InterproceduralAnalysisResult cachedResult))
-        {
-            return cachedResult;
-        }
-
         if (!interproceduralContext.TemplateCache.TryReserveAnalysis(
             sourceMethodDefinition,
             callerContext.CancellationToken,
             out InterproceduralAnalysisResult? completedResult))
         {
             return completedResult
-                ?? InterproceduralAnalysisResult.Unknown("The source method is already being analyzed.");
+                ?? AnalyzeCalleeWithoutCaching(
+                    sourceMethodDefinition,
+                    sourceMethodDeclaration,
+                    interproceduralContext,
+                    calleeState);
         }
 
         bool stored = false;
         try
         {
-            SemanticModel calleeSemanticModel = interproceduralContext.Compilation.GetSemanticModel(
-                sourceMethodDeclaration.SyntaxTree);
-            InterproceduralAnalysisResult analyzedResult = new MethodComplexityExtractor()
-                .AnalyzeSourceMethod(
-                    sourceMethodDeclaration,
-                    sourceMethodDefinition,
-                    calleeSemanticModel,
-                    interproceduralContext,
-                    calleeState,
-                    callerContext.CancellationToken);
-
-            interproceduralContext.TemplateCache.StoreCompleted(
+            InterproceduralAnalysisResult analyzedResult = AnalyzeCalleeWithoutCaching(
                 sourceMethodDefinition,
-                analyzedResult,
-                callerContext.CancellationToken);
-            stored = true;
+                sourceMethodDeclaration,
+                interproceduralContext,
+                calleeState);
+
+            if (IsCacheable(analyzedResult))
+            {
+                interproceduralContext.TemplateCache.StoreCompleted(
+                    sourceMethodDefinition,
+                    analyzedResult,
+                    callerContext.CancellationToken);
+                stored = true;
+            }
+
             return analyzedResult;
         }
         finally
@@ -154,6 +175,31 @@ internal sealed class InterproceduralInvocationAnalyzer
                     CancellationToken.None);
             }
         }
+    }
+
+    private InterproceduralAnalysisResult AnalyzeCalleeWithoutCaching(
+        IMethodSymbol sourceMethodDefinition,
+        MethodDeclarationSyntax sourceMethodDeclaration,
+        InterproceduralAnalysisContext interproceduralContext,
+        InterproceduralRootAnalysisState calleeState)
+    {
+        callerContext.CancellationToken.ThrowIfCancellationRequested();
+
+        SemanticModel calleeSemanticModel = interproceduralContext.Compilation.GetSemanticModel(
+            sourceMethodDeclaration.SyntaxTree);
+        return new MethodComplexityExtractor()
+            .AnalyzeSourceMethod(
+                sourceMethodDeclaration,
+                sourceMethodDefinition,
+                calleeSemanticModel,
+                interproceduralContext,
+                calleeState,
+                callerContext.CancellationToken);
+    }
+
+    private static bool IsCacheable(InterproceduralAnalysisResult result)
+    {
+        return result.Kind == InterproceduralAnalysisResultKind.Known;
     }
 
     private ComplexityExpression SubstituteCallSiteArguments(
