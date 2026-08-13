@@ -1,72 +1,50 @@
 {
-  "delivery": "Phase 4 - BCL, LINQ & Actionable Diagnostics",
-  "currentObjective": "Prepare Phase 4 for final validation and closure after characterization, documentation, and package hardening",
-  "completedStep": "8/9 — characterization, documentation and package hardening",
+  "delivery": "Phase 4 — BCL, LINQ & Actionable Diagnostics",
+  "currentObjective": "Phase 4 complete",
+  "completedStep": "9/9 — validation and closure",
   "decisions": [
-    "Known operations must be resolved through Roslyn symbols, not text-only method names.",
-    "Unsupported or unresolved invocations remain Unknown; the inherited conservative O(n) fallback is explicitly rejected.",
-    "Known operation mappings carry complexity, execution semantics, provenance, and diagnostic metadata.",
-    "KnownOperationMapping, KnownOperationRegistry, and KnownOperationResolver live under Analysis/KnownOperations with immutable value-oriented model objects and no Roslyn dependency under Model/.",
+    "Known operations are resolved through Roslyn symbols and exact operation identities, not text-only method names.",
+    "Unsupported or unresolved invocations remain Unknown; there is no fallback to O(n).",
+    "Known operation mappings carry complexity, execution semantics, provenance, complexity-case metadata, and diagnostic metadata.",
     "KnownOperationRegistry.Bcl remains BCL-only; KnownOperationRegistry.Default combines BCL and LINQ mappings for extraction.",
-    "LINQ mappings cover high-value System.Linq.Enumerable immediate/materializing operations and deferred pipeline operations with official documentation/runtime-source provenance.",
-    "Deferred LINQ pipeline creation is charged as O(1); receiver enumeration is charged only when consumed by supported terminal operations or foreach.",
-    "Supported consumed pipeline chains compose source enumeration, predicate/selector local lambda complexity, materialization, and ordering without artificial double-counting of Where/Select plus ToList/ToArray.",
-    "OrderBy/OrderByDescending/ThenBy/ThenByDescending remain deferred at creation, but sorting complexity is counted when consumed.",
-    "Count() specializes to O(1) only when the receiver semantic type safely exposes ICollection/ICollection<T> count or array length; generic IEnumerable remains O(n).",
-    "LINQ lambdas are analyzed only locally; unresolved invocation work inside consumed predicates/selectors preserves Unknown.",
-    "Foreach now has the minimal contract needed to account for consumed deferred LINQ pipelines without introducing diagnostics.",
-    "Known BCL/LINQ invocations are integrated with method extraction through KnownOperationResolver and contribute to ComplexityExpression only after semantic mapping resolution.",
-    "Invocation receiver/source dimensions are substituted from the actual receiver expression, so later parameters such as right map to their own canonical variable instead of always using n.",
-    "BIG0001 exposes known method complexity estimates as an Info diagnostic and remains disabled by default.",
-    "BIG0001 reports at the method identifier and is not emitted when method extraction returns Unknown.",
-    "BIG1001 reports semantically resolved linear lookup operations inside analyzable loop bodies, points at the lookup invocation, suppresses constant lookup mappings such as HashSet<T>.Contains, and does not report custom same-name methods.",
-    "BIG1002 reports semantically resolved materializing LINQ terminal operations inside analyzable loop bodies, points at the materializing invocation, and explains repeated enumeration/allocation without modeling space complexity.",
-    "BIG1003 reports semantically resolved deferred ordering operations only when a supported consuming invocation is proven inside an analyzable loop body, points at the ordering invocation, and respects deferred execution.",
-    "BIG100x diagnostics use Info severity and are enabled by default; they remain non-error diagnostics and are not a quality gate."
+    "Deferred LINQ pipeline creation is O(1); enumeration cost is counted only when a supported terminal operation or foreach consumes the pipeline.",
+    "OrderBy, OrderByDescending, ThenBy, and ThenByDescending remain deferred at creation and count sorting only when consumed.",
+    "BIG0001 and BIG9000 are Info diagnostics disabled by default; BIG1001, BIG1002, and BIG1003 are Info diagnostics enabled by default.",
+    "BIG1003 reports deferred ordering only when supported consumption is proven inside an analyzable loop."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
     "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
-    "Do not copy the inherited BCL registry wholesale.",
-    "Do not implement call graph, interprocedural analysis, recursion, recurrence solving, Workspaces, CodeFix, memory complexity, parallel complexity, or probabilistic complexity in Phase 4.",
-    "Do not change BIG9000 unless a later explicit spec changes that contract.",
-    "Respect CancellationToken and keep analyzer hot paths deterministic, immutable, and free from I/O, network access, process execution, and reflection-heavy behavior."
+    "Do not add Microsoft.CodeAnalysis.Workspaces, MathNet, or SymPy to the isolated analyzer.",
+    "Do not implement call graph, interprocedural analysis, recursion, recurrence solving, CodeFix, memory complexity, parallel complexity, or probabilistic complexity in Phase 4.",
+    "Keep analyzer hot paths deterministic, cancellation-aware, and free from I/O, network access, process execution, and reflection-heavy behavior."
   ],
   "relevantFiles": [
     "analyzer/specs/phase-4/bcl-linq-diagnostics.md",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/ActionableComplexityDiagnosticAnalyzer.cs",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperationComplexityAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/BclMappings.cs",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/LinqMappings.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperationComplexityAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/ActionableComplexityDiagnosticAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/LoopBoundAnalyzer.cs",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/BasicOperationAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
+    "analyzer/docs/en/analyzers.md",
+    "analyzer/docs/pt-BR/analyzers.md",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/KnownOperationRegistryTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
   ],
   "validations": [
-    "Known-operation infrastructure tests cover exact match, unknown lookup, overload distinction, custom same-name non-match, reduced extension resolution, deterministic registry ordering, concurrent read behavior, and Unknown not becoming O(n).",
-    "Core BCL mapping tests cover List<T>.Count/indexer/Contains/IndexOf/Sort overloads, Dictionary<TKey,TValue>.ContainsKey/ContainsValue, HashSet<T>.Contains, Array.Length, string.Length, custom homonymous List<T>.Contains, verified or explicitly conservative provenance, and absence of LINQ mappings from the BCL-only registry.",
-    "LINQ mapping tests cover semantic resolution and provenance for Where, Select, OrderBy, Distinct, GroupBy, ToList, Any, Count, and Contains plus custom homonymous extensions.",
-    "Method extraction tests cover List.Contains, HashSet.Contains, Dictionary.ContainsValue, LINQ Any, LINQ ToList, Where+ToList, OrderBy+ToList, foreach Where, unknown custom methods, receiver-dimension substitution, foreach plus inner List.Contains composition, Count specialization, custom Where/Any extensions, nested/chained operators, SelectMany with known inner receiver, and unresolved consumed predicate preserving Unknown.",
-    "Public analyzer tests cover BIG0001 descriptor metadata, disabled-by-default behavior, enabled O(1)/O(n)/O(n^2) reports, Unknown suppression, BIG1001/BIG1002/BIG1003 descriptor metadata and actionable positive/negative fixtures, coexistence without duplicate reports, repeated-source diagnostic determinism for ID/message/location, and unchanged BIG9000 behavior.",
-    "Performance review found one concrete repeated semantic-resolution path in actionable diagnostics; resolved symbols and mappings are now reused when computing the same invocation complexity.",
-    "English and pt-BR README and docs now document Phase 4 diagnostics, supported known-operation subset, Unknown policy, deferred LINQ consumption, and standard .editorconfig severity configuration.",
-    "dotnet restore passed.",
-    "dotnet build --configuration Release --no-restore passed.",
-    "dotnet test --configuration Release --no-build passed.",
-    "dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.4.0-phase4-local passed.",
-    "Package inspection confirmed the analyzer DLL under analyzers/dotnet/cs/, English README.md, no inherited DLLs, and no nuspec dependencies for Roslyn, Workspaces, or MathNet.",
-    "Temporary ignored consumer under analyzer/artifacts validated defaults, BIG0001 enabled through .editorconfig, BIG1001 promoted through .editorconfig, and configured severity appearing as warnings."
+    "Analyzer restore, Release build, Release test, and Release pack pass.",
+    "Tests cover semantic BCL/LINQ resolution, custom homonymous non-matches, Unknown preservation, deferred and immediate LINQ semantics, actionable diagnostics, and BIG9000 behavior.",
+    "Package inspection confirms the analyzer DLL under analyzers/dotnet/cs/, README.md, no lib assembly, no dependency groups, no inherited assemblies, no Workspaces, and no MathNet.",
+    "SupportedDiagnostics, DiagnosticDescriptors, AnalyzerReleases.Unshipped.md, and EN/pt-BR analyzer docs expose the same public diagnostics.",
+    "Inherited solution restore/build were checked without editing upstream; a cache issue and documentation-file lock required isolated package cache and redirected documentation output for a clean build."
   ],
   "knownPendingItems": [
-    "Run final Phase 4 validation and closure review."
+    "Project-local calls remain Unknown until interprocedural analysis.",
+    "Call graph, recursion detection, and recurrence solving remain unsupported.",
+    "The known-operation registry intentionally covers a documented subset rather than full BCL/LINQ parity."
   ],
-  "nextStep": "9/9 — phase validation and closure"
+  "nextStep": "Phase 5 — Interprocedural Analysis"
 }

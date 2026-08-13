@@ -2,9 +2,7 @@
 
 ## Status
 
-Specification initialized.
-
-Phase 4 is not implemented by this document. The current repository state shows Phase 3 complete: intraprocedural extraction exists under the isolated analyzer project, method invocations without known local rules remain `Unknown`, only `BIG9000` is exposed by the public analyzer, and the Release test suite passes.
+Complete.
 
 ## Objective
 

@@ -15,7 +15,7 @@ Phase 1 through Phase 4 are implemented.
 | Phase 1 - Analyzer Foundation | Complete | Isolated `netstandard2.0` analyzer project, package layout, and `BIG9000` infrastructure probe. |
 | Phase 2 - Complexity Model | Complete | Roslyn-free Big-O expression model, deterministic formatting, growth comparison, composition, independent variables, and `Unknown`. |
 | Phase 3 - Roslyn Extraction | Complete | Intraprocedural method extraction from Roslyn syntax and semantics. |
-| Phase 4 - BCL, LINQ, and Actionable Diagnostics | In hardening | Semantic known-operation mappings for a documented BCL/LINQ subset, `BIG0001`, and actionable `BIG100x` diagnostics. |
+| Phase 4 - BCL, LINQ, and Actionable Diagnostics | Complete | Semantic known-operation mappings for a documented BCL/LINQ subset, `BIG0001`, and actionable `BIG100x` diagnostics. |
 
 The analyzer remains intraprocedural. It does not build a call graph, follow project-local methods, solve recursion, or use `Microsoft.CodeAnalysis.Workspaces`.
 
