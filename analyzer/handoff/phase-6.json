@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 6 \u2014 Recursion & Recurrence Solving",
   "currentObjective": "Extract and solve bounded direct-recursion recurrence patterns",
-  "completedStep": "5/11 \u2014 summation and decrement recurrence solver",
+  "completedStep": "6/11 \u2014 constant-coefficient branching recursion solver",
   "decisions": [
     "Phase 6 starts from Phase 5 cycle boundaries and may solve only supported direct recursion with sufficient base-case evidence.",
     "Recurrence extraction and recurrence solving remain separate responsibilities.",
@@ -21,7 +21,10 @@
     "Base-case evidence extraction is conservative and recognizes simple terminating if branches guarded by bounded comparisons such as n <= constant or n == constant.",
     "SummationRecurrenceSolver solves only T(n)=T(n-c)+f(n) with one multiplicity-one constant-decrement term and supported polylog local work.",
     "For supported summation recurrences, the solver increments the polynomial degree by one and preserves the log exponent; c does not affect the Big-O class.",
-    "SummationRecurrenceSolver returns structured Invalid or Unsupported outcomes instead of converting unsupported shapes to a hidden null or known complexity."
+    "SummationRecurrenceSolver returns structured Invalid or Unsupported outcomes instead of converting unsupported shapes to a hidden null or known complexity.",
+    "ConstantCoefficientRecurrenceSolver solves only same-decrement multiplicity aT(n-c)+polylog with a > 1 and the positive second-order subset a1T(n-1)+a2T(n-2)+polylog where a1 >= 0 and a2 > 0.",
+    "Same-decrement multiplicity uses the homogeneous exponential base a^(1/c), and positive second-order solving uses the bounded quadratic formula for r^2 = a1*r + a2 without MathNet, matrices, or a general root solver.",
+    "Exponential bases now normalize deterministically using invariant culture, integer tolerance, and three fractional decimal places, so Fibonacci-like results format as O(1.618^n)."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -54,14 +57,15 @@
     "Step 3 Release build passed with dotnet build --configuration Release.",
     "Step 3 Release tests passed with dotnet test --configuration Release --no-build: 383 passed, 0 failed, 0 skipped.",
     "Step 5 Release build passed with dotnet build --configuration Release.",
-    "Step 5 Release tests passed with dotnet test --configuration Release --no-build: 407 passed, 0 failed, 0 skipped."
+    "Step 5 Release tests passed with dotnet test --configuration Release --no-build: 407 passed, 0 failed, 0 skipped.",
+    "Step 6 Release build passed with dotnet build --configuration Release.",
+    "Step 6 Release tests passed with dotnet test --configuration Release --no-build: 416 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "Constant-coefficient branching recurrence solving is not implemented yet.",
     "BIG1005 is specified but not implemented in step 2.",
     "Mutual recursion remains Unknown in Phase 6."
   ],
-  "nextStep": "6/11 \u2014 constant-coefficient branching recursion solver",
+  "nextStep": "7/11 \u2014 Master Theorem solver",
   "lastCommit": {
     "hash": "80ff546385338b4667a158a633096d86cd0c889e",
     "message": "feat: extract direct recursion recurrences"

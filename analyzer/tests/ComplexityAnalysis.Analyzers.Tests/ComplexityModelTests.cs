@@ -77,6 +77,7 @@ public sealed class ComplexityModelTests
             (ComplexityFactory.Polynomial(ComplexityVariable.N, 1.585), "O(n^1.585)"),
             (ComplexityFactory.Exponential(ComplexityVariable.N, 2), "O(2^n)"),
             (ComplexityFactory.Exponential(ComplexityVariable.N, 3), "O(3^n)"),
+            (ComplexityFactory.Exponential(ComplexityVariable.N, 1.618033988749895), "O(1.618^n)"),
             (ComplexityFactory.Factorial(ComplexityVariable.N), "O(n!)"),
             (ComplexityFactory.Unknown(), "Unknown"),
         ];
@@ -100,6 +101,7 @@ public sealed class ComplexityModelTests
         Assert.NotEqual(ComplexityFactory.Linear(n), ComplexityFactory.Linear(m));
         Assert.Equal(ComplexityFactory.NLogN(n), new PolynomialLogComplexity(n, polynomialDegree: 1, logExponent: 1));
         Assert.Equal(ComplexityFactory.Polynomial(n, 1.585), new PolynomialLogComplexity(n, polynomialDegree: 1.584962500721156, logExponent: 0));
+        Assert.Equal(ComplexityFactory.Exponential(n, 1.618), ComplexityFactory.Exponential(n, 1.618033988749895));
         Assert.Equal(ComplexityFactory.Exponential(n, 2), ComplexityFactory.Exponential(new ComplexityVariable("n"), 2));
         Assert.Equal(ComplexityFactory.Factorial(n), ComplexityFactory.Factorial(new ComplexityVariable("n")));
     }
@@ -520,6 +522,7 @@ public sealed class ComplexityModelTests
             Assert.Equal("O(n^1.585)", ComplexityFactory.Polynomial(ComplexityVariable.N, 1.584962500721156).ToBigONotation());
             Assert.Equal("O(log^12 n)", new PolynomialLogComplexity(ComplexityVariable.N, polynomialDegree: 0, logExponent: 12).ToBigONotation());
             Assert.Equal("O(1.5^n)", ComplexityFactory.Exponential(ComplexityVariable.N, 1.5).ToBigONotation());
+            Assert.Equal("O(1.618^n)", ComplexityFactory.Exponential(ComplexityVariable.N, 1.618033988749895).ToBigONotation());
         }
         finally
         {
