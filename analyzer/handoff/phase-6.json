@@ -1,0 +1,46 @@
+{
+  "delivery": "Phase 6 \u2014 Recursion & Recurrence Solving",
+  "currentObjective": "Extract and solve bounded direct-recursion recurrence patterns",
+  "completedStep": "1/11 \u2014 specification",
+  "decisions": [
+    "Phase 6 starts from Phase 5 cycle boundaries and may solve only supported direct recursion with sufficient base-case evidence.",
+    "Recurrence extraction and recurrence solving remain separate responsibilities.",
+    "The recurrence model is internal to the analyzer and independent from ComplexityExpression and inherited solver projects.",
+    "Recursive calls must be counted per execution path, so mutually exclusive branches do not add multiplicity while sequential calls on the same path may.",
+    "Supported initial reductions are constant positive decrements and constant scale reductions proven from syntax and semantics.",
+    "Unsupported, invalid, unsafe, numerically inconclusive, and mutually recursive patterns remain Unknown."
+  ],
+  "constraints": [
+    "Do not modify inherited projects outside analyzer/.",
+    "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
+    "Do not add MathNet.Numerics, SymPy, Microsoft.CodeAnalysis.Workspaces, or Microsoft.CodeAnalysis.CSharp.Workspaces.",
+    "Do not implement full symbolic recurrence solving, full Akra-Bazzi, general characteristic polynomials, matrix eigendecomposition, general numerical integration, SCC/Tarjan solving, CodeFixProvider, memoization detection, or production diagnostics changes before the diagnostics step.",
+    "Respect CancellationToken and deterministic bounded numerical limits in extraction and solving."
+  ],
+  "relevantFiles": [
+    "analyzer/specs/phase-6/recursion-solving.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/PhaseFiveInterproceduralContractTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InterproceduralAnalysisContextTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ArgumentComplexityBinderTests.cs"
+  ],
+  "validations": [
+    "Before the specification edit, Release analyzer tests passed: 334 passed, 0 failed, 0 skipped.",
+    "Phase 5 was checked against code and tests: source calls propagate, BCL/LINQ precedence holds, cache is Compilation-scoped, budgets are enforced, and direct/mutual cycles terminate as Unknown.",
+    "The current model stores polynomial/log exponents as integers and exponential bases as invariant doubles, so Phase 6 must specify minimal fractional polynomial power support."
+  ],
+  "knownPendingItems": [
+    "Step 2/11 must implement the recurrence model and fractional power support without adding forbidden dependencies.",
+    "BIG1005 is specified but not implemented in this specification-only step.",
+    "Mutual recursion remains Unknown in Phase 6."
+  ],
+  "nextStep": "2/11 \u2014 recurrence model and fractional power support",
+  "lastCommit": {
+    "hash": "a5abc89a7b8bcae4382c3304239646d1388020c2",
+    "message": "Merge pull request #4 from rodri-oliveira-dev/feature/Phase5"
+  }
+}

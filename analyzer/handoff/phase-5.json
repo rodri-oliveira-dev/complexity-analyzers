@@ -45,7 +45,7 @@
   ],
   "nextStep": "Phase 6 \u2014 Recursion & Solver",
   "lastCommit": {
-    "hash": "b5894809969b93159ac698aab19ca2c7d4b0e9ef",
-    "message": "test: harden interprocedural analysis behavior"
+    "hash": "a5abc89a7b8bcae4382c3304239646d1388020c2",
+    "message": "Merge pull request #4 from rodri-oliveira-dev/feature/Phase5"
   }
 }
