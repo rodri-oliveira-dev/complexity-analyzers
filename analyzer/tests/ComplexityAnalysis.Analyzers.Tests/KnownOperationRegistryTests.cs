@@ -275,9 +275,433 @@ public sealed class KnownOperationRegistryTests
         Assert.NotEqual("O(n)", callerResult.ToBigONotation());
     }
 
+    [Theory]
+    [InlineData(
+        "list-count",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(List<int> values) => values.Count;
+        }
+        """,
+        "O(1)",
+        "WorstCase",
+        false,
+        false,
+        false)]
+    [InlineData(
+        "list-indexer",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(List<int> values) => values[0];
+        }
+        """,
+        "O(1)",
+        "WorstCase",
+        false,
+        false,
+        false)]
+    [InlineData(
+        "array-length",
+        """
+        public sealed class Sample
+        {
+            int M(int[] values) => values.Length;
+        }
+        """,
+        "O(1)",
+        "WorstCase",
+        false,
+        false,
+        false)]
+    [InlineData(
+        "string-length",
+        """
+        public sealed class Sample
+        {
+            int M(string text) => text.Length;
+        }
+        """,
+        "O(1)",
+        "WorstCase",
+        false,
+        false,
+        false)]
+    public void Bcl_property_mappings_resolve_semantically(
+        string operationFamily,
+        string source,
+        string expectedComplexity,
+        string expectedCase,
+        bool expectedEnumeratesReceiver,
+        bool expectedOrders,
+        bool expectedLookupOperation)
+    {
+        KnownOperationMapping mapping = ResolveBclProperty(source);
+
+        AssertBclMapping(
+            mapping,
+            operationFamily,
+            expectedComplexity,
+            ParseComplexityCase(expectedCase),
+            expectedEnumeratesReceiver,
+            expectedOrders,
+            expectedLookupOperation);
+    }
+
+    [Theory]
+    [InlineData(
+        "list-contains",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(List<int> values) => values.Contains(1);
+        }
+        """,
+        "O(n)",
+        "WorstCase",
+        true,
+        false,
+        true)]
+    [InlineData(
+        "list-indexof",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(List<int> values) => values.IndexOf(1);
+        }
+        """,
+        "O(n)",
+        "WorstCase",
+        true,
+        false,
+        true)]
+    [InlineData(
+        "list-indexof",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(List<int> values) => values.IndexOf(1, 0);
+        }
+        """,
+        "O(n)",
+        "WorstCase",
+        true,
+        false,
+        true)]
+    [InlineData(
+        "list-indexof",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(List<int> values) => values.IndexOf(1, 0, 1);
+        }
+        """,
+        "O(n)",
+        "WorstCase",
+        true,
+        false,
+        true)]
+    [InlineData(
+        "list-sort",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            void M(List<int> values) => values.Sort();
+        }
+        """,
+        "O(n log n)",
+        "WorstCase",
+        true,
+        true,
+        false)]
+    [InlineData(
+        "list-sort",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            void M(List<int> values, IComparer<int> comparer) => values.Sort(comparer);
+        }
+        """,
+        "O(n log n)",
+        "WorstCase",
+        true,
+        true,
+        false)]
+    [InlineData(
+        "list-sort",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            void M(List<int> values) => values.Sort(static (left, right) => 0);
+        }
+        """,
+        "O(n log n)",
+        "WorstCase",
+        true,
+        true,
+        false)]
+    [InlineData(
+        "list-sort",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            void M(List<int> values, IComparer<int> comparer) => values.Sort(0, values.Count, comparer);
+        }
+        """,
+        "O(n log n)",
+        "WorstCase",
+        true,
+        true,
+        false)]
+    [InlineData(
+        "dictionary-contains-key",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(Dictionary<int, string> values) => values.ContainsKey(1);
+        }
+        """,
+        "O(1)",
+        "Average",
+        false,
+        false,
+        true)]
+    [InlineData(
+        "dictionary-contains-value",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(Dictionary<int, string> values) => values.ContainsValue("a");
+        }
+        """,
+        "O(n)",
+        "WorstCase",
+        true,
+        false,
+        true)]
+    [InlineData(
+        "hashset-contains",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(HashSet<int> values) => values.Contains(1);
+        }
+        """,
+        "O(1)",
+        "Average",
+        false,
+        false,
+        true)]
+    public void Bcl_method_mappings_resolve_semantically(
+        string operationFamily,
+        string source,
+        string expectedComplexity,
+        string expectedCase,
+        bool expectedEnumeratesReceiver,
+        bool expectedOrders,
+        bool expectedLookupOperation)
+    {
+        KnownOperationMapping mapping = ResolveBclInvocation(source);
+
+        AssertBclMapping(
+            mapping,
+            operationFamily,
+            expectedComplexity,
+            ParseComplexityCase(expectedCase),
+            expectedEnumeratesReceiver,
+            expectedOrders,
+            expectedLookupOperation);
+    }
+
+    [Fact]
+    public void Bcl_registry_distinguishes_dictionary_key_and_value_lookup()
+    {
+        KnownOperationMapping containsKey = ResolveBclInvocation(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                bool M(Dictionary<int, string> values) => values.ContainsKey(1);
+            }
+            """);
+        KnownOperationMapping containsValue = ResolveBclInvocation(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                bool M(Dictionary<int, string> values) => values.ContainsValue("a");
+            }
+            """);
+
+        Assert.Equal("dictionary-contains-key", containsKey.Metadata.OperationFamily);
+        Assert.Equal("dictionary-contains-value", containsValue.Metadata.OperationFamily);
+        Assert.Equal("O(1)", containsKey.Complexity.ToBigONotation());
+        Assert.Equal("O(n)", containsValue.Complexity.ToBigONotation());
+    }
+
+    [Fact]
+    public void Bcl_registry_distinguishes_hashset_contains_from_list_contains()
+    {
+        KnownOperationMapping listContains = ResolveBclInvocation(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                bool M(List<int> values) => values.Contains(1);
+            }
+            """);
+        KnownOperationMapping hashSetContains = ResolveBclInvocation(
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                bool M(HashSet<int> values) => values.Contains(1);
+            }
+            """);
+
+        Assert.Equal("list-contains", listContains.Metadata.OperationFamily);
+        Assert.Equal("hashset-contains", hashSetContains.Metadata.OperationFamily);
+        Assert.Equal("O(n)", listContains.Complexity.ToBigONotation());
+        Assert.Equal("O(1)", hashSetContains.Complexity.ToBigONotation());
+        Assert.Equal(KnownOperationComplexityCase.Average, hashSetContains.ComplexityCase);
+    }
+
+    [Fact]
+    public void Bcl_registry_does_not_match_custom_homonymous_list_contains()
+    {
+        InvocationFacts facts = CreateInvocationFacts(
+            """
+            namespace MyCompany
+            {
+                public sealed class List<T>
+                {
+                    public bool Contains(T value) => true;
+                }
+
+                public sealed class Sample
+                {
+                    bool M(List<int> values) => values.Contains(1);
+                }
+            }
+            """);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        Assert.False(resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out _));
+    }
+
+    [Fact]
+    public void Bcl_registry_contains_no_linq_mappings()
+    {
+        Assert.DoesNotContain(
+            KnownOperationRegistry.Bcl.Mappings,
+            mapping => StringComparer.Ordinal.Equals(
+                "System.Linq",
+                mapping.Identity.ContainingType.NamespaceName));
+    }
+
+    [Fact]
+    public void Bcl_mappings_have_verified_or_explicitly_conservative_provenance()
+    {
+        Assert.All(
+            KnownOperationRegistry.Bcl.Mappings,
+            mapping =>
+            {
+                Assert.Contains(
+                    "src/ComplexityAnalysis.Roslyn/BCL/BCLComplexityMappings.cs",
+                    mapping.Provenance.Note,
+                    StringComparison.Ordinal);
+                Assert.True(
+                    mapping.Provenance.Note.Contains("learn.microsoft.com/dotnet/api/", StringComparison.Ordinal)
+                    || mapping.Provenance.Note.Contains("dotnet/runtime", StringComparison.Ordinal),
+                    "Expected official documentation, runtime source, or explicit conservative provenance for "
+                    + mapping.Identity.SortKey);
+                if (mapping.Provenance.Kind == KnownOperationProvenanceKind.Conservative)
+                {
+                    Assert.Contains("conservative", mapping.Provenance.Note, StringComparison.OrdinalIgnoreCase);
+                }
+            });
+    }
+
     private static KnownOperationResolver CreateResolver(params KnownOperationMapping[] mappings)
     {
         return new KnownOperationResolver(KnownOperationRegistry.Create(mappings));
+    }
+
+    private static KnownOperationMapping ResolveBclInvocation(string source)
+    {
+        InvocationFacts facts = CreateInvocationFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        return resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out KnownOperationMapping mapping)
+            ? mapping
+            : throw new InvalidOperationException("Expected BCL invocation mapping for " + facts.MethodSymbol);
+    }
+
+    private static KnownOperationMapping ResolveBclProperty(string source)
+    {
+        PropertyFacts facts = CreatePropertyFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        return resolver.TryResolve(facts.PropertySymbol, CancellationToken.None, out KnownOperationMapping mapping)
+            ? mapping
+            : throw new InvalidOperationException("Expected BCL property mapping for " + facts.PropertySymbol);
+    }
+
+    private static void AssertBclMapping(
+        KnownOperationMapping mapping,
+        string operationFamily,
+        string expectedComplexity,
+        KnownOperationComplexityCase expectedCase,
+        bool expectedEnumeratesReceiver,
+        bool expectedOrders,
+        bool expectedLookupOperation)
+    {
+        Assert.Equal(operationFamily, mapping.Metadata.OperationFamily);
+        Assert.Equal(expectedComplexity, mapping.Complexity.ToBigONotation());
+        Assert.Equal(KnownOperationExecutionKind.Immediate, mapping.ExecutionKind);
+        Assert.Equal(expectedCase, mapping.ComplexityCase);
+        Assert.Equal(expectedEnumeratesReceiver, mapping.Metadata.EnumeratesReceiver);
+        Assert.False(mapping.Metadata.Materializes);
+        Assert.Equal(expectedOrders, mapping.Metadata.Orders);
+        Assert.Equal(expectedLookupOperation, mapping.Metadata.IsLookupOperation);
+    }
+
+    private static KnownOperationComplexityCase ParseComplexityCase(string value)
+    {
+        return Enum.TryParse(value, ignoreCase: false, out KnownOperationComplexityCase complexityCase)
+            ? complexityCase
+            : throw new ArgumentException("Unknown complexity case.", nameof(value));
     }
 
     private static KnownOperationMapping CreateMapping(
@@ -350,6 +774,38 @@ public sealed class KnownOperationRegistryTests
         return new InvocationFacts(methodSymbol);
     }
 
+    private static PropertyFacts CreatePropertyFacts(string source)
+    {
+        SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(source);
+        CSharpCompilation compilation = CSharpCompilation.Create(
+            assemblyName: "KnownOperationRegistryTests",
+            syntaxTrees: [syntaxTree],
+            references: BasicReferences,
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
+        ExpressionSyntax propertyAccess = FindPropertyAccess(syntaxTree);
+        IPropertySymbol propertySymbol = semanticModel.GetSymbolInfo(propertyAccess, CancellationToken.None).Symbol as IPropertySymbol
+            ?? throw new InvalidOperationException("Expected property access to resolve to a property symbol.");
+
+        return new PropertyFacts(propertySymbol);
+    }
+
+    private static ExpressionSyntax FindPropertyAccess(SyntaxTree syntaxTree)
+    {
+        SyntaxNode root = syntaxTree.GetRoot();
+        ElementAccessExpressionSyntax? elementAccess = root
+            .DescendantNodes()
+            .OfType<ElementAccessExpressionSyntax>()
+            .SingleOrDefault();
+
+        return elementAccess is not null
+            ? elementAccess
+            : root
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Single(memberAccess => memberAccess.Name.Identifier.ValueText is "Count" or "Length");
+    }
+
     private static ImmutableArray<MetadataReference> BasicReferences
     {
         get;
@@ -360,4 +816,6 @@ public sealed class KnownOperationRegistryTests
         ];
 
     private sealed record InvocationFacts(IMethodSymbol MethodSymbol);
+
+    private sealed record PropertyFacts(IPropertySymbol PropertySymbol);
 }

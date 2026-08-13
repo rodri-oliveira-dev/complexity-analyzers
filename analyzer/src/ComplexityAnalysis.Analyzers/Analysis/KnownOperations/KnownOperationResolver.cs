@@ -28,6 +28,24 @@ internal sealed class KnownOperationResolver
         return registry.TryGetMapping(identity, out mapping);
     }
 
+    internal bool TryResolve(
+        IPropertySymbol propertySymbol,
+        CancellationToken cancellationToken,
+        out KnownOperationMapping mapping)
+    {
+        _ = propertySymbol ?? throw new ArgumentNullException(nameof(propertySymbol));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (propertySymbol.GetMethod is null)
+        {
+            mapping = null!;
+            return false;
+        }
+
+        return registry.TryGetMapping(CreateIdentity(propertySymbol, cancellationToken), out mapping);
+    }
+
     internal static KnownOperationIdentity CreateIdentity(
         IMethodSymbol methodSymbol,
         CancellationToken cancellationToken)
@@ -54,6 +72,20 @@ internal sealed class KnownOperationResolver
             definitionSymbol.MetadataName,
             definitionSymbol.Arity,
             parameterTypes);
+    }
+
+    internal static KnownOperationIdentity CreateIdentity(
+        IPropertySymbol propertySymbol,
+        CancellationToken cancellationToken)
+    {
+        _ = propertySymbol ?? throw new ArgumentNullException(nameof(propertySymbol));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IMethodSymbol accessor = propertySymbol.GetMethod
+            ?? throw new ArgumentException("Property symbol must have a getter.", nameof(propertySymbol));
+
+        return CreateIdentity(accessor, cancellationToken);
     }
 
     private static KnownOperationReceiverKind GetReceiverKind(IMethodSymbol methodSymbol)
