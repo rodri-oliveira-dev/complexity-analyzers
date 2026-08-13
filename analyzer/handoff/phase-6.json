@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 6 \u2014 Recursion & Recurrence Solving",
   "currentObjective": "Extract and solve bounded direct-recursion recurrence patterns",
-  "completedStep": "2/11 \u2014 recurrence model and fractional power support",
+  "completedStep": "3/11 \u2014 recursive call shape and base-case extraction",
   "decisions": [
     "Phase 6 starts from Phase 5 cycle boundaries and may solve only supported direct recursion with sufficient base-case evidence.",
     "Recurrence extraction and recurrence solving remain separate responsibilities.",
@@ -13,7 +13,12 @@
     "RecurrenceTerm stores integer positive Multiplicity and a RecurrenceReduction with either SubtractConstant c > 0 or Scale q where 0 < q < 1.",
     "RecurrenceSolution is a future solver outcome value with Solved, Unsupported, Invalid, and NumericallyInconclusive states; no solver is implemented in step 2.",
     "PolynomialLogComplexity now stores normalized double polynomial degrees so fractional powers such as O(n^1.585) share the existing polylog model.",
-    "Polynomial exponents normalize near integers within 1e-9 and format non-integers with three deterministic decimal places, trimming trailing zeros with invariant culture."
+    "Polynomial exponents normalize near integers within 1e-9 and format non-integers with three deterministic decimal places, trimming trailing zeros with invariant culture.",
+    "RecursiveCallAnalyzer identifies only semantically direct recursive invocations with SymbolEqualityComparer.Default and keeps same-name overloads out of direct recursion.",
+    "Recursive call shapes store per-eligible-parameter argument relations, preserving the correct input-size variable instead of assuming the first parameter.",
+    "Recursive argument reduction extraction recognizes positive constant decrements and constant scale reductions, including n - c, n + (-c), n / b, n * q, and q * n where supported.",
+    "Recursive execution paths distinguish sequential recursive calls from mutually exclusive branch alternatives, so binary-search-style branches produce one recursive call per path.",
+    "Base-case evidence extraction is conservative and recognizes simple terminating if branches guarded by bounded comparisons such as n <= constant or n == constant."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -32,7 +37,8 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/PhaseFiveInterproceduralContractTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InterproceduralAnalysisContextTests.cs",
-    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ArgumentComplexityBinderTests.cs"
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ArgumentComplexityBinderTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/RecursiveCallAnalyzerTests.cs"
   ],
   "validations": [
     "Before the specification edit, Release analyzer tests passed: 334 passed, 0 failed, 0 skipped.",
@@ -40,18 +46,19 @@
     "The current model stored polynomial/log exponents as integers and exponential bases as invariant doubles before step 2.",
     "Step 2 Release build passed with dotnet build --configuration Release.",
     "Step 2 Release tests passed with dotnet test --configuration Release --no-build: 362 passed, 0 failed, 0 skipped.",
-    "Model folder was checked for Roslyn syntax and symbol APIs; no Microsoft.CodeAnalysis, SyntaxNode, SemanticModel, or symbol references were found."
+    "Model folder was checked for Roslyn syntax and symbol APIs; no Microsoft.CodeAnalysis, SyntaxNode, SemanticModel, or symbol references were found.",
+    "Step 3 Release build passed with dotnet build --configuration Release.",
+    "Step 3 Release tests passed with dotnet test --configuration Release --no-build: 383 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "Recursive call shape extraction is not implemented yet.",
-    "Base-case evidence extraction is not implemented yet.",
+    "Direct recurrence extraction is not implemented yet.",
     "Recurrence solving is not implemented yet.",
     "BIG1005 is specified but not implemented in step 2.",
     "Mutual recursion remains Unknown in Phase 6."
   ],
-  "nextStep": "3/11 \u2014 recursive call shape and base-case extraction",
+  "nextStep": "4/11 \u2014 direct recurrence extraction",
   "lastCommit": {
-    "hash": "9cf090d6bfa2c570faec0835b571abe040772cac",
-    "message": "docs: define phase 6 recurrence solving"
+    "hash": "c2dc23bb8f0b1fa1133d8f3dce433490a45504e9",
+    "message": "feat: add recurrence domain model"
   }
 }
