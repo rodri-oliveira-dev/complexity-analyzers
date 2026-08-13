@@ -19,12 +19,14 @@ internal sealed class ArgumentComplexityBinder
     internal ImmutableDictionary<ComplexityVariable, ComplexityExpression> Bind(
         InvocationExpressionSyntax invocation,
         IMethodSymbol targetMethodSymbol,
+        IMethodSymbol sourceMethodDefinition,
         MethodComplexityTemplate calleeTemplate,
         MethodAnalysisContext callerContext,
         CancellationToken cancellationToken)
     {
         _ = invocation ?? throw new ArgumentNullException(nameof(invocation));
         _ = targetMethodSymbol ?? throw new ArgumentNullException(nameof(targetMethodSymbol));
+        _ = sourceMethodDefinition ?? throw new ArgumentNullException(nameof(sourceMethodDefinition));
         _ = calleeTemplate ?? throw new ArgumentNullException(nameof(calleeTemplate));
         _ = callerContext ?? throw new ArgumentNullException(nameof(callerContext));
 
@@ -34,7 +36,7 @@ internal sealed class ArgumentComplexityBinder
             BindArgumentsToParameters(
                 invocation,
                 targetMethodSymbol,
-                calleeTemplate.ParameterVariables.Keys,
+                sourceMethodDefinition.Parameters,
                 cancellationToken);
         ImmutableDictionary<ComplexityVariable, ComplexityExpression>.Builder bindings =
             ImmutableDictionary.CreateBuilder<ComplexityVariable, ComplexityExpression>();
@@ -54,10 +56,9 @@ internal sealed class ArgumentComplexityBinder
     private static ImmutableDictionary<IParameterSymbol, ExpressionSyntax> BindArgumentsToParameters(
         InvocationExpressionSyntax invocation,
         IMethodSymbol targetMethodSymbol,
-        IEnumerable<IParameterSymbol> templateParameters,
+        ImmutableArray<IParameterSymbol> parameters,
         CancellationToken cancellationToken)
     {
-        ImmutableArray<IParameterSymbol> parameters = OrderTemplateParameters(templateParameters);
         ImmutableDictionary<IParameterSymbol, ExpressionSyntax>.Builder bindings =
             ImmutableDictionary.CreateBuilder<IParameterSymbol, ExpressionSyntax>(ParameterSymbolComparer.Instance);
         int nextPositionalParameter = TryBindReducedExtensionReceiver(
@@ -84,14 +85,6 @@ internal sealed class ArgumentComplexityBinder
         }
 
         return bindings.ToImmutable();
-    }
-
-    private static ImmutableArray<IParameterSymbol> OrderTemplateParameters(
-        IEnumerable<IParameterSymbol> templateParameters)
-    {
-        List<IParameterSymbol> parameters = new(templateParameters);
-        parameters.Sort((left, right) => left.Ordinal.CompareTo(right.Ordinal));
-        return ImmutableArray.CreateRange(parameters);
     }
 
     private static bool TryBindReducedExtensionReceiver(

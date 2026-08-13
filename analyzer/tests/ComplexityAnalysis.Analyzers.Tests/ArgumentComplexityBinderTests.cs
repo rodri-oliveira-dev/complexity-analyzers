@@ -201,6 +201,31 @@ public sealed class ArgumentComplexityBinderTests
         Assert.Equal("O(n)", result.ToBigONotation());
     }
 
+    [Fact]
+    public void Non_dimension_parameters_keep_positional_slots_when_binding_arguments()
+    {
+        BindingFacts facts = CreateFacts(
+            """
+            public sealed class Sample
+            {
+                void Caller(int[] items)
+                {
+                    Helper(true, items);
+                }
+
+                void Helper(bool enabled, int[] values)
+                {
+                }
+            }
+            """);
+
+        ComplexityExpression result = SubstituteCalleeTemplate(
+            facts,
+            ComplexityFactory.Linear(ComplexityVariable.N));
+
+        Assert.Equal("O(n)", result.ToBigONotation());
+    }
+
     [Theory]
     [InlineData("count - 1")]
     [InlineData("count + 1")]
@@ -383,6 +408,7 @@ public sealed class ArgumentComplexityBinderTests
             new ArgumentComplexityBinder().Bind(
                 facts.Invocation,
                 facts.Target,
+                facts.Callee,
                 template,
                 callerContext,
                 CancellationToken.None);

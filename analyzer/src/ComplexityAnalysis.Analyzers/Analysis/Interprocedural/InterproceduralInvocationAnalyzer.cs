@@ -94,6 +94,7 @@ internal sealed class InterproceduralInvocationAnalyzer
             return SubstituteCallSiteArguments(
                 invocation,
                 resolution.TargetMethodSymbol,
+                sourceMethodDefinition,
                 cachedResult);
         }
 
@@ -122,6 +123,7 @@ internal sealed class InterproceduralInvocationAnalyzer
         return SubstituteCallSiteArguments(
             invocation,
             resolution.TargetMethodSymbol,
+            sourceMethodDefinition,
             calleeResult);
     }
 
@@ -205,6 +207,7 @@ internal sealed class InterproceduralInvocationAnalyzer
     private ComplexityExpression SubstituteCallSiteArguments(
         InvocationExpressionSyntax invocation,
         IMethodSymbol targetMethodSymbol,
+        IMethodSymbol sourceMethodDefinition,
         InterproceduralAnalysisResult calleeResult)
     {
         callerContext.CancellationToken.ThrowIfCancellationRequested();
@@ -219,6 +222,7 @@ internal sealed class InterproceduralInvocationAnalyzer
             new ArgumentComplexityBinder().Bind(
                 invocation,
                 targetMethodSymbol,
+                sourceMethodDefinition,
                 calleeResult.Template,
                 callerContext,
                 callerContext.CancellationToken);
@@ -283,6 +287,8 @@ internal sealed class InterproceduralInvocationAnalyzer
             return ComplexityFactory.Constant();
         }
 
-        return new BasicOperationAnalyzer(callerContext).AnalyzeExpression(memberAccess.Expression);
+        return memberAccess.Expression is ThisExpressionSyntax or BaseExpressionSyntax
+            ? ComplexityFactory.Constant()
+            : new BasicOperationAnalyzer(callerContext).AnalyzeExpression(memberAccess.Expression);
     }
 }

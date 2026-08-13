@@ -837,6 +837,81 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
+    public void Source_call_preserves_positional_slots_for_non_dimension_parameters()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    Helper(true, items);
+                }
+
+                private void Helper(bool enabled, int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Explicit_this_receiver_on_source_call_is_constant()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    this.Scan(items);
+                }
+
+                private void Scan(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Explicit_base_receiver_on_source_call_is_constant()
+    {
+        AssertMethodComplexity(
+            """
+            public class BaseSample
+            {
+                protected void Scan(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+
+            public sealed class Sample : BaseSample
+            {
+                void M(int[] items)
+                {
+                    base.Scan(items);
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
     public void Source_extension_receiver_substitutes_into_callee_template()
     {
         AssertMethodComplexity(
