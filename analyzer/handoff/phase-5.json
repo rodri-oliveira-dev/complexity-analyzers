@@ -1,11 +1,14 @@
 {
-  "delivery": "Phase 5 — Interprocedural Analysis",
-  "currentObjective": "Add bounded demand-driven source-method complexity propagation",
-  "completedStep": "1/9 — specification",
+  "delivery": "Phase 5 \u2014 Interprocedural Analysis",
+  "currentObjective": "Source call-target resolution complete",
+  "completedStep": "2/9 \u2014 source call-target resolution",
   "decisions": [
     "Phase 5 is demand-driven and must not eagerly build a whole-compilation call graph.",
     "BCL/LINQ known operations from Phase 4 keep precedence over source-method analysis.",
     "Source calls must be resolved by IMethodSymbol and safe dispatch, not text-only names.",
+    "SourceMethodResolver classifies invocation targets as KnownOperation, SourceMethod, or Unsupported without analyzing callee bodies.",
+    "Source methods are considered available only through local DeclaringSyntaxReferences that resolve to MethodDeclarationSyntax.",
+    "Initial safe dispatch accepts static, private, ordinary nonvirtual, and proven sealed targets; virtual, interface, abstract, external, and unavailable-source calls remain Unsupported.",
     "Cached method complexity is a template relative to the callee parameters, never a caller-bound expression.",
     "Cycles are detected and return Unknown in Phase 5; recursion solving belongs to Phase 6.",
     "Initial internal budgets are MaximumCallDepth = 5 and MaximumMethodsPerRootAnalysis = 32."
@@ -21,32 +24,35 @@
   "relevantFiles": [
     "analyzer/specs/phase-5/interprocedural-analysis.md",
     "analyzer/specs/phase-4/bcl-linq-diagnostics.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/CallTargetResolution.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/CallTargetResolutionKind.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/SourceMethodResolver.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodAnalysisContext.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperationComplexityAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/SourceMethodResolverTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/KnownOperationRegistryTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
   ],
   "validations": [
-    "Before writing Phase 5 artifacts, git status was clean on branch main at e91fe518021c3496e22caddcc03bda3cc750ac38.",
+    "Before this step, git status was clean on branch main at 2fe3652389e2f3ed98e9c7fd73f5218d2584c3ed.",
     "Phase 4 implementation was verified by code and tests: known-operation registry, semantic resolver, method extraction integration, actionable diagnostics, and BIG0001 are present.",
-    "Release build passed before this specification step.",
-    "Release tests passed before this specification step: 239 passed, 0 failed, 0 skipped."
+    "Release build passed for source call-target resolution.",
+    "Release tests passed for source call-target resolution: 252 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "Implement source call-target resolution.",
     "Implement per-compilation interprocedural state and cache.",
     "Implement method complexity templates and argument substitution.",
     "Implement bounded traversal and cycle detection without recursion solving.",
     "Integrate known interprocedural results into BIG0001 and consider BIG1004 only in a later implementation step."
   ],
-  "nextStep": "2/9 — source call-target resolution",
+  "nextStep": "3/9 \u2014 per-compilation context, cache and analysis budget",
   "lastCommit": {
-    "hash": "e91fe518021c3496e22caddcc03bda3cc750ac38",
-    "message": "Merge pull request #2 from rodri-oliveira-dev/chore/bootstrap-analyzer-workspace"
+    "hash": "2fe3652389e2f3ed98e9c7fd73f5218d2584c3ed",
+    "message": "docs: define phase 5 interprocedural analysis"
   }
 }
