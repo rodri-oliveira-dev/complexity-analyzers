@@ -56,7 +56,10 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         }
 
         KnownOperationComplexityAnalyzer operationAnalyzer = new(context);
-        ComplexityExpression invocationComplexity = operationAnalyzer.AnalyzeInvocation(invocation);
+        ComplexityExpression invocationComplexity = operationAnalyzer.AnalyzeInvocation(
+            invocation,
+            methodSymbol,
+            mapping);
         if (invocationComplexity is UnknownComplexity)
         {
             return;
@@ -74,10 +77,21 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
             return;
         }
 
-        if (IsActionableOrdering(invocation, mapping, context, out InvocationExpressionSyntax? consumerInvocation)
-            && consumerInvocation is not null)
+        if (IsActionableOrdering(
+            invocation,
+            mapping,
+            context,
+            out InvocationExpressionSyntax? consumerInvocation,
+            out IMethodSymbol? consumerMethodSymbol,
+            out KnownOperationMapping? consumerMapping)
+            && consumerInvocation is not null
+            && consumerMethodSymbol is not null
+            && consumerMapping is not null)
         {
-            ComplexityExpression consumedComplexity = operationAnalyzer.AnalyzeInvocation(consumerInvocation);
+            ComplexityExpression consumedComplexity = operationAnalyzer.AnalyzeInvocation(
+                consumerInvocation,
+                consumerMethodSymbol,
+                consumerMapping);
             if (consumedComplexity is not UnknownComplexity)
             {
                 ReportOrdering(invocation, methodSymbol, iterationComplexity, consumedComplexity, diagnostics);
@@ -105,9 +119,13 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         InvocationExpressionSyntax invocation,
         KnownOperationMapping mapping,
         MethodAnalysisContext context,
-        out InvocationExpressionSyntax? consumerInvocation)
+        out InvocationExpressionSyntax? consumerInvocation,
+        out IMethodSymbol? consumerMethodSymbol,
+        out KnownOperationMapping? consumerMapping)
     {
         consumerInvocation = null;
+        consumerMethodSymbol = null;
+        consumerMapping = null;
 
         if (!mapping.Metadata.Orders
             || mapping.ExecutionKind != KnownOperationExecutionKind.Deferred
@@ -133,6 +151,8 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
             }
 
             consumerInvocation = ancestor;
+            consumerMethodSymbol = ancestorSymbol;
+            consumerMapping = ancestorMapping;
             return true;
         }
 

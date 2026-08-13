@@ -1,8 +1,8 @@
 # Configuracao
 
-[English](../en/configuration.md) | Português (Brasil)
+[English](../en/configuration.md) | Portugues (Brasil)
 
-`ComplexityAnalysis.Analyzers` usa a configuracao padrao de severidade de diagnostics Roslyn. Nao ha opcoes customizadas do analyzer ate a Phase 3.
+`ComplexityAnalysis.Analyzers` usa a configuracao padrao de severidade de diagnostics Roslyn. A Phase 4 nao define opcoes customizadas do analyzer.
 
 ## Formato .editorconfig
 
@@ -23,22 +23,39 @@ error
 default
 ```
 
-O comportamento exato no build e controlado pelas convencoes do compilador .NET e do SDK para analyzer diagnostics.
+O compilador e o SDK determinam o comportamento exato do build para cada severidade configurada.
 
-## Padrao do BIG9000
+## Padroes
 
-`BIG9000` e desabilitado por padrao em seu descriptor:
+| ID | Severidade padrao | Habilitado por padrao |
+| --- | --- | --- |
+| `BIG0001` | `Info` | `false` |
+| `BIG1001` | `Info` | `true` |
+| `BIG1002` | `Info` | `true` |
+| `BIG1003` | `Info` | `true` |
+| `BIG9000` | `Info` | `false` |
 
-```text
-Default severity: Info
-Enabled by default: false
+## Visibilidade Local Recomendada
+
+`BIG0001` e informational e desabilitado por padrao. Habilite quando quiser que o analyzer mostre estimativas conhecidas de metodos:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG0001.severity = suggestion
 ```
 
-Sem configuracao explicita, os testes confirmam que o analyzer nao reporta `BIG9000`.
+Promova diagnostics acionaveis quando quiser ve-los no build:
 
-## Manter BIG9000 Desabilitado
+```ini
+[*.cs]
 
-Use isto em projetos normais:
+dotnet_diagnostic.BIG1001.severity = warning
+dotnet_diagnostic.BIG1002.severity = warning
+dotnet_diagnostic.BIG1003.severity = warning
+```
+
+Mantenha o probe de infraestrutura desabilitado em projetos normais:
 
 ```ini
 [*.cs]
@@ -46,17 +63,7 @@ Use isto em projetos normais:
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-## Habilitar BIG9000 Para Smoke Test
-
-Use `suggestion` quando quiser um sinal visivel de baixa severidade:
-
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG9000.severity = suggestion
-```
-
-Use `warning` quando quiser que o probe fique obvio em um teste temporario de consumo de pacote ou CI:
+Habilite o probe apenas em testes de consumo de pacote ou smoke tests de CI:
 
 ```ini
 [*.cs]
@@ -64,29 +71,30 @@ Use `warning` quando quiser que o probe fique obvio em um teste temporario de co
 dotnet_diagnostic.BIG9000.severity = warning
 ```
 
-`warning` altera a severidade configurada pelo consumidor. Isso nao significa que `BIG9000` seja originalmente um warning. O analyzer o define como diagnostic `Info`.
+## Desabilitar Regras
 
-## Desabilitar Novamente
-
-Depois do smoke test, remova a configuracao explicita ou defina:
+Use `none` para qualquer regra que voce nao queira reportar:
 
 ```ini
 [*.cs]
 
+dotnet_diagnostic.BIG0001.severity = none
+dotnet_diagnostic.BIG1001.severity = none
+dotnet_diagnostic.BIG1002.severity = none
+dotnet_diagnostic.BIG1003.severity = none
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-Nao mantenha `BIG9000` habilitado permanentemente, a menos que voce queira intencionalmente um diagnostic de infraestrutura em toda compilation onde o analyzer executa.
+## O Que Nao E Configuravel
 
-## O Que Ainda Nao E Configuravel
-
-Ate a Phase 3, nao ha opcoes publicas para:
+A Phase 4 nao expoe opcoes para:
 
 - thresholds de Big-O;
-- severidade por complexidade de loops;
-- comportamento de mappings BCL ou LINQ;
+- mappings customizados de operacoes;
+- mudar comportamento de mappings BCL ou LINQ;
 - tratamento de recursao;
-- resolucao de chamadas de metodo;
-- IDs de diagnostics de produto.
+- analise de call graph;
+- code fixes;
+- complexidade de memoria, paralela ou probabilistica.
 
-Essas capacidades ainda nao estao expostas como diagnostics.
+Operacoes nao suportadas ou nao resolvidas continuam como `Unknown`; nao ha opcao para converte-las em uma classe de complexidade conhecida.

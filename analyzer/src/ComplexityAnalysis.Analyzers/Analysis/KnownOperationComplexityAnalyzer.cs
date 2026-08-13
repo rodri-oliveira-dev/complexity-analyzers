@@ -35,6 +35,20 @@ internal sealed class KnownOperationComplexityAnalyzer
             return ComplexityFactory.Unknown();
         }
 
+        return AnalyzeInvocation(invocation, methodSymbol, mapping);
+    }
+
+    internal ComplexityExpression AnalyzeInvocation(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol methodSymbol,
+        KnownOperationMapping mapping)
+    {
+        _ = invocation ?? throw new ArgumentNullException(nameof(invocation));
+        _ = methodSymbol ?? throw new ArgumentNullException(nameof(methodSymbol));
+        _ = mapping ?? throw new ArgumentNullException(nameof(mapping));
+
+        context.CancellationToken.ThrowIfCancellationRequested();
+
         if (mapping.ExecutionKind == KnownOperationExecutionKind.Deferred)
         {
             return ComplexityFactory.Constant();

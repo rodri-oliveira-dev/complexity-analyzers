@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Globalization;
 
@@ -487,6 +488,54 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_diagnostics_are_deterministic_for_repeated_source()
+    {
+        const string source = """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                public int Constant() => 42;
+
+                void M(List<int> customers, List<int> blockedCustomers, IEnumerable<int> items)
+                {
+                    foreach (var customer in customers)
+                    {
+                        _ = blockedCustomers.Contains(customer);
+                        var sorted = items.OrderBy(item => item).ToList();
+                    }
+                }
+            }
+            """;
+        ImmutableArray<string>? expected = null;
+
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+                source,
+                enableProbe: true,
+                enableComplexity: true);
+            ImmutableArray<string> actual =
+            [
+                .. diagnostics
+                .OrderBy(diagnostic => diagnostic.Id, StringComparer.Ordinal)
+                .ThenBy(diagnostic => diagnostic.Location.SourceSpan.Start)
+                .Select(FormatDeterministicDiagnostic)
+            ];
+
+            expected ??= actual;
+
+            Assert.Equal(expected, actual);
+            Assert.Contains(actual, diagnostic => diagnostic.StartsWith(EstimatedAlgorithmicComplexityId + "|", StringComparison.Ordinal));
+            Assert.Contains(actual, diagnostic => diagnostic.StartsWith(LinearLookupInsideIterationId + "|", StringComparison.Ordinal));
+            Assert.Contains(actual, diagnostic => diagnostic.StartsWith(MaterializationInsideIterationId + "|", StringComparison.Ordinal));
+            Assert.Contains(actual, diagnostic => diagnostic.StartsWith(OrderingInsideIterationId + "|", StringComparison.Ordinal));
+            Assert.Contains(actual, diagnostic => diagnostic.StartsWith(AnalyzerExecutionProbeId + "|", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
     public async Task Analyzer_does_not_report_the_probe_when_it_is_not_enabled()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
@@ -660,6 +709,24 @@ public sealed class ComplexityAnalyzerTests
             .ToString();
 
         Assert.Equal(expectedText, diagnosticText);
+    }
+
+    private static string FormatDeterministicDiagnostic(Diagnostic diagnostic)
+    {
+        SyntaxTree sourceTree = diagnostic.Location.SourceTree
+            ?? throw new System.InvalidOperationException("Expected a source location.");
+        string diagnosticText = sourceTree
+            .GetText()
+            .GetSubText(diagnostic.Location.SourceSpan)
+            .ToString();
+
+        return string.Join(
+            "|",
+            diagnostic.Id,
+            diagnostic.GetMessage(CultureInfo.InvariantCulture),
+            diagnostic.Location.SourceSpan.Start.ToString(CultureInfo.InvariantCulture),
+            diagnostic.Location.SourceSpan.Length.ToString(CultureInfo.InvariantCulture),
+            diagnosticText);
     }
 
     private static ImmutableArray<MetadataReference> BasicReferences
