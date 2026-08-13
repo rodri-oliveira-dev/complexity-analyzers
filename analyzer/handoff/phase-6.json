@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 6 \u2014 Recursion & Recurrence Solving",
   "currentObjective": "Extract and solve bounded direct-recursion recurrence patterns",
-  "completedStep": "6/11 \u2014 constant-coefficient branching recursion solver",
+  "completedStep": "7/11 \u2014 Master Theorem solver",
   "decisions": [
     "Phase 6 starts from Phase 5 cycle boundaries and may solve only supported direct recursion with sufficient base-case evidence.",
     "Recurrence extraction and recurrence solving remain separate responsibilities.",
@@ -24,7 +24,11 @@
     "SummationRecurrenceSolver returns structured Invalid or Unsupported outcomes instead of converting unsupported shapes to a hidden null or known complexity.",
     "ConstantCoefficientRecurrenceSolver solves only same-decrement multiplicity aT(n-c)+polylog with a > 1 and the positive second-order subset a1T(n-1)+a2T(n-2)+polylog where a1 >= 0 and a2 > 0.",
     "Same-decrement multiplicity uses the homogeneous exponential base a^(1/c), and positive second-order solving uses the bounded quadratic formula for r^2 = a1*r + a2 without MathNet, matrices, or a general root solver.",
-    "Exponential bases now normalize deterministically using invariant culture, integer tolerance, and three fractional decimal places, so Fibonacci-like results format as O(1.618^n)."
+    "Exponential bases now normalize deterministically using invariant culture, integer tolerance, and three fractional decimal places, so Fibonacci-like results format as O(1.618^n).",
+    "MasterTheoremRecurrenceSolver solves only one normalized scale term aT(qn)+supported polylog local work, with a >= 1, 0 < q < 1, and b = 1/q > 1.",
+    "Master Theorem critical exponent p is computed with System.Math.Log(a) / System.Math.Log(b), normalized through PolynomialExponentNormalizer, and formatted with the deterministic real-power policy.",
+    "Master Theorem case selection uses centralized RecurrenceNumerics tolerances: polynomial gap threshold for cases 1 and 3, comparison epsilon for case 2, and NumericallyInconclusive for the unsupported boundary gap.",
+    "Case 3 is returned only for supported polylog tolls whose equivalent regularity ratio a*q^k is strictly below one; unsupported local work and unsupported recurrence shapes remain Unsupported."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -45,7 +49,8 @@
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InterproceduralAnalysisContextTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ArgumentComplexityBinderTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/RecursiveCallAnalyzerTests.cs",
-    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/SummationRecurrenceSolverTests.cs"
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/SummationRecurrenceSolverTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MasterTheoremRecurrenceSolverTests.cs"
   ],
   "validations": [
     "Before the specification edit, Release analyzer tests passed: 334 passed, 0 failed, 0 skipped.",
@@ -59,15 +64,17 @@
     "Step 5 Release build passed with dotnet build --configuration Release.",
     "Step 5 Release tests passed with dotnet test --configuration Release --no-build: 407 passed, 0 failed, 0 skipped.",
     "Step 6 Release build passed with dotnet build --configuration Release.",
-    "Step 6 Release tests passed with dotnet test --configuration Release --no-build: 416 passed, 0 failed, 0 skipped."
+    "Step 6 Release tests passed with dotnet test --configuration Release --no-build: 416 passed, 0 failed, 0 skipped.",
+    "Step 7 Release build passed with dotnet build --configuration Release.",
+    "Step 7 Release tests passed with dotnet test --configuration Release --no-build: 434 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
     "BIG1005 is specified but not implemented in step 2.",
     "Mutual recursion remains Unknown in Phase 6."
   ],
-  "nextStep": "7/11 \u2014 Master Theorem solver",
+  "nextStep": "8/11 \u2014 restricted Akra-Bazzi solver",
   "lastCommit": {
-    "hash": "80ff546385338b4667a158a633096d86cd0c889e",
-    "message": "feat: extract direct recursion recurrences"
+    "hash": "7515011c17f6855a3434c13e8cd4527b15fcccf1",
+    "message": "feat: solve simple exponential recurrences"
   }
 }

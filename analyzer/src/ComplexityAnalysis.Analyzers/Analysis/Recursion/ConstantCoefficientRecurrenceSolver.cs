@@ -6,9 +6,6 @@ namespace ComplexityAnalysis.Analyzers.Analysis.Recursion;
 
 internal sealed class ConstantCoefficientRecurrenceSolver
 {
-    private const double DecrementTolerance = 0.000000001;
-    private const double RootTolerance = 0.000000001;
-
     internal bool IsApplicable(RecurrenceRelation? relation)
     {
         return CheckApplicability(relation).Kind == ApplicabilityKind.Applicable;
@@ -118,7 +115,7 @@ internal sealed class ConstantCoefficientRecurrenceSolver
                 return false;
             }
 
-            if (Math.Abs(term.Reduction.Value - decrement) <= DecrementTolerance)
+            if (Math.Abs(term.Reduction.Value - decrement) <= RecurrenceNumerics.ComparisonEpsilon)
             {
                 multiplicity += term.Multiplicity;
             }
@@ -131,7 +128,7 @@ internal sealed class ConstantCoefficientRecurrenceSolver
     {
         return !double.IsNaN(root)
             && !double.IsInfinity(root)
-            && root > 1 + RootTolerance;
+            && root > 1 + RecurrenceNumerics.ComparisonEpsilon;
     }
 
     private static bool TryClassifySupportedLocalWork(
