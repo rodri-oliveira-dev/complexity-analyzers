@@ -17,6 +17,7 @@ public sealed class ComplexityAnalyzerTests
     private const string MaterializationInsideIterationId = "BIG1002";
     private const string OrderingInsideIterationId = "BIG1003";
     private const string InputDependentCallInsideIterationId = "BIG1004";
+    private const string ExponentialRecursiveGrowthId = "BIG1005";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -40,6 +41,7 @@ public sealed class ComplexityAnalyzerTests
                 MaterializationInsideIterationId,
                 OrderingInsideIterationId,
                 InputDependentCallInsideIterationId,
+                ExponentialRecursiveGrowthId,
                 AnalyzerExecutionProbeId
             ],
             analyzer.SupportedDiagnostics.Select(descriptor => descriptor.Id));
@@ -64,6 +66,7 @@ public sealed class ComplexityAnalyzerTests
     [InlineData(MaterializationInsideIterationId, "Materialization inside iteration")]
     [InlineData(OrderingInsideIterationId, "Ordering inside iteration")]
     [InlineData(InputDependentCallInsideIterationId, "Input-dependent method call inside iteration")]
+    [InlineData(ExponentialRecursiveGrowthId, "Exponential recursive growth")]
     public void Actionable_diagnostics_have_expected_public_descriptor_metadata(
         string diagnosticId,
         string expectedTitle)
@@ -267,6 +270,132 @@ public sealed class ComplexityAnalyzerTests
         Assert.Equal("Estimated time complexity: O(n \u00b7 m)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
     }
 
+    [Theory]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public int M(int n)
+            {
+                if (n <= 1)
+                {
+                    return 1;
+                }
+
+                return M(n - 1) + 1;
+            }
+        }
+        """,
+        "M",
+        "Estimated time complexity: O(n)")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public int BinarySearch(int n, bool takeLeft)
+            {
+                if (n <= 1)
+                {
+                    return 0;
+                }
+
+                if (takeLeft)
+                {
+                    return BinarySearch(n / 2, false);
+                }
+
+                return BinarySearch(n / 2, false);
+            }
+        }
+        """,
+        "BinarySearch",
+        "Estimated time complexity: O(log n)")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public void MergeSort(int n)
+            {
+                if (n <= 1)
+                {
+                    return;
+                }
+
+                MergeSort(n / 2);
+                MergeSort(n / 2);
+
+                for (var i = 0; i < n; i++)
+                {
+                    var value = i + 1;
+                }
+            }
+        }
+        """,
+        "MergeSort",
+        "Estimated time complexity: O(n log n)")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public void FractionalMaster(int n)
+            {
+                if (n <= 1)
+                {
+                    return;
+                }
+
+                FractionalMaster(n / 2);
+                FractionalMaster(n / 2);
+                FractionalMaster(n / 2);
+
+                for (var i = 0; i < n; i++)
+                {
+                    var value = i + 1;
+                }
+            }
+        }
+        """,
+        "FractionalMaster",
+        "Estimated time complexity: O(n^1.585)")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public void UnequalSplit(double n)
+            {
+                if (n <= 1)
+                {
+                    return;
+                }
+
+                UnequalSplit(n / 3);
+                UnequalSplit(n * (2.0 / 3.0));
+
+                for (var i = 0; i < n; i++)
+                {
+                    var value = i + 1;
+                }
+            }
+        }
+        """,
+        "UnequalSplit",
+        "Estimated time complexity: O(n log n)")]
+    public async Task Analyzer_reports_recursive_estimated_complexity_when_enabled(
+        string source,
+        string methodName,
+        string expectedMessage)
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            source,
+            enableComplexity: true);
+
+        Diagnostic diagnostic = diagnostics
+            .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+            .Single(diagnostic => GetDiagnosticText(diagnostic) == methodName);
+
+        Assert.Equal(expectedMessage, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+    }
+
     [Fact]
     public async Task Analyzer_does_not_report_estimated_complexity_for_interprocedural_cycles()
     {
@@ -277,6 +406,24 @@ public sealed class ComplexityAnalyzerTests
                 public void M(int[] values)
                 {
                     M(values);
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
+    }
+
+    [Fact]
+    public async Task Analyzer_does_not_report_estimated_complexity_for_unknown_recursion()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public int M(int n)
+                {
+                    return M(n - 1);
                 }
             }
             """,
@@ -651,6 +798,43 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
+    public async Task Big1004_reports_solved_recursive_source_call_inside_foreach()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void M(int[] customers, int limit)
+                {
+                    foreach (var customer in customers)
+                    {
+                        CountDown(limit);
+                    }
+                }
+
+                private int CountDown(int n)
+                {
+                    if (n <= 1)
+                    {
+                        return 1;
+                    }
+
+                    return CountDown(n - 1) + 1;
+                }
+            }
+            """);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
+
+        Assert.Equal(
+            "Method 'Sample.CountDown' contributes O(m) work inside a O(n) iteration. Estimated combined complexity: O(n \u00b7 m).",
+            diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertDiagnosticText(diagnostic, "CountDown(limit)");
+    }
+
+    [Fact]
     public async Task Big1004_does_not_report_constant_source_call_inside_foreach()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
@@ -826,6 +1010,131 @@ public sealed class ComplexityAnalyzerTests
         Assert.Equal(1, diagnostics.Count(diagnostic => diagnostic.Id == MaterializationInsideIterationId));
         Assert.Equal(1, diagnostics.Count(diagnostic => diagnostic.Id == OrderingInsideIterationId));
         Assert.Equal(0, diagnostics.Count(diagnostic => diagnostic.Id == InputDependentCallInsideIterationId));
+    }
+
+    [Fact]
+    public async Task Big1005_reports_fibonacci_like_supported_recursion()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                int Fibonacci(int n)
+                {
+                    if (n <= 1)
+                    {
+                        return n;
+                    }
+
+                    return Fibonacci(n - 1) + Fibonacci(n - 2);
+                }
+            }
+            """);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == ExponentialRecursiveGrowthId);
+
+        Assert.Equal(
+            "Recursive method 'Sample.Fibonacci' has estimated exponential time complexity O(1.618^n)",
+            diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertDiagnosticText(diagnostic, "Fibonacci");
+    }
+
+    [Fact]
+    public async Task Big1005_reports_two_decrement_recursive_calls()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void Branch(int n)
+                {
+                    if (n <= 1)
+                    {
+                        return;
+                    }
+
+                    Branch(n - 1);
+                    Branch(n - 1);
+                }
+            }
+            """);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == ExponentialRecursiveGrowthId);
+
+        Assert.Equal(
+            "Recursive method 'Sample.Branch' has estimated exponential time complexity O(2^n)",
+            diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertDiagnosticText(diagnostic, "Branch");
+    }
+
+    [Fact]
+    public async Task Big1005_does_not_report_non_exponential_recursion()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void M(int n)
+                {
+                    if (n <= 1)
+                    {
+                        return;
+                    }
+
+                    M(n - 1);
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == ExponentialRecursiveGrowthId);
+    }
+
+    [Fact]
+    public async Task Big1005_does_not_report_unknown_recursion()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void M(int n)
+                {
+                    M(n - 1);
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == ExponentialRecursiveGrowthId);
+    }
+
+    [Fact]
+    public async Task Big1005_does_not_report_mutual_recursion()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                void A(int n)
+                {
+                    if (n <= 1)
+                    {
+                        return;
+                    }
+
+                    B(n - 1);
+                }
+
+                void B(int n)
+                {
+                    A(n - 1);
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == ExponentialRecursiveGrowthId);
     }
 
     [Fact]

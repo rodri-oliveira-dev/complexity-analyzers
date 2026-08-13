@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
+using ComplexityAnalysis.Analyzers.Analysis.Recursion;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -122,11 +123,48 @@ internal sealed class MethodComplexityExtractor
         MethodDeclarationSyntax methodDeclaration,
         MethodAnalysisContext context)
     {
+        if (TrySolveDirectRecurrence(methodDeclaration, context, out ComplexityExpression? recursiveComplexity)
+            && recursiveComplexity is not null)
+        {
+            return recursiveComplexity;
+        }
+
         return methodDeclaration.Body is not null
             ? AnalyzeBlockCore(methodDeclaration.Body, context)
             : methodDeclaration.ExpressionBody is null
             ? ComplexityFactory.Unknown()
             : new BasicOperationAnalyzer(context).AnalyzeExpression(methodDeclaration.ExpressionBody.Expression);
+    }
+
+    internal static bool TrySolveDirectRecurrence(
+        MethodDeclarationSyntax methodDeclaration,
+        MethodAnalysisContext context,
+        out ComplexityExpression? complexity)
+    {
+        _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
+        _ = context ?? throw new ArgumentNullException(nameof(context));
+
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        complexity = null;
+        RecurrenceExtractionResult extraction = new RecurrenceExtractor().Extract(
+            methodDeclaration,
+            context);
+        if (extraction.Kind != RecurrenceExtractionResultKind.Extracted
+            || extraction.Relation is null)
+        {
+            return false;
+        }
+
+        RecurrenceSolution solution = new RecurrenceSolver().Solve(extraction.Relation);
+        if (solution.Kind != RecurrenceSolutionKind.Solved
+            || solution.Complexity is null)
+        {
+            return false;
+        }
+
+        complexity = solution.Complexity;
+        return true;
     }
 
     internal ComplexityExpression AnalyzeBlock(

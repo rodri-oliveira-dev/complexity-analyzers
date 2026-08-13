@@ -42,6 +42,8 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
             cancellationToken);
         ImmutableArray<Diagnostic>.Builder diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
+        AnalyzeRecursiveMethod(methodDeclaration, context, diagnostics);
+
         foreach (InvocationExpressionSyntax invocation in methodDeclaration.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -50,6 +52,25 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         }
 
         return diagnostics.ToImmutable();
+    }
+
+    private static void AnalyzeRecursiveMethod(
+        MethodDeclarationSyntax methodDeclaration,
+        MethodAnalysisContext context,
+        ImmutableArray<Diagnostic>.Builder diagnostics)
+    {
+        if (MethodComplexityExtractor.TrySolveDirectRecurrence(
+            methodDeclaration,
+            context,
+            out ComplexityExpression? complexity)
+            && complexity is ExponentialComplexity)
+        {
+            diagnostics.Add(Diagnostic.Create(
+                DiagnosticDescriptors.ExponentialRecursiveGrowth,
+                methodDeclaration.Identifier.GetLocation(),
+                FormatOperation(context.MethodSymbol),
+                complexity.ToBigONotation()));
+        }
     }
 
     private static void AnalyzeInvocation(

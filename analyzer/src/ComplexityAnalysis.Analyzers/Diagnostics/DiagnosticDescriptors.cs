@@ -49,6 +49,15 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports source method calls with known input-dependent complexity executed inside an analyzable iteration.");
 
+    internal static readonly DiagnosticDescriptor ExponentialRecursiveGrowth = new(
+        id: "BIG1005",
+        title: "Exponential recursive growth",
+        messageFormat: "Recursive method '{0}' has estimated exponential time complexity {1}",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports recursive methods whose supported recurrence solves to exponential time complexity.");
+
     internal static readonly DiagnosticDescriptor AnalyzerExecutionProbe = new(
         id: "BIG9000",
         title: "Analyzer execution probe",

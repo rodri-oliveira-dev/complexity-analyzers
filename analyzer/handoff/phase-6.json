@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 6 \u2014 Recursion & Recurrence Solving",
   "currentObjective": "Extract and solve bounded direct-recursion recurrence patterns",
-  "completedStep": "8/11 \u2014 restricted Akra-Bazzi solver",
+  "completedStep": "9/11 \u2014 analyzer and diagnostic integration",
   "decisions": [
     "Phase 6 starts from Phase 5 cycle boundaries and may solve only supported direct recursion with sufficient base-case evidence.",
     "Recurrence extraction and recurrence solving remain separate responsibilities.",
@@ -69,10 +69,9 @@
     "Step 7 Release tests passed with dotnet test --configuration Release --no-build: 434 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "BIG1005 is specified but not implemented in step 2.",
     "Mutual recursion remains Unknown in Phase 6."
   ],
-  "nextStep": "9/11 \u2014 analyzer and diagnostic integration",
+  "nextStep": "10/11 \u2014 characterization, performance, docs and package hardening",
   "lastCommit": {
     "hash": "7515011c17f6855a3434c13e8cd4527b15fcccf1",
     "message": "feat: solve simple exponential recurrences"
