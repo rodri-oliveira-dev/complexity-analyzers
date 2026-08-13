@@ -587,6 +587,26 @@ public sealed class PhaseFiveInterproceduralContractTests
     }
 
     [Fact]
+    public void Default_method_budget_allows_boundary_and_stops_boundary_plus_one()
+    {
+        ComplexityExpression boundary = AnalyzeMethod(
+            [CreateFanoutSource(callCount: 32)],
+            "M",
+            AnalysisBudget.Default,
+            out InterproceduralAnalysisContext boundaryContext);
+        ComplexityExpression boundaryPlusOne = AnalyzeMethod(
+            [CreateFanoutSource(callCount: 33)],
+            "M",
+            AnalysisBudget.Default,
+            out InterproceduralAnalysisContext boundaryPlusOneContext);
+
+        Assert.Equal("O(1)", boundary.ToBigONotation());
+        Assert.Equal(32, boundaryContext.TemplateCache.Count);
+        Assert.Equal("Unknown", boundaryPlusOne.ToBigONotation());
+        Assert.Equal(32, boundaryPlusOneContext.TemplateCache.Count);
+    }
+
+    [Fact]
     public void Depth_budget_limits_adversarial_call_chain()
     {
         ComplexityExpression result = AnalyzeMethod(
@@ -704,6 +724,36 @@ public sealed class PhaseFiveInterproceduralContractTests
 
         Assert.Same(analysis, completed);
         Assert.Equal("Unknown", await analysis);
+    }
+
+    private static string CreateFanoutSource(int callCount)
+    {
+        string calls = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(1, callCount).Select(index => "        Helper" + index + "(items);"));
+        string helpers = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(1, callCount).Select(index => "    private void Helper" + index + "(int[] values) { }"));
+
+        return
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+            """
+            + Environment.NewLine
+            + calls
+            + Environment.NewLine
+            + """
+                }
+
+            """
+            + helpers
+            + Environment.NewLine
+            + """
+            }
+            """;
     }
 
     private static ComplexityExpression AnalyzeMethod(

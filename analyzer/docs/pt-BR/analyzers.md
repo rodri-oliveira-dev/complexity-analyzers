@@ -416,4 +416,8 @@ A analise interprocedural de metodos fonte e limitada a metodos ordinarios na me
 - metodos ordinarios nao virtuais;
 - dispatch sealed quando o alvo de runtime e comprovado.
 
-Continuam fora de escopo: solucao de recursao, dispatch virtual/interface completo, assemblies externos, construtores, propriedades, operadores, local functions, lambdas como alvos independentes, call graph de compilation inteira e analise de solution inteira. Ciclos sao detectados mas tratados internamente como `Unknown`; a Phase 6 e responsavel por solucao de recorrencias.
+A travessia e demand-driven: um callee fonte e analisado somente quando um caller analisado alcanca aquela invocacao. O analyzer nao constroi um call graph obrigatorio da compilation inteira e nao pre-analisa todas as syntax trees para propagacao interprocedural.
+
+A expansao e limitada por budgets internos: a profundidade maxima de chamadas e `5`, e o maximo de expansoes uncached de metodos fonte por analise raiz e `32`. Quando um boundary de budget e alcancado, a chamada afetada permanece `Unknown`; raizes independentes posteriores ainda podem analisar e cachear o mesmo metodo fonte quando o proprio budget permitir.
+
+Continuam fora de escopo: solucao de recursao, dispatch virtual/interface completo, assemblies externos, construtores, propriedades, operadores, local functions, lambdas como alvos independentes, call graph de compilation inteira e analise de solution inteira. Ciclos sao detectados mas tratados internamente como `Unknown`; recursao nao e resolvida na Phase 5. A Phase 6 e responsavel por solucao de recorrencias e chamadas recursivas.

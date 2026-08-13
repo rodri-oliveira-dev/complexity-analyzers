@@ -2,9 +2,7 @@
 
 ## Status
 
-In Progress.
-
-This specification defines the contract for Phase 5 only. The phase has not implemented production code yet at the time this document is introduced.
+Complete.
 
 ## Objective
 

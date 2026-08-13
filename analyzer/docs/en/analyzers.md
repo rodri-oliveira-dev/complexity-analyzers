@@ -416,4 +416,8 @@ Source-method interprocedural analysis is limited to ordinary methods in the sam
 - non-virtual ordinary methods;
 - sealed dispatch when the runtime target is proven.
 
-Out of scope remains recursion solving, full virtual/interface dispatch, external assemblies, constructors, properties, operators, local functions, lambdas as independent targets, whole-compilation call graphs, and whole-solution analysis. Cycles are detected but reported internally as `Unknown`; Phase 6 is responsible for recurrence solving.
+The traversal is demand-driven: a source callee is analyzed only when an analyzed caller reaches that invocation. The analyzer does not build a mandatory whole-compilation call graph and does not pre-analyze every syntax tree for interprocedural propagation.
+
+Expansion is bounded by internal budgets: maximum call depth is `5`, and maximum uncached source-method expansions per root analysis is `32`. When a budget boundary is reached, the affected call remains `Unknown`; later independent roots can still analyze and cache the same source method when their own budget allows it.
+
+Out of scope remains recursion solving, full virtual/interface dispatch, external assemblies, constructors, properties, operators, local functions, lambdas as independent targets, whole-compilation call graphs, and whole-solution analysis. Cycles are detected but reported internally as `Unknown`; recursion is not solved in Phase 5. Phase 6 is responsible for recurrence and recursive-call solving.
