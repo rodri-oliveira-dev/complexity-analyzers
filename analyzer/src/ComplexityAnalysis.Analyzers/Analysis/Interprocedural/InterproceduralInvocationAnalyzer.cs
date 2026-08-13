@@ -94,6 +94,7 @@ internal sealed class InterproceduralInvocationAnalyzer
             return SubstituteCallSiteArguments(
                 invocation,
                 resolution.TargetMethodSymbol,
+                sourceMethodDefinition,
                 cachedResult);
         }
 
@@ -122,6 +123,7 @@ internal sealed class InterproceduralInvocationAnalyzer
         return SubstituteCallSiteArguments(
             invocation,
             resolution.TargetMethodSymbol,
+            sourceMethodDefinition,
             calleeResult);
     }
 
@@ -205,6 +207,7 @@ internal sealed class InterproceduralInvocationAnalyzer
     private ComplexityExpression SubstituteCallSiteArguments(
         InvocationExpressionSyntax invocation,
         IMethodSymbol targetMethodSymbol,
+        IMethodSymbol sourceMethodDefinition,
         InterproceduralAnalysisResult calleeResult)
     {
         callerContext.CancellationToken.ThrowIfCancellationRequested();
@@ -219,13 +222,73 @@ internal sealed class InterproceduralInvocationAnalyzer
             new ArgumentComplexityBinder().Bind(
                 invocation,
                 targetMethodSymbol,
+                sourceMethodDefinition,
+                calleeResult.Template,
                 callerContext,
-                callerContext.SemanticModel,
                 callerContext.CancellationToken);
 
-        return ComplexitySubstitution.Substitute(
+        ComplexityExpression callSiteEvaluationComplexity = AnalyzeCallSiteEvaluation(
+            invocation,
+            targetMethodSymbol);
+        if (callSiteEvaluationComplexity is UnknownComplexity)
+        {
+            return callSiteEvaluationComplexity;
+        }
+
+        ComplexityExpression substitutedCalleeComplexity = ComplexitySubstitution.Substitute(
             calleeResult.Template.Complexity,
             bindings,
             callerContext.CancellationToken);
+
+        return ComplexityComposer.Sequential(
+            callSiteEvaluationComplexity,
+            substitutedCalleeComplexity);
+    }
+
+    private ComplexityExpression AnalyzeCallSiteEvaluation(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol targetMethodSymbol)
+    {
+        ComplexityExpression complexity = AnalyzeReceiverEvaluation(
+            invocation,
+            targetMethodSymbol);
+        if (complexity is UnknownComplexity)
+        {
+            return complexity;
+        }
+
+        BasicOperationAnalyzer operationAnalyzer = new(callerContext);
+        foreach (ArgumentSyntax argument in invocation.ArgumentList.Arguments)
+        {
+            callerContext.CancellationToken.ThrowIfCancellationRequested();
+
+            ComplexityExpression argumentComplexity = argument.Expression is LambdaExpressionSyntax
+                ? ComplexityFactory.Constant()
+                : operationAnalyzer.AnalyzeExpression(argument.Expression);
+            complexity = ComplexityComposer.Sequential(complexity, argumentComplexity);
+            if (complexity is UnknownComplexity)
+            {
+                return complexity;
+            }
+        }
+
+        return complexity;
+    }
+
+    private ComplexityExpression AnalyzeReceiverEvaluation(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol targetMethodSymbol)
+    {
+        callerContext.CancellationToken.ThrowIfCancellationRequested();
+
+        if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess
+            || (targetMethodSymbol.IsStatic && targetMethodSymbol.ReducedFrom is null))
+        {
+            return ComplexityFactory.Constant();
+        }
+
+        return memberAccess.Expression is ThisExpressionSyntax or BaseExpressionSyntax
+            ? ComplexityFactory.Constant()
+            : new BasicOperationAnalyzer(callerContext).AnalyzeExpression(memberAccess.Expression);
     }
 }

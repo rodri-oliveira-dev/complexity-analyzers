@@ -794,6 +794,151 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
+    public void Source_call_includes_known_argument_evaluation_cost()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                void M(IEnumerable<int> values)
+                {
+                    Helper(values.ToList());
+                }
+
+                private void Helper(List<int> values)
+                {
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Source_call_with_unknown_argument_evaluation_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M()
+                {
+                    Helper(System.Console.ReadLine());
+                }
+
+                private void Helper(string value)
+                {
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Source_call_preserves_positional_slots_for_non_dimension_parameters()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    Helper(true, items);
+                }
+
+                private void Helper(bool enabled, int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Explicit_this_receiver_on_source_call_is_constant()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    this.Scan(items);
+                }
+
+                private void Scan(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Explicit_base_receiver_on_source_call_is_constant()
+    {
+        AssertMethodComplexity(
+            """
+            public class BaseSample
+            {
+                protected void Scan(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+
+            public sealed class Sample : BaseSample
+            {
+                void M(int[] items)
+                {
+                    base.Scan(items);
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Source_extension_receiver_substitutes_into_callee_template()
+    {
+        AssertMethodComplexity(
+            """
+            public static class Extensions
+            {
+                public static void Scan(this int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+
+            public sealed class Sample
+            {
+                void M(int[] items)
+                {
+                    items.Scan();
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
     public void Known_bcl_mapping_keeps_precedence_over_source_analysis_cache()
     {
         AssertMethodComplexityAndCacheCount(
