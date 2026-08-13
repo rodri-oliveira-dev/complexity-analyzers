@@ -1,13 +1,15 @@
 {
   "delivery": "Phase 5 \u2014 Interprocedural Analysis",
-  "currentObjective": "Per-compilation context, cache and analysis budget complete",
-  "completedStep": "3/9 \u2014 per-compilation context, cache and analysis budget",
+  "currentObjective": "Argument binding and complexity substitution complete",
+  "completedStep": "4/9 \u2014 argument binding and complexity substitution",
   "decisions": [
     "InterproceduralAnalysisContext is created per Roslyn Compilation and owns its own template cache; no static or cross-compilation cache is used.",
     "Template cache keys normalize to method OriginalDefinition through a SymbolEqualityComparer-based MethodSymbolKey so overloads and constructed generic calls keep semantic identity.",
-    "Cached values are MethodComplexityTemplate results relative to callee parameters only; caller argument binding and substitution remain pending.",
+    "Cached values are MethodComplexityTemplate results relative to callee parameters only; caller-specific argument substitution is performed outside the template cache.",
     "The cache uses ConcurrentDictionary entries with explicit InProgress and Completed states instead of Lazy<T>, so future cycle handling does not need self-waiting cache initialization.",
-    "AnalysisBudget remains internal with MaximumCallDepth = 5 and MaximumMethodsPerRootAnalysis = 32; InterproceduralRootAnalysisState owns depth, expanded method count, active path, and CancellationToken per root."
+    "AnalysisBudget remains internal with MaximumCallDepth = 5 and MaximumMethodsPerRootAnalysis = 32; InterproceduralRootAnalysisState owns depth, expanded method count, active path, and CancellationToken per root.",
+    "ArgumentComplexityBinder maps eligible callee parameter variables to caller-side ComplexityExpression values through proven direct arguments, known Length/Count size properties, constants, and simple constant affine/scaled transformations.",
+    "ComplexitySubstitution rewrites the closed Phase 2 model without mutating cached templates; unknown or unproven variable bindings remain Unknown."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -24,6 +26,8 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/CallTargetResolutionKind.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/SourceMethodResolver.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/ArgumentComplexityBinder.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/ComplexitySubstitution.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodAnalysisContext.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/",
@@ -32,6 +36,7 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/SourceMethodResolverTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/InterproceduralAnalysisContextTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ArgumentComplexityBinderTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/KnownOperationRegistryTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
@@ -42,16 +47,18 @@
     "Release build passed for source call-target resolution.",
     "Release tests passed for source call-target resolution: 252 passed, 0 failed, 0 skipped.",
     "Release build passed for per-compilation context, cache and analysis budget.",
-    "Release tests passed for per-compilation context, cache and analysis budget: 263 passed, 0 failed, 0 skipped."
+    "Release tests passed for per-compilation context, cache and analysis budget: 263 passed, 0 failed, 0 skipped.",
+    "Before argument binding step, git status was clean on branch main at 593b26b7d93aa099e89bf8f5f421e6df57210e07.",
+    "Release build passed for argument binding and complexity substitution.",
+    "Release tests passed for argument binding and complexity substitution: 279 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "Implement method complexity templates and argument substitution.",
     "Implement bounded traversal and cycle detection without recursion solving.",
     "Integrate known interprocedural results into BIG0001 and consider BIG1004 only in a later implementation step."
   ],
-  "nextStep": "4/9 \u2014 argument binding and complexity substitution",
+  "nextStep": "5/9 \u2014 demand-driven interprocedural propagation",
   "lastCommit": {
-    "hash": "7f701c49fa75e0c525d92c4f8cb999726fb78a0a",
-    "message": "feat: resolve source method call targets"
+    "hash": "593b26b7d93aa099e89bf8f5f421e6df57210e07",
+    "message": "feat: add interprocedural analysis context"
   }
 }
