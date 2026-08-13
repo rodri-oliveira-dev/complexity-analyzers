@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -630,6 +630,211 @@ public sealed class KnownOperationRegistryTests
                 mapping.Identity.ContainingType.NamespaceName));
     }
 
+    [Theory]
+    [InlineData(
+        "linq-where",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            IEnumerable<int> M(IEnumerable<int> values) => values.Where(value => value > 0);
+        }
+        """,
+        "O(n)",
+        "Deferred",
+        true,
+        false,
+        false)]
+    [InlineData(
+        "linq-select",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            IEnumerable<int> M(IEnumerable<int> values) => values.Select(value => value + 1);
+        }
+        """,
+        "O(n)",
+        "Deferred",
+        true,
+        false,
+        false)]
+    [InlineData(
+        "linq-orderby",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            IOrderedEnumerable<int> M(IEnumerable<int> values) => values.OrderBy(value => value);
+        }
+        """,
+        "O(n log n)",
+        "Deferred",
+        true,
+        false,
+        true)]
+    [InlineData(
+        "linq-distinct",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            IEnumerable<int> M(IEnumerable<int> values) => values.Distinct();
+        }
+        """,
+        "O(n)",
+        "Deferred",
+        true,
+        false,
+        false)]
+    [InlineData(
+        "linq-groupby",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            IEnumerable<IGrouping<int, int>> M(IEnumerable<int> values) => values.GroupBy(value => value);
+        }
+        """,
+        "O(n)",
+        "Deferred",
+        true,
+        false,
+        false)]
+    [InlineData(
+        "linq-to-list",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            List<int> M(IEnumerable<int> values) => values.ToList();
+        }
+        """,
+        "O(n)",
+        "Immediate",
+        true,
+        true,
+        false)]
+    [InlineData(
+        "linq-any",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            bool M(IEnumerable<int> values) => values.Any();
+        }
+        """,
+        "O(1)",
+        "Immediate",
+        false,
+        false,
+        false)]
+    [InlineData(
+        "linq-count",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            int M(IEnumerable<int> values) => values.Count();
+        }
+        """,
+        "O(n)",
+        "Immediate",
+        true,
+        false,
+        false)]
+    [InlineData(
+        "linq-contains",
+        """
+        using System.Collections.Generic;
+        using System.Linq;
+
+        public sealed class Sample
+        {
+            bool M(IEnumerable<int> values) => values.Contains(1);
+        }
+        """,
+        "O(n)",
+        "Immediate",
+        true,
+        false,
+        false)]
+    public void Linq_mappings_resolve_semantically(
+        string operationFamily,
+        string source,
+        string expectedComplexity,
+        string expectedExecutionKind,
+        bool expectedEnumeratesReceiver,
+        bool expectedMaterializes,
+        bool expectedOrders)
+    {
+        KnownOperationMapping mapping = ResolveDefaultInvocation(source);
+
+        Assert.Equal(operationFamily, mapping.Metadata.OperationFamily);
+        Assert.Equal(expectedComplexity, mapping.Complexity.ToBigONotation());
+        Assert.Equal(ParseExecutionKind(expectedExecutionKind), mapping.ExecutionKind);
+        Assert.Equal(expectedEnumeratesReceiver, mapping.Metadata.EnumeratesReceiver);
+        Assert.Equal(expectedMaterializes, mapping.Metadata.Materializes);
+        Assert.Equal(expectedOrders, mapping.Metadata.Orders);
+        Assert.Equal(KnownOperationProvenanceKind.OfficialDocumentation, mapping.Provenance.Kind);
+        Assert.Contains("learn.microsoft.com", mapping.Provenance.Note, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Linq_registry_does_not_match_custom_homonymous_extensions()
+    {
+        InvocationFacts facts = CreateInvocationFacts(
+            """
+            using System.Collections.Generic;
+
+            namespace MyCompany
+            {
+                public static class QueryExtensions
+                {
+                    public static IEnumerable<T> Where<T>(this IEnumerable<T> source, System.Func<T, bool> predicate) => source;
+                }
+
+                public sealed class Sample
+                {
+                    IEnumerable<int> M(IEnumerable<int> values) => values.Where(value => value > 0);
+                }
+            }
+            """);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Default);
+
+        Assert.False(resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out _));
+    }
+
+    [Fact]
+    public void Linq_mappings_have_verified_provenance()
+    {
+        Assert.All(
+            KnownOperationRegistry.Default.Mappings.Where(mapping => StringComparer.Ordinal.Equals(
+                "System.Linq",
+                mapping.Identity.ContainingType.NamespaceName)),
+            mapping =>
+            {
+                Assert.Equal(KnownOperationProvenanceKind.OfficialDocumentation, mapping.Provenance.Kind);
+                Assert.Contains("learn.microsoft.com", mapping.Provenance.Note, StringComparison.Ordinal);
+            });
+    }
+
     [Fact]
     public void Bcl_mappings_have_verified_or_explicitly_conservative_provenance()
     {
@@ -668,6 +873,16 @@ public sealed class KnownOperationRegistryTests
             : throw new InvalidOperationException("Expected BCL invocation mapping for " + facts.MethodSymbol);
     }
 
+    private static KnownOperationMapping ResolveDefaultInvocation(string source)
+    {
+        InvocationFacts facts = CreateInvocationFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Default);
+
+        return resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out KnownOperationMapping mapping)
+            ? mapping
+            : throw new InvalidOperationException("Expected known invocation mapping for " + facts.MethodSymbol);
+    }
+
     private static KnownOperationMapping ResolveBclProperty(string source)
     {
         PropertyFacts facts = CreatePropertyFacts(source);
@@ -702,6 +917,13 @@ public sealed class KnownOperationRegistryTests
         return Enum.TryParse(value, ignoreCase: false, out KnownOperationComplexityCase complexityCase)
             ? complexityCase
             : throw new ArgumentException("Unknown complexity case.", nameof(value));
+    }
+
+    private static KnownOperationExecutionKind ParseExecutionKind(string value)
+    {
+        return Enum.TryParse(value, ignoreCase: false, out KnownOperationExecutionKind executionKind)
+            ? executionKind
+            : throw new ArgumentException("Unknown execution kind.", nameof(value));
     }
 
     private static KnownOperationMapping CreateMapping(
@@ -809,11 +1031,20 @@ public sealed class KnownOperationRegistryTests
     private static ImmutableArray<MetadataReference> BasicReferences
     {
         get;
-    } =
-        [
-            MetadataReference.CreateFromFile(typeof(object).GetTypeInfo().Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Enumerable).GetTypeInfo().Assembly.Location)
-        ];
+    } = CreateTrustedPlatformReferences();
+
+    private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferences()
+    {
+        string trustedPlatformAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
+            ?? string.Empty;
+
+        return trustedPlatformAssemblies
+            .Split(Path.PathSeparator)
+            .Where(path => path.Length > 0)
+            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
+            .ToImmutableArray();
+    }
 
     private sealed record InvocationFacts(IMethodSymbol MethodSymbol);
 

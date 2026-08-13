@@ -54,6 +54,7 @@ internal sealed class BasicOperationAnalyzer
             AssignmentExpressionSyntax assignment => AnalyzeAssignment(assignment),
             PrefixUnaryExpressionSyntax prefixUnary => AnalyzePrefixUnary(prefixUnary),
             PostfixUnaryExpressionSyntax postfixUnary => AnalyzePostfixUnary(postfixUnary),
+            InvocationExpressionSyntax invocation => new KnownOperationComplexityAnalyzer(context).AnalyzeInvocation(invocation),
             MemberAccessExpressionSyntax memberAccess => AnalyzeMemberAccess(memberAccess),
             ElementAccessExpressionSyntax elementAccess => AnalyzeElementAccess(elementAccess),
             _ => ComplexityFactory.Unknown(),
@@ -153,6 +154,13 @@ internal sealed class BasicOperationAnalyzer
 
     private ComplexityExpression AnalyzeMemberAccess(MemberAccessExpressionSyntax memberAccess)
     {
+        ComplexityExpression knownOperationComplexity =
+            new KnownOperationComplexityAnalyzer(context).AnalyzeMemberAccess(memberAccess);
+        if (knownOperationComplexity is not UnknownComplexity)
+        {
+            return knownOperationComplexity;
+        }
+
         if (!StringComparer.Ordinal.Equals(memberAccess.Name.Identifier.ValueText, "Length"))
         {
             return ComplexityFactory.Unknown();
@@ -171,6 +179,13 @@ internal sealed class BasicOperationAnalyzer
 
     private ComplexityExpression AnalyzeElementAccess(ElementAccessExpressionSyntax elementAccess)
     {
+        ComplexityExpression knownOperationComplexity =
+            new KnownOperationComplexityAnalyzer(context).AnalyzeElementAccess(elementAccess);
+        if (knownOperationComplexity is not UnknownComplexity)
+        {
+            return knownOperationComplexity;
+        }
+
         if (!IsSimpleValueAccess(elementAccess.Expression)
             || !IsArrayType(GetExpressionType(elementAccess.Expression)))
         {

@@ -115,11 +115,18 @@ internal sealed class MethodComplexityExtractor
         MethodAnalysisContext context)
     {
         LoopBoundAnalysisResult loopBound = new LoopBoundAnalyzer(context).AnalyzeForEach(forEachStatement);
-        return loopBound.IsAnalyzable
-            ? ComplexityComposer.Nested(
-                loopBound.IterationComplexity,
-                AnalyzeLoopBody(forEachStatement.Statement, context))
-            : ComplexityFactory.Unknown();
+        if (!loopBound.IsAnalyzable)
+        {
+            return ComplexityFactory.Unknown();
+        }
+
+        ComplexityExpression bodyComplexity = ComplexityComposer.Nested(
+            loopBound.IterationComplexity,
+            AnalyzeLoopBody(forEachStatement.Statement, context));
+
+        return ComplexityComposer.Sequential(
+            loopBound.EnumerationComplexity,
+            bodyComplexity);
     }
 
     private static ComplexityExpression AnalyzeWhileStatement(

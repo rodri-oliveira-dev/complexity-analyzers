@@ -1,21 +1,21 @@
 {
-  "delivery": "Phase 4 — BCL, LINQ & Actionable Diagnostics",
-  "currentObjective": "Core BCL known-operation mappings implemented without LINQ mappings or new diagnostics",
-  "completedStep": "3/9 — core BCL mappings",
+  "delivery": "Phase 4 - BCL, LINQ & Actionable Diagnostics",
+  "currentObjective": "LINQ execution semantics and mappings implemented without new diagnostics",
+  "completedStep": "4/9 - LINQ execution semantics and mappings",
   "decisions": [
     "Known operations must be resolved through Roslyn symbols, not text-only method names.",
     "Unsupported or unresolved invocations remain Unknown; the inherited conservative O(n) fallback is explicitly rejected.",
     "Known operation mappings carry complexity, execution semantics, provenance, and diagnostic metadata.",
-    "KnownOperationMapping, KnownOperationRegistry, and KnownOperationResolver were added under Analysis/KnownOperations with immutable value-oriented model objects and no Roslyn dependency under Model/.",
-    "The registry is immutable after construction, deterministic by sorted mapping identity, read-only for callers, and has no I/O, reflection, or mutable global state.",
-    "Resolver lookup starts from IMethodSymbol, normalizes original definitions, handles reduced extension methods, and uses SymbolEqualityComparer where symbol-definition comparison is needed.",
-    "KnownOperationResolver also resolves getter/indexer IPropertySymbol values through accessor identities such as get_Count, get_Item, and get_Length.",
-    "KnownOperationRegistry.Bcl contains only verified core BCL mappings: List<T>.Count/indexer/Contains/IndexOf/Sort, Dictionary<TKey,TValue>.ContainsKey/ContainsValue, HashSet<T>.Contains, Array.Length, and string.Length.",
-    "Dictionary<TKey,TValue>.ContainsKey and HashSet<T>.Contains store O(1) as Average-case metadata instead of silently treating hash-based lookup as worst-case O(1).",
-    "No LINQ mappings and no public diagnostics were added in step 3.",
-    "LINQ deferred pipeline creation must not be charged as full enumeration until supported consumption is observed.",
-    "Initial scope prioritizes small BCL/LINQ subsets with verifiable provenance rather than full parity with inherited mappings.",
-    "BIG0001 is specified as Info and disabled by default; BIG100x diagnostics start conservatively and must minimize false positives."
+    "KnownOperationMapping, KnownOperationRegistry, and KnownOperationResolver live under Analysis/KnownOperations with immutable value-oriented model objects and no Roslyn dependency under Model/.",
+    "KnownOperationRegistry.Bcl remains BCL-only; KnownOperationRegistry.Default combines BCL and LINQ mappings for extraction.",
+    "LINQ mappings cover high-value System.Linq.Enumerable immediate/materializing operations and deferred pipeline operations with official documentation/runtime-source provenance.",
+    "Deferred LINQ pipeline creation is charged as O(1); receiver enumeration is charged only when consumed by supported terminal operations or foreach.",
+    "Supported consumed pipeline chains compose source enumeration, predicate/selector local lambda complexity, materialization, and ordering without artificial double-counting of Where/Select plus ToList/ToArray.",
+    "OrderBy/OrderByDescending/ThenBy/ThenByDescending remain deferred at creation, but sorting complexity is counted when consumed.",
+    "Count() specializes to O(1) only when the receiver semantic type safely exposes ICollection/ICollection<T> count or array length; generic IEnumerable remains O(n).",
+    "LINQ lambdas are analyzed only locally; unresolved invocation work inside consumed predicates/selectors preserves Unknown.",
+    "Foreach now has the minimal contract needed to account for consumed deferred LINQ pipelines without introducing diagnostics.",
+    "No public diagnostics were added in step 4."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -27,30 +27,29 @@
   ],
   "relevantFiles": [
     "analyzer/specs/phase-4/bcl-linq-diagnostics.md",
-    "analyzer/specs/phase-3/roslyn-extraction.md",
-    "analyzer/specs/phase-2/complexity-model.md",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperationComplexityAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/BclMappings.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/LinqMappings.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/LoopBoundAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/BasicOperationAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Model/",
-    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
-    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
-    "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/KnownOperationRegistryTests.cs",
-    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs",
-    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs"
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/MethodComplexityExtractorTests.cs"
   ],
   "validations": [
-    "Phase 3 was verified from code and tests before creating the Phase 4 specification.",
-    "Release tests passed for the analyzer workspace before documentation edits.",
     "Known-operation infrastructure tests cover exact match, unknown lookup, overload distinction, custom same-name non-match, reduced extension resolution, deterministic registry ordering, concurrent read behavior, and Unknown not becoming O(n).",
-    "Core BCL mapping tests cover List<T>.Count/indexer/Contains/IndexOf/Sort overloads, Dictionary<TKey,TValue>.ContainsKey/ContainsValue, HashSet<T>.Contains, Array.Length, string.Length, custom homonymous List<T>.Contains, verified or explicitly conservative provenance, and absence of LINQ mappings.",
+    "Core BCL mapping tests cover List<T>.Count/indexer/Contains/IndexOf/Sort overloads, Dictionary<TKey,TValue>.ContainsKey/ContainsValue, HashSet<T>.Contains, Array.Length, string.Length, custom homonymous List<T>.Contains, verified or explicitly conservative provenance, and absence of LINQ mappings from the BCL-only registry.",
+    "LINQ mapping tests cover semantic resolution and provenance for Where, Select, OrderBy, Distinct, GroupBy, ToList, Any, Count, and Contains plus custom homonymous extensions.",
+    "Method extraction tests cover Where without consumption, Where+ToList, Select+ToArray, OrderBy without consumption, OrderBy+ToList, Any, Contains, Count specialization, foreach over pipeline, custom Where/Any extensions, nested/chained operators, SelectMany with known inner receiver, and unresolved consumed predicate preserving Unknown.",
     "dotnet build --configuration Release passed.",
     "dotnet test --configuration Release --no-build passed."
   ],
   "knownPendingItems": [
-    "Implement LINQ mappings and deferred pipeline consumption accounting.",
+    "Integrate invocation analysis with public diagnostics in the next Phase 4 step.",
     "Add BIG0001 and BIG100x diagnostics only after descriptor/release/documentation updates and tests."
   ],
-  "nextStep": "4/9 — LINQ execution semantics and mappings"
+  "nextStep": "5/9 - invocation integration"
 }

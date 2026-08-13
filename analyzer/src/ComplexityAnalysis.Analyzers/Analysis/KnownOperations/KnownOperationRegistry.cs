@@ -32,6 +32,11 @@ internal sealed class KnownOperationRegistry
         get;
     } = Create(BclMappings.Create());
 
+    internal static KnownOperationRegistry Default
+    {
+        get;
+    } = Create(BclMappings.Create().AddRange(LinqMappings.Create()));
+
     internal static KnownOperationRegistry Create(IEnumerable<KnownOperationMapping> mappings)
     {
         if (mappings is null)
