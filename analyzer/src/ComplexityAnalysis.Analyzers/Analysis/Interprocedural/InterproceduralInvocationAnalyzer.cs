@@ -24,6 +24,12 @@ internal sealed class InterproceduralInvocationAnalyzer
 
         callerContext.CancellationToken.ThrowIfCancellationRequested();
 
+        if (callerContext.TreatsDirectRecursiveInvocationsAsConstant
+            && IsDirectRecursiveInvocation(invocation))
+        {
+            return ComplexityFactory.Constant();
+        }
+
         InterproceduralAnalysisContext? interproceduralContext = callerContext.InterproceduralContext;
         InterproceduralRootAnalysisState? rootState = callerContext.InterproceduralRootState;
         if (interproceduralContext is null || rootState is null)
@@ -243,6 +249,22 @@ internal sealed class InterproceduralInvocationAnalyzer
         return ComplexityComposer.Sequential(
             callSiteEvaluationComplexity,
             substitutedCalleeComplexity);
+    }
+
+    private bool IsDirectRecursiveInvocation(InvocationExpressionSyntax invocation)
+    {
+        SymbolInfo symbolInfo = callerContext.SemanticModel.GetSymbolInfo(
+            invocation,
+            callerContext.CancellationToken);
+        return symbolInfo.Symbol is IMethodSymbol methodSymbol
+            && SymbolEqualityComparer.Default.Equals(
+                GetMethodDefinition(methodSymbol),
+                GetMethodDefinition(callerContext.MethodSymbol));
+    }
+
+    private static IMethodSymbol GetMethodDefinition(IMethodSymbol methodSymbol)
+    {
+        return (methodSymbol.ReducedFrom ?? methodSymbol).OriginalDefinition;
     }
 
     private ComplexityExpression AnalyzeCallSiteEvaluation(

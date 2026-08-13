@@ -8,7 +8,7 @@ The analyzer is developed under `analyzer/` as a package boundary separate from 
 
 ## Current Status
 
-Phase 1 through Phase 5 are implemented.
+Phase 1 through Phase 6 are implemented.
 
 | Phase | Status | Delivered |
 | --- | --- | --- |
@@ -17,8 +17,9 @@ Phase 1 through Phase 5 are implemented.
 | Phase 3 - Roslyn Extraction | Complete | Intraprocedural method extraction from Roslyn syntax and semantics. |
 | Phase 4 - BCL, LINQ, and Actionable Diagnostics | Complete | Semantic known-operation mappings for a documented BCL/LINQ subset, `BIG0001`, and actionable `BIG100x` diagnostics. |
 | Phase 5 - Interprocedural Analysis | Complete | Bounded demand-driven propagation from safe source methods in the same compilation, source-call loop diagnostic `BIG1004`, cycle detection, cache, and internal limits. |
+| Phase 6 - Recursion & Recurrence Solving | Complete | Bounded direct-recursion extraction, summation recurrences, simple exponential recursion, Master Theorem, a restricted/bounded Akra-Bazzi subset, fractional powers, and `BIG1005`. |
 
-The analyzer can follow supported source methods in the same compilation when dispatch is safe and the call is reached from the current root method. It does not build a whole-compilation call graph, solve recursion, or use `Microsoft.CodeAnalysis.Workspaces`.
+The analyzer can follow supported source methods in the same compilation when dispatch is safe and the call is reached from the current root method. It can also solve selected direct recursive methods when base-case evidence, argument reduction, local work, and recurrence shape are all proven. It does not build a whole-compilation call graph, solve mutual recursion, or use `Microsoft.CodeAnalysis.Workspaces`.
 
 ## Diagnostics
 
@@ -29,9 +30,12 @@ The analyzer can follow supported source methods in the same compilation when di
 | `BIG1002` | Materialization inside iteration | `Complexity` | `Info` | Yes |
 | `BIG1003` | Ordering inside iteration | `Complexity` | `Info` | Yes |
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | Yes |
+| `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | Yes |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | No |
 
 `BIG0001` is informational and disabled by default. It reports a known method complexity estimate at the method identifier when explicitly enabled.
+
+`BIG1005` reports supported direct recursive methods whose solved recurrence is exponential, such as Fibonacci-like recursion.
 
 `BIG9000` is an infrastructure probe. It proves the analyzer package loaded and ran when explicitly enabled; it is not a performance recommendation.
 
@@ -45,7 +49,7 @@ Supported source methods are ordinary C# methods with safe dispatch, including s
 
 Traversal is demand-driven. A callee is analyzed only when the current root method reaches that invocation. The analyzer does not pre-scan every syntax tree or build a complete call graph. Internal limits bound call depth and methods expanded per root analysis.
 
-Unsupported, unresolved, unsafe, budget-limited, cancelled, or cyclic calls remain `Unknown`. Direct and mutual cycles are detected so analysis terminates, but recurrence solving is deferred to Phase 6.
+Unsupported, unresolved, unsafe, budget-limited, cancelled, or cyclic calls remain `Unknown`. Direct recursion may be solved only by the bounded Phase 6 recurrence pipeline. Mutual recursion is detected but not solved.
 
 Examples:
 
@@ -57,6 +61,19 @@ B(left) + B(right)   => O(n + m)
 B(constant)          => O(1)
 A -> B -> C O(log n) => O(log n)
 ```
+
+## Direct Recursion and Recurrences
+
+Phase 6 recognizes direct recursive calls by Roslyn symbol identity and requires compatible base-case evidence before solving. Recursive calls in mutually exclusive branches are counted per path, so binary-search-style code with two syntactic calls in exclusive branches remains `O(log n)`, not `O(n)`.
+
+Supported recurrence families include:
+
+- summation/decrement recurrences such as `T(n)=T(n-1)+1`, `T(n)=T(n-1)+n`, and `T(n)=T(n-1)+log n`;
+- simple exponential direct recursion such as `2T(n-1)+1` and Fibonacci-like `T(n-1)+T(n-2)+1`;
+- Master Theorem forms such as `T(n)=T(n/2)+1`, `2T(n/2)+n`, `2T(n/2)+n^2`, and `3T(n/2)+n`;
+- a restricted/bounded Akra-Bazzi subset with scale-only recursive terms and polylogarithmic tolls, for example `T(n)=T(n/3)+T(2n/3)+n`.
+
+Fractional polynomial powers are represented deterministically, so `3T(n/2)+n` reports `O(n^1.585)`. Unknown local work, missing base cases, non-reducing arguments, unsupported recurrence shapes, numerically inconclusive solving, cancellation, and mutual recursion remain `Unknown`. The analyzer does not claim full Akra-Bazzi, symbolic recurrence solving, memoization detection, or proof of general termination.
 
 ## Known Operation Scope
 
@@ -87,7 +104,7 @@ cd analyzer
 dotnet restore ComplexityAnalysis.Analyzers.slnx
 dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
 dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.5.0-phase5-local
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.6.0-phase6-local
 ```
 
 The package is documented as a local build/package source. Do not assume a NuGet.org release unless one exists independently.
@@ -96,7 +113,7 @@ See [Getting Started](docs/en/getting-started.md).
 
 ## Configuration
 
-Diagnostics use standard Roslyn `.editorconfig` severity configuration. There are no custom analyzer options in Phase 5.
+Diagnostics use standard Roslyn `.editorconfig` severity configuration. There are no custom analyzer options in Phase 6.
 
 ```ini
 [*.cs]
@@ -106,6 +123,7 @@ dotnet_diagnostic.BIG1001.severity = warning
 dotnet_diagnostic.BIG1002.severity = warning
 dotnet_diagnostic.BIG1003.severity = warning
 dotnet_diagnostic.BIG1004.severity = warning
+dotnet_diagnostic.BIG1005.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
@@ -147,8 +165,10 @@ See [Architecture](docs/en/architecture.md).
 
 - Source-method analysis is limited to ordinary safe-dispatch methods in the same compilation.
 - There is no whole-compilation or whole-solution call graph.
-- Recursion is detected but not solved; recurrence solving is deferred to Phase 6.
-- Master Theorem and Akra-Bazzi are not implemented in the isolated analyzer.
+- Recurrence solving is limited to supported direct-recursion shapes with base-case evidence.
+- Mutual recursion is detected but not solved.
+- Akra-Bazzi support is only a restricted/bounded Akra-Bazzi subset, not the full theorem.
+- General characteristic polynomials, general numerical integration, MathNet, SymPy, and inherited solver projects are not used.
 - No `CodeFixProvider` is included.
 - `Microsoft.CodeAnalysis.Workspaces` is not used.
 - Unsupported or unproven behavior prefers `Unknown` over unsafe guesses.

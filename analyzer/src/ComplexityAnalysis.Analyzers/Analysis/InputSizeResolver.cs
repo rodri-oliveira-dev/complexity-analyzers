@@ -58,7 +58,7 @@ internal sealed class InputSizeResolver
             && type.TypeKind != TypeKind.Delegate
             && (type.TypeKind == TypeKind.Array
             || type.SpecialType == SpecialType.System_String
-            || IsIntegralBoundType(type)
+            || IsNumericBoundType(type)
             || IsCollectionOrEnumerable(type));
     }
 
@@ -76,7 +76,7 @@ internal sealed class InputSizeResolver
         return new ComplexityVariable(name);
     }
 
-    private static bool IsIntegralBoundType(ITypeSymbol type)
+    private static bool IsNumericBoundType(ITypeSymbol type)
     {
         return type.SpecialType is SpecialType.System_SByte
             or SpecialType.System_Byte
@@ -85,7 +85,10 @@ internal sealed class InputSizeResolver
             or SpecialType.System_Int32
             or SpecialType.System_UInt32
             or SpecialType.System_Int64
-            or SpecialType.System_UInt64;
+            or SpecialType.System_UInt64
+            or SpecialType.System_Single
+            or SpecialType.System_Double
+            or SpecialType.System_Decimal;
     }
 
     private bool IsCollectionOrEnumerable(ITypeSymbol type)

@@ -316,6 +316,7 @@ public sealed class ArgumentComplexityBinderTests
         Assert.Equal("O(1)", Substitute(ComplexityFactory.Constant(), bindings));
         Assert.Equal("O(log m)", Substitute(ComplexityFactory.LogN(ComplexityVariable.N), bindings));
         Assert.Equal("O(m log m)", Substitute(ComplexityFactory.NLogN(ComplexityVariable.N), bindings));
+        Assert.Equal("O(m^1.585)", Substitute(ComplexityFactory.Polynomial(ComplexityVariable.N, 1.585), bindings));
         Assert.Equal("O(2^m)", Substitute(ComplexityFactory.Exponential(ComplexityVariable.N, 2), bindings));
         Assert.Equal("O(m!)", Substitute(ComplexityFactory.Factorial(ComplexityVariable.N), bindings));
         Assert.Equal("Unknown", Substitute(ComplexityFactory.Unknown(), bindings));
@@ -365,13 +366,13 @@ public sealed class ArgumentComplexityBinderTests
                     [Pair(ComplexityVariable.N, ComplexityFactory.Linear(ComplexityVariable.M))]);
 
             string first = Substitute(
-                ComplexityFactory.Exponential(ComplexityVariable.N, 1.5),
+                ComplexityFactory.Polynomial(ComplexityVariable.N, 1.584962500721156),
                 bindings);
             string second = Substitute(
-                ComplexityFactory.Exponential(ComplexityVariable.N, 1.5),
+                ComplexityFactory.Polynomial(ComplexityVariable.N, 1.584962500721156),
                 bindings);
 
-            Assert.Equal("O(1.5^m)", first);
+            Assert.Equal("O(m^1.585)", first);
             Assert.Equal(first, second);
         }
         finally

@@ -2,7 +2,7 @@
 
 [English](getting-started.md) | [Portugues (Brasil)](../pt-BR/getting-started.md)
 
-This page explains how to build, test, pack, and consume the isolated analyzer workspace through Phase 5.
+This page explains how to build, test, pack, and consume the isolated analyzer workspace through Phase 6.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ Create a local analyzer package:
 
 ```bash
 cd analyzer
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.5.0-phase5-local
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.6.0-phase6-local
 ```
 
 The package is a Roslyn analyzer package. The analyzer assembly is packed under:
@@ -50,11 +50,11 @@ One local workflow is:
 
 ```bash
 cd analyzer
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.5.0-phase5-local --output artifacts/local-packages
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.6.0-phase6-local --output artifacts/local-packages
 dotnet new console -o artifacts/tmp/AnalyzerConsumer
 cd artifacts/tmp/AnalyzerConsumer
 dotnet nuget add source ../../local-packages --name complexity-analysis-local
-dotnet add package ComplexityAnalysis.Analyzers --version 0.5.0-phase5-local --source complexity-analysis-local
+dotnet add package ComplexityAnalysis.Analyzers --version 0.6.0-phase6-local --source complexity-analysis-local
 ```
 
 If needed, point the local NuGet source at the directory containing the generated `.nupkg`.
@@ -74,7 +74,7 @@ The analyzer is not a runtime library. Application code does not call its types.
 
 ## Smoke Test Diagnostics
 
-`BIG1001`, `BIG1002`, `BIG1003`, and `BIG1004` are enabled by default as `Info` diagnostics. Build output visibility depends on the consuming project and SDK settings. You can promote one locally:
+`BIG1001`, `BIG1002`, `BIG1003`, `BIG1004`, and `BIG1005` are enabled by default as `Info` diagnostics. Build output visibility depends on the consuming project and SDK settings. You can promote one locally:
 
 ```ini
 [*.cs]
@@ -90,7 +90,15 @@ Promote the Phase 5 source-call loop diagnostic:
 dotnet_diagnostic.BIG1004.severity = warning
 ```
 
-`BIG0001` is disabled by default. Enable it when you want method complexity estimates, including supported source-method costs propagated in Phase 5:
+Promote the Phase 6 exponential-recursion diagnostic:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1005.severity = warning
+```
+
+`BIG0001` is disabled by default. Enable it when you want method complexity estimates, including supported source-method costs and solved direct recursion:
 
 ```ini
 [*.cs]

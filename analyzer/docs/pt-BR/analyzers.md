@@ -2,9 +2,9 @@
 
 [English](../en/analyzers.md) | Portugues (Brasil)
 
-Esta pagina e o catalogo publico dos diagnostics expostos por `ComplexityAnalysis.Analyzers` na Phase 5.
+Esta pagina e o catalogo publico dos diagnostics expostos por `ComplexityAnalysis.Analyzers` na Phase 6.
 
-O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, e pode propagar complexidade de metodos fonte seguros na mesma compilation. Metodos customizados com o mesmo nome nao sao tratados como operacoes BCL/LINQ conhecidas. Operacoes nao suportadas, inseguras, ciclicas, limitadas por budget ou nao resolvidas continuam como `Unknown`.
+O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, pode propagar complexidade de metodos fonte seguros na mesma compilation e pode resolver formatos selecionados de recorrencia diretamente recursiva. Metodos customizados com o mesmo nome nao sao tratados como operacoes BCL/LINQ conhecidas. Operacoes nao suportadas, inseguras, ciclicas, limitadas por budget, numericamente inconclusivas ou nao resolvidas continuam como `Unknown`.
 
 ## Resumo
 
@@ -15,6 +15,7 @@ O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, e pod
 | `BIG1002` | Materialization inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1003` | Ordering inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | `true` |
+| `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## BIG0001 - Estimated Algorithmic Complexity
@@ -31,7 +32,7 @@ O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, e pod
 
 ### Problema Detectado
 
-`BIG0001` e informational. Ele expoe a estimativa conhecida do analyzer para um metodo suportado, como `O(1)`, `O(n)`, `O(n log n)` ou `O(n^2)`. Na Phase 5, essa estimativa pode incluir complexidade propagada de callees fonte seguros.
+`BIG0001` e informational. Ele expoe a estimativa conhecida do analyzer para um metodo suportado, como `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`, `O(n^1.585)` ou `O(1.618^n)`. Na Phase 6, essa estimativa pode incluir complexidade propagada de callees fonte seguros e recursao direta resolvida.
 
 ### Exemplo
 
@@ -72,13 +73,39 @@ public sealed class Sample
 
 Quando `BIG0001` esta habilitado, `M` reporta `Estimated time complexity: O(n)`.
 
+Exemplo de recursao direta:
+
+```csharp
+public sealed class Sample
+{
+    public int BinarySearch(int n, bool left)
+    {
+        if (n <= 1)
+        {
+            return -1;
+        }
+
+        if (left)
+        {
+            return BinarySearch(n / 2, false);
+        }
+
+        return BinarySearch(n / 2, false);
+    }
+}
+```
+
+Quando `BIG0001` esta habilitado, `BinarySearch` reporta `Estimated time complexity: O(log n)`. As duas chamadas recursivas sintaticas estao em branches exclusivos e nao sao contadas como multiplicidade dois.
+
 ### Casos Que Nao Geram Diagnostic
 
 Nenhum diagnostic e reportado quando:
 
 - `BIG0001` nao esta habilitado pela configuracao do consumidor;
 - o resultado do metodo e `Unknown`;
-- o metodo depende de operacoes nao suportadas, inseguras, ciclicas, limitadas por budget ou nao resolvidas.
+- o metodo depende de operacoes nao suportadas, inseguras, ciclicas, limitadas por budget, numericamente inconclusivas ou nao resolvidas;
+- recursao direta sem evidencia de base case, com argumentos nao redutores, com trabalho local desconhecido ou fora das familias de recorrencia suportadas;
+- recursao mutua em vez de recursao direta.
 
 ### Configuracao
 
@@ -350,6 +377,67 @@ Desabilite com:
 dotnet_diagnostic.BIG1004.severity = none
 ```
 
+## BIG1005 - Exponential Recursive Growth
+
+| Propriedade | Valor |
+| --- | --- |
+| ID | `BIG1005` |
+| Titulo | `Exponential recursive growth` |
+| Categoria | `Complexity` |
+| Severidade padrao | `Info` |
+| Habilitado por padrao | `true` |
+| Localizacao | Identificador do metodo recursivo |
+| Mensagem | `Recursive method '{method}' has estimated exponential time complexity {complexity}` |
+
+### Problema Detectado
+
+`BIG1005` reporta um metodo diretamente recursivo suportado cuja recorrencia resolvida e exponencial. Ele e intencionalmente informational e nao prescreve memoization ou reescrita.
+
+### Exemplo
+
+```csharp
+public sealed class Sample
+{
+    int Fibonacci(int n)
+    {
+        if (n <= 1)
+        {
+            return n;
+        }
+
+        return Fibonacci(n - 1) + Fibonacci(n - 2);
+    }
+}
+```
+
+O diagnostic aponta para `Fibonacci` e reporta `O(1.618^n)`.
+
+### Casos Que Nao Geram Diagnostic
+
+Nenhum diagnostic e reportado para:
+
+- recursao resolvida polinomial ou logaritmica;
+- resultados de recorrencia unknown, unsupported, invalid ou numericamente inconclusivos;
+- evidencia de base case ausente;
+- argumentos recursivos nao redutores como `n` ou `n + 1`;
+- recursao mutua, que e detectada mas nao resolvida.
+
+### Configuracao
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1005.severity = warning
+```
+
+Desabilite com:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1005.severity = none
+```
+
 ## BIG9000 - Analyzer Execution Probe
 
 | Propriedade | Valor |
@@ -399,7 +487,7 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## Subconjunto Suportado de Operacoes Conhecidas
 
-A Phase 5 inclui um subconjunto pequeno e documentado:
+O analyzer inclui um subconjunto pequeno e documentado:
 
 - BCL: operacoes selecionadas de `List<T>`, `Dictionary<TKey,TValue>`, `HashSet<T>`, arrays e string.
 - LINQ imediatas ou terminais: `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max` e `Aggregate`.
@@ -420,4 +508,19 @@ A travessia e demand-driven: um callee fonte e analisado somente quando um calle
 
 A expansao e limitada por budgets internos: a profundidade maxima de chamadas e `5`, e o maximo de expansoes uncached de metodos fonte por analise raiz e `32`. Quando um boundary de budget e alcancado, a chamada afetada permanece `Unknown`; raizes independentes posteriores ainda podem analisar e cachear o mesmo metodo fonte quando o proprio budget permitir.
 
-Continuam fora de escopo: solucao de recursao, dispatch virtual/interface completo, assemblies externos, construtores, propriedades, operadores, local functions, lambdas como alvos independentes, call graph de compilation inteira e analise de solution inteira. Ciclos sao detectados mas tratados internamente como `Unknown`; recursao nao e resolvida na Phase 5. A Phase 6 e responsavel por solucao de recorrencias e chamadas recursivas.
+Continuam fora de escopo: dispatch virtual/interface completo, assemblies externos, construtores, propriedades, operadores, local functions, lambdas como alvos independentes, call graph de compilation inteira e analise de solution inteira. Ciclos sao detectados e continuam seguros; recursao mutua e detectada, mas nao resolvida.
+
+## Escopo Suportado de Recursao Direta
+
+A Phase 6 resolve apenas recursao direta limitada. Uma chamada recursiva precisa resolver semanticamente para a mesma definicao de metodo, o metodo precisa fornecer evidencia compativel de base case, o argumento recursivo precisa ser comprovadamente redutor e o trabalho local nao recursivo precisa ser conhecido.
+
+Familias de recorrencia suportadas:
+
+- soma/decremento: `T(n)=T(n-c)+f(n)` para `f(n)` polylogaritmico suportado;
+- recursao direta exponencial simples: `aT(n-c)+polylog` para o subconjunto de coeficiente constante suportado, incluindo Fibonacci `T(n-1)+T(n-2)+1`;
+- Master Theorem: um termo de escala `aT(n/b)+f(n)` para tolls polylogaritmicos suportados;
+- subconjunto restrito/limitado de Akra-Bazzi: termos recursivos apenas por escala, sem perturbacoes, e tolls polylogaritmicos suportados.
+
+Exemplos incluem `T(n)=T(n-1)+1 => O(n)`, `T(n)=T(n-1)+n => O(n^2)`, `T(n)=T(n-1)+log n => O(n log n)`, `2T(n-1)+1 => O(2^n)`, `T(n/2)+1 => O(log n)`, `2T(n/2)+n => O(n log n)`, `3T(n/2)+n => O(n^1.585)` e `T(n/3)+T(2n/3)+n => O(n log n)`.
+
+O analyzer nao implementa Akra-Bazzi completo, polinomios caracteristicos arbitrarios, parsing simbolico de recorrencias, integracao numerica geral, MathNet, SymPy, Workspaces ou referencias a projetos solver herdados. Casos nao suportados permanecem `Unknown`.

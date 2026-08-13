@@ -24,9 +24,15 @@ internal static class ComplexityFactory
 
     internal static ComplexityExpression Polynomial(ComplexityVariable variable, int degree)
     {
-        return degree == 0
+        return Polynomial(variable, (double)degree);
+    }
+
+    internal static ComplexityExpression Polynomial(ComplexityVariable variable, double degree)
+    {
+        double normalizedDegree = PolynomialExponentNormalizer.Normalize(degree);
+        return normalizedDegree == 0
             ? Constant()
-            : new PolynomialLogComplexity(variable, degree, logExponent: 0);
+            : new PolynomialLogComplexity(variable, normalizedDegree, logExponent: 0);
     }
 
     internal static ComplexityExpression Exponential(ComplexityVariable variable, double @base)

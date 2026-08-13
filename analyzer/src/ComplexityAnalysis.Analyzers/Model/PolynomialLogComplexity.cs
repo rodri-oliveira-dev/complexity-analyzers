@@ -5,25 +5,26 @@ namespace ComplexityAnalysis.Analyzers.Model;
 internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable<PolynomialLogComplexity>
 {
     internal PolynomialLogComplexity(ComplexityVariable variable, int polynomialDegree, int logExponent)
+        : this(variable, (double)polynomialDegree, logExponent)
+    {
+    }
+
+    internal PolynomialLogComplexity(ComplexityVariable variable, double polynomialDegree, int logExponent)
     {
         Variable = variable ?? throw new ArgumentNullException(nameof(variable));
-
-        if (polynomialDegree < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(polynomialDegree), "Polynomial degree must be non-negative.");
-        }
 
         if (logExponent < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(logExponent), "Log exponent must be non-negative.");
         }
 
-        if (polynomialDegree == 0 && logExponent == 0)
+        double normalizedPolynomialDegree = PolynomialExponentNormalizer.Normalize(polynomialDegree);
+        if (IsZero(normalizedPolynomialDegree) && logExponent == 0)
         {
             throw new ArgumentException("Use ConstantComplexity for O(1).", nameof(polynomialDegree));
         }
 
-        PolynomialDegree = polynomialDegree;
+        PolynomialDegree = normalizedPolynomialDegree;
         LogExponent = logExponent;
     }
 
@@ -32,7 +33,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
         get;
     }
 
-    internal int PolynomialDegree
+    internal double PolynomialDegree
     {
         get;
     }
@@ -45,7 +46,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
     public bool Equals(PolynomialLogComplexity? other)
     {
         return other is not null
-            && PolynomialDegree == other.PolynomialDegree
+            && Math.Abs(PolynomialDegree - other.PolynomialDegree) <= PolynomialExponentNormalizer.IntegerTolerance
             && LogExponent == other.LogExponent
             && Variable.Equals(other.Variable);
     }
@@ -60,7 +61,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
         unchecked
         {
             int hash = Variable.GetHashCode();
-            hash = (hash * 397) ^ PolynomialDegree;
+            hash = (hash * 397) ^ PolynomialDegree.GetHashCode();
             hash = (hash * 397) ^ LogExponent;
             return hash;
         }
@@ -68,7 +69,7 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
 
     internal override string ToBigOBody()
     {
-        return PolynomialDegree == 0
+        return IsZero(PolynomialDegree)
             ? FormatLogTerm()
             : FormatPolynomialLogBody();
     }
@@ -82,13 +83,13 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
 
     private string FormatPolynomialTerm()
     {
-        return PolynomialDegree switch
-        {
-            1 => Variable.Name,
-            2 => Variable.Name + "\u00b2",
-            3 => Variable.Name + "\u00b3",
-            _ => Variable.Name + "^" + PolynomialDegree.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        };
+        return IsEquivalentDegree(1)
+            ? Variable.Name
+            : IsEquivalentDegree(2)
+            ? Variable.Name + "\u00b2"
+            : IsEquivalentDegree(3)
+            ? Variable.Name + "\u00b3"
+            : Variable.Name + "^" + PolynomialExponentNormalizer.Format(PolynomialDegree);
     }
 
     private string FormatLogTerm()
@@ -96,5 +97,15 @@ internal sealed class PolynomialLogComplexity : ComplexityExpression, IEquatable
         return LogExponent == 1
             ? "log " + Variable.Name
             : "log^" + LogExponent.ToString(System.Globalization.CultureInfo.InvariantCulture) + " " + Variable.Name;
+    }
+
+    private bool IsEquivalentDegree(double degree)
+    {
+        return Math.Abs(PolynomialDegree - degree) <= PolynomialExponentNormalizer.IntegerTolerance;
+    }
+
+    private static bool IsZero(double value)
+    {
+        return Math.Abs(value) <= PolynomialExponentNormalizer.IntegerTolerance;
     }
 }

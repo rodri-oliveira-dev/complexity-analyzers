@@ -2,7 +2,7 @@
 
 [English](configuration.md) | [Portugues (Brasil)](../pt-BR/configuration.md)
 
-`ComplexityAnalysis.Analyzers` uses standard Roslyn diagnostic severity configuration. Phase 5 does not define custom analyzer options.
+`ComplexityAnalysis.Analyzers` uses standard Roslyn diagnostic severity configuration. Phase 6 does not define custom analyzer options.
 
 ## .editorconfig Format
 
@@ -34,6 +34,7 @@ The compiler and SDK determine the exact build behavior for each configured seve
 | `BIG1002` | `Info` | `true` |
 | `BIG1003` | `Info` | `true` |
 | `BIG1004` | `Info` | `true` |
+| `BIG1005` | `Info` | `true` |
 | `BIG9000` | `Info` | `false` |
 
 ## Recommended Local Visibility
@@ -55,6 +56,7 @@ dotnet_diagnostic.BIG1001.severity = warning
 dotnet_diagnostic.BIG1002.severity = warning
 dotnet_diagnostic.BIG1003.severity = warning
 dotnet_diagnostic.BIG1004.severity = warning
+dotnet_diagnostic.BIG1005.severity = warning
 ```
 
 Keep the infrastructure probe disabled in normal projects:
@@ -85,19 +87,21 @@ dotnet_diagnostic.BIG1001.severity = none
 dotnet_diagnostic.BIG1002.severity = none
 dotnet_diagnostic.BIG1003.severity = none
 dotnet_diagnostic.BIG1004.severity = none
+dotnet_diagnostic.BIG1005.severity = none
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
 ## What Is Not Configurable
 
-Phase 5 does not expose options for:
+Phase 6 does not expose options for:
 
 - Big-O thresholds;
 - custom operation mappings;
 - changing BCL or LINQ mapping behavior;
-- recursion handling;
+- recurrence-family selection, theorem thresholds, or numerical tolerances;
 - call graph analysis;
 - interprocedural call-depth or method-budget limits;
+- full Akra-Bazzi, mutual recursion solving, or general symbolic recurrence solving;
 - code fixes;
 - memory, parallel, or probabilistic complexity.
 

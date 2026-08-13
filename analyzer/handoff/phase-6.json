@@ -1,0 +1,54 @@
+{
+  "delivery": "Phase 6 \u2014 Recursion & Recurrence Solving",
+  "currentObjective": "Phase 6 complete",
+  "completedStep": "11/11 \u2014 validation and closure",
+  "decisions": [
+    "Phase 6 solves only supported direct recursion with semantic self-call identity, compatible base-case evidence, proven reducing arguments, path-aware recursive-call multiplicity, and known non-recursive local work.",
+    "Recurrence extraction and recurrence solving remain separate internal responsibilities under analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Recursion/.",
+    "The recurrence model is internal to the isolated analyzer and independent from inherited solver/core projects.",
+    "Supported solver families are summation/decrement, simple constant-coefficient exponential recurrences including Fibonacci-like order-2 forms, Master Theorem for one scaled recursive term, and restricted/bounded Akra-Bazzi for scale-only unequal splits.",
+    "Fractional polynomial powers and exponential bases use deterministic invariant formatting with bounded normalization.",
+    "Unsupported, invalid, numerically inconclusive, unknown-local-work, missing-base-case, non-reducing, and mutual-recursive cases remain Unknown.",
+    "BIG0001 reports solved recursive estimates only when enabled; BIG1005 reports only solved exponential direct-recursive growth."
+  ],
+  "constraints": [
+    "Do not modify inherited projects outside analyzer/.",
+    "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
+    "Do not add MathNet.Numerics, SymPy, Microsoft.CodeAnalysis.Workspaces, or Microsoft.CodeAnalysis.CSharp.Workspaces.",
+    "Do not claim full Akra-Bazzi, general symbolic recurrence solving, mutual recursion solving, memoization detection, or whole-compilation recurrence scanning."
+  ],
+  "relevantFiles": [
+    "analyzer/specs/phase-6/recursion-solving.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Recursion/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/ActionableComplexityDiagnosticAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/PhaseSixRecurrenceContractTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/RecursiveCallAnalyzerTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/RecurrenceExtractorTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/RecurrenceSolverTests.cs",
+    "analyzer/docs/en/analyzers.md",
+    "analyzer/docs/pt-BR/analyzers.md"
+  ],
+  "validations": [
+    "All Phase 6 acceptance criteria were checked against code, tests, diagnostics, documentation, dependency audit, package inspection, and upstream isolation.",
+    "Recurrence extraction audit covered direct recursion semantic identity, base-case evidence, reducing arguments, branch-exclusive calls, sequential multiplicity, local-work extraction, and mutual recursion boundaries.",
+    "Solver matrix covered summation/decrement, simple exponential recurrence, Fibonacci-like recurrence, Master Theorem cases 1/2/3, fractional Master exponent, restricted Akra-Bazzi unequal split, unsupported recurrence, and numerical inconclusiveness.",
+    "False-positive audit confirmed missing base case, non-reducing recursion, mutual recursion, unsupported recurrence, numerical inconclusive result, and unknown local work remain Unknown.",
+    "Diagnostic audit confirmed BIG0001/BIG1001/BIG1002/BIG1003/BIG1004/BIG1005/BIG9000 alignment across SupportedDiagnostics, DiagnosticDescriptors, AnalyzerReleases.Unshipped.md, docs/en/analyzers.md, and docs/pt-BR/analyzers.md.",
+    "Dependency audit found no MathNet.Numerics, SymPy, Microsoft.CodeAnalysis.Workspaces, Microsoft.CodeAnalysis.CSharp.Workspaces, or inherited ProjectReference in the analyzer product.",
+    "Analyzer validation passed: dotnet restore; dotnet build --configuration Release --no-restore; dotnet test --configuration Release --no-build with 472 passed, 0 failed, 0 skipped.",
+    "Local Release package 0.6.0-phase6-validation was inspected: analyzer DLL under analyzers/dotnet/cs, README.md included, no lib assets, no dependency groups, and no forbidden assemblies.",
+    "Upstream isolation was confirmed: no files outside analyzer/ differ from the initial HEAD; root restore/build passed with an isolated NuGet cache and redirected MkDocs output after the default environment hit a corrupt global NuGet metadata file and a docs/api file lock."
+  ],
+  "knownPendingItems": [
+    "Mutual recursion remains unsupported and resolves conservatively to Unknown.",
+    "General symbolic recurrence solving is intentionally unsupported.",
+    "Full Akra-Bazzi with perturbations or symbolic integrals is intentionally unsupported."
+  ],
+  "nextStep": "Consult the current repository roadmap/spec before defining any new phase.",
+  "lastCommit": {
+    "hash": "df2f92b22dca4b2b7d89ad12c22d1232e3c2665e",
+    "message": "test: harden recurrence solver behavior"
+  }
+}

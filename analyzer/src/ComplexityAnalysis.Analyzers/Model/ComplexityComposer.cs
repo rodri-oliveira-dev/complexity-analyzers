@@ -47,7 +47,7 @@ internal static class ComplexityComposer
         };
     }
 
-    private static ComplexityExpression PolynomialLog(ComplexityVariable variable, int polynomialDegree, int logExponent)
+    private static ComplexityExpression PolynomialLog(ComplexityVariable variable, double polynomialDegree, int logExponent)
     {
         return polynomialDegree == 0 && logExponent == 0
             ? ComplexityFactory.Constant()

@@ -27,6 +27,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.MaterializationInsideIteration,
             DiagnosticDescriptors.OrderingInsideIteration,
             DiagnosticDescriptors.InputDependentCallInsideIteration,
+            DiagnosticDescriptors.ExponentialRecursiveGrowth,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)

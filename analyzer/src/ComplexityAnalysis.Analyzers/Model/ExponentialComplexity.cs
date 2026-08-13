@@ -1,6 +1,4 @@
 using System;
-using System.Globalization;
-
 namespace ComplexityAnalysis.Analyzers.Model;
 
 internal sealed class ExponentialComplexity : ComplexityExpression, IEquatable<ExponentialComplexity>
@@ -9,12 +7,7 @@ internal sealed class ExponentialComplexity : ComplexityExpression, IEquatable<E
     {
         Variable = variable ?? throw new ArgumentNullException(nameof(variable));
 
-        if (double.IsNaN(@base) || double.IsInfinity(@base) || @base <= 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(@base), "Exponential base must be finite and greater than one.");
-        }
-
-        Base = @base;
+        Base = ExponentialBaseNormalizer.Normalize(@base);
     }
 
     internal ComplexityVariable Variable
@@ -49,6 +42,6 @@ internal sealed class ExponentialComplexity : ComplexityExpression, IEquatable<E
 
     internal override string ToBigOBody()
     {
-        return Base.ToString("G", CultureInfo.InvariantCulture) + "^" + Variable.Name;
+        return ExponentialBaseNormalizer.Format(Base) + "^" + Variable.Name;
     }
 }

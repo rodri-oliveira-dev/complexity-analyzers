@@ -2,7 +2,7 @@
 
 [English](../en/getting-started.md) | Portugues (Brasil)
 
-Esta pagina explica como compilar, testar, empacotar e consumir o workspace isolado do analyzer ate a Phase 5.
+Esta pagina explica como compilar, testar, empacotar e consumir o workspace isolado do analyzer ate a Phase 6.
 
 ## Pre-Requisitos
 
@@ -31,7 +31,7 @@ Crie um pacote analyzer local:
 
 ```bash
 cd analyzer
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.5.0-phase5-local
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.6.0-phase6-local
 ```
 
 O pacote e um pacote Roslyn analyzer. O assembly do analyzer e empacotado em:
@@ -50,11 +50,11 @@ Um fluxo local possivel e:
 
 ```bash
 cd analyzer
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.5.0-phase5-local --output artifacts/local-packages
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.6.0-phase6-local --output artifacts/local-packages
 dotnet new console -o artifacts/tmp/AnalyzerConsumer
 cd artifacts/tmp/AnalyzerConsumer
 dotnet nuget add source ../../local-packages --name complexity-analysis-local
-dotnet add package ComplexityAnalysis.Analyzers --version 0.5.0-phase5-local --source complexity-analysis-local
+dotnet add package ComplexityAnalysis.Analyzers --version 0.6.0-phase6-local --source complexity-analysis-local
 ```
 
 Se necessario, aponte a fonte NuGet local para o diretorio que contem o `.nupkg` gerado.
@@ -74,7 +74,7 @@ O analyzer nao e uma biblioteca de runtime. O codigo da aplicacao nao chama seus
 
 ## Smoke Tests de Diagnostics
 
-`BIG1001`, `BIG1002`, `BIG1003` e `BIG1004` sao habilitados por padrao como diagnostics `Info`. A visibilidade no build depende do projeto consumidor e das configuracoes do SDK. Voce pode promover uma regra localmente:
+`BIG1001`, `BIG1002`, `BIG1003`, `BIG1004` e `BIG1005` sao habilitados por padrao como diagnostics `Info`. A visibilidade no build depende do projeto consumidor e das configuracoes do SDK. Voce pode promover uma regra localmente:
 
 ```ini
 [*.cs]
@@ -90,7 +90,15 @@ Promova o diagnostic de chamada fonte em loop da Phase 5:
 dotnet_diagnostic.BIG1004.severity = warning
 ```
 
-`BIG0001` e desabilitado por padrao. Habilite quando quiser estimativas de complexidade por metodo, incluindo custos de metodos fonte suportados propagados na Phase 5:
+Promova o diagnostic de recursao exponencial da Phase 6:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1005.severity = warning
+```
+
+`BIG0001` e desabilitado por padrao. Habilite quando quiser estimativas de complexidade por metodo, incluindo custos de metodos fonte suportados e recursao direta resolvida:
 
 ```ini
 [*.cs]
