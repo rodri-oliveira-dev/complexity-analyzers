@@ -167,6 +167,36 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_reports_interprocedural_estimated_complexity_when_enabled()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public void M(int[] values)
+                {
+                    Helper(values);
+                }
+
+                private void Helper(int[] items)
+                {
+                    foreach (var item in items)
+                    {
+                        var x = item + 1;
+                    }
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Diagnostic diagnostic = diagnostics
+            .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+            .Single(diagnostic => GetDiagnosticText(diagnostic) == "M");
+
+        Assert.Equal("Estimated time complexity: O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
     public async Task Analyzer_does_not_report_estimated_complexity_for_unknown_methods()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
@@ -701,14 +731,17 @@ public sealed class ComplexityAnalyzerTests
 
     private static void AssertDiagnosticText(Diagnostic diagnostic, string expectedText)
     {
+        Assert.Equal(expectedText, GetDiagnosticText(diagnostic));
+    }
+
+    private static string GetDiagnosticText(Diagnostic diagnostic)
+    {
         SyntaxTree sourceTree = diagnostic.Location.SourceTree
             ?? throw new System.InvalidOperationException("Expected a source location.");
-        string diagnosticText = sourceTree
+        return sourceTree
             .GetText()
             .GetSubText(diagnostic.Location.SourceSpan)
             .ToString();
-
-        Assert.Equal(expectedText, diagnosticText);
     }
 
     private static string FormatDeterministicDiagnostic(Diagnostic diagnostic)

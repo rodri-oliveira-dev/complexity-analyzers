@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 
+using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -54,7 +55,7 @@ internal sealed class BasicOperationAnalyzer
             AssignmentExpressionSyntax assignment => AnalyzeAssignment(assignment),
             PrefixUnaryExpressionSyntax prefixUnary => AnalyzePrefixUnary(prefixUnary),
             PostfixUnaryExpressionSyntax postfixUnary => AnalyzePostfixUnary(postfixUnary),
-            InvocationExpressionSyntax invocation => new KnownOperationComplexityAnalyzer(context).AnalyzeInvocation(invocation),
+            InvocationExpressionSyntax invocation => new InterproceduralInvocationAnalyzer(context).AnalyzeInvocation(invocation),
             MemberAccessExpressionSyntax memberAccess => AnalyzeMemberAccess(memberAccess),
             ElementAccessExpressionSyntax elementAccess => AnalyzeElementAccess(elementAccess),
             _ => ComplexityFactory.Unknown(),

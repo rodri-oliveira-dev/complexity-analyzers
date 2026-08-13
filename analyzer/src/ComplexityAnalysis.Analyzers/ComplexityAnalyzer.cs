@@ -69,6 +69,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         ComplexityExpression complexity = new MethodComplexityExtractor().AnalyzeMethod(
             methodDeclaration,
             context.SemanticModel,
+            interproceduralContext,
             context.CancellationToken);
 
         if (complexity is UnknownComplexity)

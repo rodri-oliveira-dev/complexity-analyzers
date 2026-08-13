@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 5 \u2014 Interprocedural Analysis",
-  "currentObjective": "Argument binding and complexity substitution complete",
-  "completedStep": "4/9 \u2014 argument binding and complexity substitution",
+  "currentObjective": "Demand-driven interprocedural propagation complete",
+  "completedStep": "5/9 \u2014 demand-driven interprocedural propagation",
   "decisions": [
     "InterproceduralAnalysisContext is created per Roslyn Compilation and owns its own template cache; no static or cross-compilation cache is used.",
     "Template cache keys normalize to method OriginalDefinition through a SymbolEqualityComparer-based MethodSymbolKey so overloads and constructed generic calls keep semantic identity.",
@@ -9,7 +9,9 @@
     "The cache uses ConcurrentDictionary entries with explicit InProgress and Completed states instead of Lazy<T>, so future cycle handling does not need self-waiting cache initialization.",
     "AnalysisBudget remains internal with MaximumCallDepth = 5 and MaximumMethodsPerRootAnalysis = 32; InterproceduralRootAnalysisState owns depth, expanded method count, active path, and CancellationToken per root.",
     "ArgumentComplexityBinder maps eligible callee parameter variables to caller-side ComplexityExpression values through proven direct arguments, known Length/Count size properties, constants, and simple constant affine/scaled transformations.",
-    "ComplexitySubstitution rewrites the closed Phase 2 model without mutating cached templates; unknown or unproven variable bindings remain Unknown."
+    "ComplexitySubstitution rewrites the closed Phase 2 model without mutating cached templates; unknown or unproven variable bindings remain Unknown.",
+    "MethodComplexityExtractor now analyzes safe source invocations on demand after known-operation resolution, caches caller-independent callee templates, substitutes arguments per call site, and composes the substituted result with the caller through ComplexityComposer.",
+    "Callee methods may live in a different SyntaxTree; source callee analysis obtains the correct SemanticModel from the per-compilation Compilation."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -26,6 +28,7 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/CallTargetResolutionKind.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/SourceMethodResolver.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/InterproceduralInvocationAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/ArgumentComplexityBinder.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/ComplexitySubstitution.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
@@ -50,15 +53,18 @@
     "Release tests passed for per-compilation context, cache and analysis budget: 263 passed, 0 failed, 0 skipped.",
     "Before argument binding step, git status was clean on branch main at 593b26b7d93aa099e89bf8f5f421e6df57210e07.",
     "Release build passed for argument binding and complexity substitution.",
-    "Release tests passed for argument binding and complexity substitution: 279 passed, 0 failed, 0 skipped."
+    "Release tests passed for argument binding and complexity substitution: 279 passed, 0 failed, 0 skipped.",
+    "Before demand-driven propagation, git status was clean on branch main at 62fddb1a933aa992f7c4fae48edc7b2adab6dcd0.",
+    "Release build passed for demand-driven interprocedural propagation.",
+    "Release tests passed for demand-driven interprocedural propagation: 293 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "Implement bounded traversal and cycle detection without recursion solving.",
-    "Integrate known interprocedural results into BIG0001 and consider BIG1004 only in a later implementation step."
+    "Harden cycle, budget, and concurrency behavior without recursion solving.",
+    "Consider BIG1004 only in a later implementation step."
   ],
-  "nextStep": "5/9 \u2014 demand-driven interprocedural propagation",
+  "nextStep": "6/9 \u2014 cycles, limits and concurrency hardening",
   "lastCommit": {
-    "hash": "593b26b7d93aa099e89bf8f5f421e6df57210e07",
-    "message": "feat: add interprocedural analysis context"
+    "hash": "62fddb1a933aa992f7c4fae48edc7b2adab6dcd0",
+    "message": "feat: bind interprocedural complexity arguments"
   }
 }

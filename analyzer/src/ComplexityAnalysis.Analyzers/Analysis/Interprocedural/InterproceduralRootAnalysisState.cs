@@ -11,13 +11,13 @@ internal sealed class InterproceduralRootAnalysisState
     private InterproceduralRootAnalysisState(
         AnalysisBudget budget,
         int currentDepth,
-        int expandedMethodCount,
+        RootExpansionCounter expansionCounter,
         ImmutableHashSet<MethodSymbolKey> activeCallPath,
         CancellationToken cancellationToken)
     {
         Budget = budget;
         CurrentDepth = currentDepth;
-        ExpandedMethodCount = expandedMethodCount;
+        ExpansionCounter = expansionCounter ?? throw new ArgumentNullException(nameof(expansionCounter));
         ActiveCallPath = activeCallPath ?? throw new ArgumentNullException(nameof(activeCallPath));
         CancellationToken = cancellationToken;
     }
@@ -33,9 +33,7 @@ internal sealed class InterproceduralRootAnalysisState
     }
 
     internal int ExpandedMethodCount
-    {
-        get;
-    }
+        => ExpansionCounter.Count;
 
     internal CancellationToken CancellationToken
     {
@@ -43,6 +41,11 @@ internal sealed class InterproceduralRootAnalysisState
     }
 
     private ImmutableHashSet<MethodSymbolKey> ActiveCallPath
+    {
+        get;
+    }
+
+    private RootExpansionCounter ExpansionCounter
     {
         get;
     }
@@ -60,7 +63,7 @@ internal sealed class InterproceduralRootAnalysisState
         return new InterproceduralRootAnalysisState(
             budget,
             currentDepth: 0,
-            expandedMethodCount: 0,
+            new RootExpansionCounter(),
             ImmutableHashSet.Create(MethodSymbolKey.Comparer, MethodSymbolKey.Create(rootMethodSymbol)),
             cancellationToken);
     }
@@ -98,7 +101,7 @@ internal sealed class InterproceduralRootAnalysisState
             return false;
         }
 
-        if (ExpandedMethodCount >= Budget.MaximumMethodsPerRootAnalysis)
+        if (!ExpansionCounter.TryReserve(Budget.MaximumMethodsPerRootAnalysis))
         {
             nextState = this;
             boundaryResult = InterproceduralAnalysisResult.BudgetExceeded("Maximum methods per root analysis was reached.");
@@ -108,7 +111,7 @@ internal sealed class InterproceduralRootAnalysisState
         nextState = new InterproceduralRootAnalysisState(
             Budget,
             CurrentDepth + 1,
-            ExpandedMethodCount + 1,
+            ExpansionCounter,
             ActiveCallPath.Add(methodKey),
             CancellationToken);
         boundaryResult = InterproceduralAnalysisResult.Unknown(string.Empty);
@@ -126,9 +129,34 @@ internal sealed class InterproceduralRootAnalysisState
             ? new InterproceduralRootAnalysisState(
                 Budget,
                 Math.Max(0, CurrentDepth - 1),
-                ExpandedMethodCount,
+                ExpansionCounter,
                 ActiveCallPath.Remove(methodKey),
                 CancellationToken)
             : this;
+    }
+
+    private sealed class RootExpansionCounter
+    {
+        private int count;
+
+        internal int Count
+            => Volatile.Read(ref count);
+
+        internal bool TryReserve(int maximumCount)
+        {
+            while (true)
+            {
+                int current = Volatile.Read(ref count);
+                if (current >= maximumCount)
+                {
+                    return false;
+                }
+
+                if (Interlocked.CompareExchange(ref count, current + 1, current) == current)
+                {
+                    return true;
+                }
+            }
+        }
     }
 }
