@@ -4,6 +4,8 @@ This directory contains repeatable performance validation for `ComplexityAnalysi
 
 The primary CI-friendly harness is the xUnit suite in `tests/ComplexityAnalysis.Analyzers.Tests/PerformanceSyntheticCorpusTests.cs`. It builds deterministic synthetic sources in memory and checks structural performance invariants instead of narrow elapsed-time thresholds.
 
+The analyzer is designed to be bounded. Source-method traversal defaults to call depth `5` and `32` uncached source-method expansions per root analysis. Public configuration can lower those values or raise them up to hard limits of `16` and `128`.
+
 ## Workloads
 
 - 520 trivial methods.
@@ -50,7 +52,13 @@ The useful signal is the analyzer execution summary emitted by the compiler for 
 - Unreachable methods are not expanded into the interprocedural cache.
 - Traversal stops at configured depth and method budgets.
 - Analyzer options are cached per syntax tree outside repeated method analysis.
+- Semantic models are reused per syntax tree within the compilation context.
+- Solved direct-recursion results are reused when possible.
+- Analyzer hot paths stay free of network access, filesystem I/O, process launch, and telemetry.
+- Generated code handling, concurrent execution, and cancellation remain explicit.
 
 ## What is not a gate yet
 
 Elapsed time printed by the test harness is informational. A single machine's milliseconds are not an SLA, and this baseline intentionally does not fail CI because a runner is modestly slower.
+
+Use larger timing changes as an investigation signal together with structural regressions, not as a standalone proof of analyzer quality.

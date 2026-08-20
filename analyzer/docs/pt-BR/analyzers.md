@@ -2,7 +2,7 @@
 
 [English](../en/analyzers.md) | Portugues (Brasil)
 
-Esta pagina e o catalogo publico dos diagnostics expostos por `ComplexityAnalysis.Analyzers` na Phase 6.
+Esta pagina e o catalogo publico dos diagnostics expostos por `ComplexityAnalysis.Analyzers` ate a Phase 7.
 
 O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, pode propagar complexidade de metodos fonte seguros na mesma compilation e pode resolver formatos selecionados de recorrencia diretamente recursiva. Metodos customizados com o mesmo nome nao sao tratados como operacoes BCL/LINQ conhecidas. Operacoes nao suportadas, inseguras, ciclicas, limitadas por budget, numericamente inconclusivas ou nao resolvidas continuam como `Unknown`.
 
@@ -16,6 +16,7 @@ O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, pode 
 | `BIG1003` | Ordering inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | `true` |
+| `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## BIG0001 - Estimated Algorithmic Complexity
@@ -32,7 +33,7 @@ O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, pode 
 
 ### Problema Detectado
 
-`BIG0001` e informational. Ele expoe a estimativa conhecida do analyzer para um metodo suportado, como `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`, `O(n^1.585)` ou `O(1.618^n)`. Na Phase 6, essa estimativa pode incluir complexidade propagada de callees fonte seguros e recursao direta resolvida.
+`BIG0001` e informational. Ele expoe a estimativa conhecida do analyzer para um metodo suportado, como `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`, `O(n^1.585)` ou `O(1.618^n)`. Essa estimativa pode incluir complexidade propagada de callees fonte seguros e recursao direta resolvida.
 
 ### Exemplo
 
@@ -438,6 +439,90 @@ Desabilite com:
 dotnet_diagnostic.BIG1005.severity = none
 ```
 
+## BIG1006 - Method Complexity Exceeds Configured Threshold
+
+| Propriedade | Valor |
+| --- | --- |
+| ID | `BIG1006` |
+| Titulo | `Method complexity exceeds configured threshold` |
+| Categoria | `Complexity` |
+| Severidade padrao | `Info` |
+| Habilitado por padrao | `true` |
+| Localizacao | Identificador do metodo |
+| Mensagem | `Method '{method}' has estimated complexity {actual}, which exceeds the configured maximum {threshold}` |
+
+### Problema Detectado
+
+`BIG1006` reporta um metodo cuja complexidade estimada conhecida e maior que o threshold configurado em `complexity_analyzers.maximum_complexity`.
+
+Embora o descriptor seja habilitado por default, a regra e funcionalmente opt-in porque o threshold default e `none`.
+
+### Exemplo
+
+```csharp
+public sealed class Sample
+{
+    public int Quadratic(int[] values)
+    {
+        var total = 0;
+        foreach (var outer in values)
+        {
+            foreach (var inner in values)
+            {
+                total += outer + inner;
+            }
+        }
+
+        return total;
+    }
+}
+```
+
+Com esta configuracao, `Quadratic` reporta `BIG1006` porque `O(n^2)` excede `O(n log n)`:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_complexity = n_log_n
+dotnet_diagnostic.BIG1006.severity = warning
+```
+
+### Casos Que Nao Geram Diagnostic
+
+Nenhum diagnostic e reportado quando:
+
+- `complexity_analyzers.maximum_complexity` e `none` ou invalido;
+- a estimativa do metodo e `Unknown`;
+- a estimativa e menor ou igual ao threshold configurado;
+- a estimativa e o threshold sao incomparaveis pelo modelo atual, incluindo algumas expressoes multivariadas sobre variaveis independentes.
+
+`BIG1006` nao e uma prova matematica universal. Ele compara apenas formatos de complexidade que o analyzer comprovou e consegue comparar com seguranca.
+
+### Configuracao
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_complexity = n_log_n
+dotnet_diagnostic.BIG1006.severity = warning
+```
+
+Desabilite reporting de threshold:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_complexity = none
+```
+
+Desabilite o diagnostic independentemente:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1006.severity = none
+```
+
 ## BIG9000 - Analyzer Execution Probe
 
 | Propriedade | Valor |
@@ -506,13 +591,13 @@ A analise interprocedural de metodos fonte e limitada a metodos ordinarios na me
 
 A travessia e demand-driven: um callee fonte e analisado somente quando um caller analisado alcanca aquela invocacao. O analyzer nao constroi um call graph obrigatorio da compilation inteira e nao pre-analisa todas as syntax trees para propagacao interprocedural.
 
-A expansao e limitada por budgets internos: a profundidade maxima de chamadas e `5`, e o maximo de expansoes uncached de metodos fonte por analise raiz e `32`. Quando um boundary de budget e alcancado, a chamada afetada permanece `Unknown`; raizes independentes posteriores ainda podem analisar e cachear o mesmo metodo fonte quando o proprio budget permitir.
+A expansao e limitada por opcoes publicas com hard limits. A profundidade maxima default de chamadas e `5`, configuravel ate `16`. O maximo default de expansoes uncached de metodos fonte por analise raiz e `32`, configuravel ate `128`. Quando uma fronteira de budget e alcancada, a chamada afetada permanece `Unknown`; raizes independentes posteriores ainda podem analisar e cachear o mesmo metodo fonte quando o proprio budget permitir.
 
 Continuam fora de escopo: dispatch virtual/interface completo, assemblies externos, construtores, propriedades, operadores, local functions, lambdas como alvos independentes, call graph de compilation inteira e analise de solution inteira. Ciclos sao detectados e continuam seguros; recursao mutua e detectada, mas nao resolvida.
 
 ## Escopo Suportado de Recursao Direta
 
-A Phase 6 resolve apenas recursao direta limitada. Uma chamada recursiva precisa resolver semanticamente para a mesma definicao de metodo, o metodo precisa fornecer evidencia compativel de base case, o argumento recursivo precisa ser comprovadamente redutor e o trabalho local nao recursivo precisa ser conhecido.
+O analyzer resolve apenas recursao direta limitada. Uma chamada recursiva precisa resolver semanticamente para a mesma definicao de metodo, o metodo precisa fornecer evidencia compativel de base case, o argumento recursivo precisa ser comprovadamente redutor e o trabalho local nao recursivo precisa ser conhecido.
 
 Familias de recorrencia suportadas:
 

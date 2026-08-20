@@ -2,7 +2,7 @@
 
 [English](architecture.md) | [Portugues (Brasil)](../pt-BR/architecture.md)
 
-`ComplexityAnalysis.Analyzers` is an isolated Roslyn analyzer package workspace. Through Phase 6, it contains analyzer infrastructure, a Roslyn-free complexity model, method extraction, semantic known-operation mapping, bounded source-method interprocedural analysis, bounded direct-recursion recurrence solving, and public diagnostics.
+`ComplexityAnalysis.Analyzers` is an isolated Roslyn analyzer package workspace. Through Phase 7, it contains analyzer infrastructure, a Roslyn-free complexity model, method extraction, semantic known-operation mapping, bounded source-method interprocedural analysis, bounded direct-recursion recurrence solving, analyzer configuration, performance validation, package contract validation, and public diagnostics.
 
 ## Current Pipeline
 
@@ -15,6 +15,7 @@ Roslyn Syntax + SemanticModel
     v
 Analysis
     |
+    +-- analyzer config options
     +-- input-size resolution
     +-- basic operations
     +-- loop bounds
@@ -41,6 +42,7 @@ DiagnosticAnalyzer
     +-- BIG1003 ordering inside iteration
     +-- BIG1004 source call inside iteration
     +-- BIG1005 exponential recursive growth
+    +-- BIG1006 configured threshold exceeded
     `-- BIG9000 infrastructure probe
 ```
 
@@ -100,7 +102,7 @@ The analysis layer lives under:
 analyzer/src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-It starts from one method at a time. Phase 6 can follow supported source-method calls on demand and solve selected direct recursion, but it does not build a whole-compilation call graph, solve mutual recursion, or inspect unrelated method bodies.
+It starts from one method at a time. The analyzer can follow supported source-method calls on demand and solve selected direct recursion, but it does not build a whole-compilation call graph, solve mutual recursion, or inspect unrelated method bodies.
 
 Main responsibilities are split across:
 
@@ -151,7 +153,7 @@ Traversal is demand-driven. A source callee is analyzed only when an invocation 
 
 Safe source dispatch includes static methods, private methods, non-virtual ordinary methods, and sealed dispatch when the runtime target is proven. Interface dispatch, unsafe virtual dispatch, dynamic dispatch, delegate invocation, reflection, external metadata-only methods, constructors, properties, operators, local functions, and lambdas as independent call targets remain out of scope.
 
-Internal limits bound call depth and methods expanded per root analysis. Unknown results remain conservative for unresolved calls, unsafe dispatch, unavailable source, unproven argument binding, budget boundaries, cancellation, and cycles. Direct recursion can be solved only by the recurrence pipeline below. Mutual recursion is detected but not solved.
+Public configuration exposes bounded call depth and methods expanded per root analysis. The defaults are call depth `5` and methods per root `32`; hard public limits are `16` and `128`. Unknown results remain conservative for unresolved calls, unsafe dispatch, unavailable source, unproven argument binding, budget boundaries, cancellation, and cycles. Direct recursion can be solved only by the recurrence pipeline below. Mutual recursion is detected but not solved.
 
 ## Direct Recursion and Recurrence Solving
 
@@ -193,10 +195,31 @@ Unsupported or unresolved invocations remain `Unknown`.
 - `BIG1003` at a deferred ordering invocation only when supported consumption is proven inside an analyzable iteration.
 - `BIG1004` at a supported source-method call with known input-dependent complexity inside an analyzable iteration.
 - `BIG1005` at a supported recursive method whose solved direct recurrence is exponential.
+- `BIG1006` at a method identifier when `complexity_analyzers.maximum_complexity` is configured and the known comparable estimate exceeds the threshold.
 - `BIG9000` once per compilation when explicitly enabled.
 
 Generated code analysis is disabled, concurrent execution is enabled, and analyzer hot paths must remain free of I/O, network access, process execution, and reflection-heavy behavior.
 
+## Configuration Layer
+
+Configuration is read through Roslyn analyzer config APIs from `AnalyzerConfigOptionsProvider`; the analyzer does not parse `.editorconfig` files manually. Tree-specific options override global options for that syntax tree.
+
+The public behavior options are:
+
+- `complexity_analyzers.interprocedural_analysis`;
+- `complexity_analyzers.recursion_analysis`;
+- `complexity_analyzers.max_call_depth`;
+- `complexity_analyzers.max_methods_per_root`;
+- `complexity_analyzers.maximum_complexity`.
+
+Invalid values fall back to defaults and do not report analyzer failures. Diagnostic severity remains standard Roslyn `dotnet_diagnostic.<RULE_ID>.severity` configuration.
+
+## Performance and Package Validation
+
+Performance validation uses deterministic synthetic workloads and structural invariants rather than narrow millisecond thresholds. The compiler `ReportAnalyzer=true` path is used to verify analyzer execution reporting when supported by the toolchain.
+
+The package contract keeps `ComplexityAnalysis.Analyzers.dll` under `analyzers/dotnet/cs/`, not under `lib/`. Roslyn authoring dependencies are private assets and are not exposed transitively to consumers. The current package embeds debug symbols in the analyzer DLL and does not emit a `.snupkg`.
+
 ## Why No Workspaces
 
-`Microsoft.CodeAnalysis.Workspaces` is intentionally absent. Phase 6 does not implement a `CodeFixProvider`, whole-project graph analysis, solution loading, or IDE workspace features that would justify that dependency.
+`Microsoft.CodeAnalysis.Workspaces` is intentionally absent. The analyzer does not implement a `CodeFixProvider`, whole-project graph analysis, solution loading, or IDE workspace features that would justify that dependency.

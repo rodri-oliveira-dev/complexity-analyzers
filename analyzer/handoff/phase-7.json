@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 7 \u2014 Configuration, Performance & NuGet Readiness",
   "currentObjective": "Phase 7 in progress",
-  "completedStep": "8/10 \u2014 CI and compatibility matrix",
+  "completedStep": "9/10 \u2014 documentation and consumer validation",
   "decisions": [
     "Phase 7 starts from factual Phase 6 completion: direct-recursion solving, BIG1005, docs, and tests are present and Release tests pass.",
     "Custom analyzer behavior configuration will use Roslyn AnalyzerConfigOptionsProvider or an equivalent analyzer config mechanism, not a manual .editorconfig parser.",
@@ -39,7 +39,10 @@
     "The dedicated analyzer CI workflow uses official action version tags consistent with the existing repository policy and minimum permissions of contents: read.",
     "Supported SDK matrix was rechecked against the official Microsoft .NET releases and support page on 2026-08-20; .NET 8 LTS, .NET 9 STS, and .NET 10 LTS are currently supported and included as Roslyn compiler hosts for package consumption smoke tests.",
     "Compatibility jobs create a temporary consumer outside analyzer/global.json, install the locally packed CI artifact, build with the matrix SDK/TFM, reject analyzer load failures such as CS8032/CS9057/AD0001/AD0002, and require the expected BIG1006 smoke diagnostic.",
-    "The new workflow is validation-only: it restores, builds, tests, packs, uploads the CI .nupkg artifact, validates compatibility, and records analyzer execution reporting without NuGet push, package registry publication, GitHub Release, write permissions, or API keys."
+    "The new workflow is validation-only: it restores, builds, tests, packs, uploads the CI .nupkg artifact, validates compatibility, and records analyzer execution reporting without NuGet push, package registry publication, GitHub Release, write permissions, or API keys.",
+    "Public documentation was updated for Phase 7 across README, pt-BR README, docs/en, docs/pt-BR, and performance README while leaving specs, handoff, AGENTS, and analyzer release notes as non-public/internal sources.",
+    "Consumer local workflow documentation now creates the sample project outside analyzer/ in the system temp directory to avoid inheriting analyzer/Directory.Packages.props central package management.",
+    "Threshold documentation states that BIG1006 reports only for known comparable complexity estimates and does not report for Unknown or incomparable multivariate estimates."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -71,7 +74,15 @@
     "analyzer/performance/ComplexityAnalysis.Analyzers.Performance/TimingWorkload.cs",
     ".github/workflows/analyzer-ci.yml",
     "analyzer/docs/en/configuration.md",
-    "analyzer/docs/pt-BR/configuration.md"
+    "analyzer/docs/pt-BR/configuration.md",
+    "analyzer/docs/en/analyzers.md",
+    "analyzer/docs/pt-BR/analyzers.md",
+    "analyzer/docs/en/getting-started.md",
+    "analyzer/docs/pt-BR/getting-started.md",
+    "analyzer/docs/en/architecture.md",
+    "analyzer/docs/pt-BR/architecture.md",
+    "analyzer/README.md",
+    "analyzer/README.pt-BR.md"
   ],
   "validations": [
     "Initial protocol inspected git status, branch, HEAD, applicable AGENTS.md, specs, handoff README, and the two latest handoffs.",
@@ -118,14 +129,29 @@
     "Step 8 validation passed: dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build --filter PerformanceSyntheticCorpusTests with 9 passed, 0 failed, 0 skipped.",
     "Step 8 validation passed: ReportAnalyzer build of the performance project succeeded and the detailed output contained ComplexityAnalysis.Analyzers.ComplexityAnalyzer.",
     "Step 8 validation passed: npx --yes yaml-lint .github/workflows/complexity-analyzers-ci.yml.",
-    "Step 8 validation passed: dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build --filter \"FullyQualifiedName!~AnalyzerPackageContractTests&FullyQualifiedName!~PerformanceSyntheticCorpusTests\" with 543 passed, 0 failed, 0 skipped."
+    "Step 8 validation passed: dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build --filter \"FullyQualifiedName!~AnalyzerPackageContractTests&FullyQualifiedName!~PerformanceSyntheticCorpusTests\" with 543 passed, 0 failed, 0 skipped.",
+    "Step 9 startup inspected git status, branch, HEAD, analyzer/AGENTS.md, Phase 7 spec, handoff README, and phase-7 handoff; root AGENTS.md is absent in this checkout.",
+    "Step 9 requested Unix find command failed under PowerShell with parameter-format error; rg --files analyzer -g \"*.md\" was used to classify public docs versus specs, handoff, AGENTS, and release notes.",
+    "Step 9 product surface was verified from code: DiagnosticDescriptors.cs, ComplexityAnalyzerOptions.cs, ComplexityAnalyzerOptionsReader.cs, ComplexityThreshold.cs, AnalysisBudget.cs, analyzer csproj, performance README, tests, and the dedicated CI workflow.",
+    "Step 9 validation passed: dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release.",
+    "Step 9 validation passed: dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages.",
+    "Step 9 consumer smoke validation passed on local net10.0 SDK using the real 0.0.0-local .nupkg: build without custom config, BIG9000 load probe, default BIG1001, explicit BIG0001, BIG1006 threshold, interprocedural feature flag, max_methods_per_root=0 budget, and BIG1001 severity override to error.",
+    "Step 9 copy-paste validation found that documenting a consumer under analyzer/artifacts inherited central package management; docs were corrected to create the consumer under the system temp directory.",
+    "Step 9 copy-paste validation passed for the updated PowerShell local-consumption workflow.",
+    "Step 9 validation passed: dotnet build --configuration Release.",
+    "Step 9 validation passed: dotnet test --configuration Release --no-build with 557 passed, 0 failed, 0 skipped.",
+    "Step 9 final pack command passed: dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages.",
+    "Step 9 package README validation passed: the .nupkg contains README.md with Phase 7 configuration content and analyzer DLL only under analyzers/dotnet/cs/.",
+    "Step 9 relative documentation link validation passed across 11 public markdown files.",
+    "Step 9 external ReportAnalyzer documentation link was validated through Microsoft Learn search/open after local Invoke-WebRequest failed with a PowerShell NullReferenceException.",
+    "Step 9 stale-public-doc scan found no remaining Phase 6 custom-option or 0.6.0 phase package references in user-facing docs.",
+    "Step 9 documented performance harness command passed with 9 passed, 0 failed, 0 skipped.",
+    "Step 9 documented ReportAnalyzer command passed and output included ComplexityAnalysis.Analyzers.ComplexityAnalyzer with BIG0001, BIG1001, BIG1002, BIG1003, BIG1004, BIG1005, BIG1006, and BIG9000."
   ],
-  "knownPendingItems": [
-    "Complete documentation and consumer validation."
-  ],
-  "nextStep": "9/10 \u2014 documentation and consumer validation",
+  "knownPendingItems": [],
+  "nextStep": "10/10 \u2014 phase validation and closure",
   "lastCommit": {
-    "hash": "878953e4f150975d0ac0b6bd7b7d1893aeebf873",
-    "message": "build: harden analyzer nuget package"
+    "hash": "d7c64a900a7feef92ce1e17d48bbc50e3617c7b4",
+    "message": "ci: validate analyzer package compatibility"
   }
 }

@@ -2,7 +2,7 @@
 
 [English](getting-started.md) | [Portugues (Brasil)](../pt-BR/getting-started.md)
 
-This page explains how to build, test, pack, and consume the isolated analyzer workspace through Phase 6.
+This page explains how to build, test, pack, and consume the isolated analyzer workspace through Phase 7.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ Create a local analyzer package:
 
 ```bash
 cd analyzer
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.6.0-phase6-local
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 ```
 
 The package is a Roslyn analyzer package. The analyzer assembly is packed under:
@@ -51,15 +51,19 @@ The package intentionally has no runtime `lib/` asset and no transitive Roslyn d
 
 The package is currently consumed from a local package source. Do not treat this documentation as evidence of a NuGet.org publication.
 
-One local workflow is:
+From the repository root, one PowerShell local workflow is:
 
-```bash
+```powershell
 cd analyzer
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.6.0-phase6-local --output artifacts/local-packages
-dotnet new console -o artifacts/tmp/AnalyzerConsumer
-cd artifacts/tmp/AnalyzerConsumer
-dotnet nuget add source ../../local-packages --name complexity-analysis-local
-dotnet add package ComplexityAnalysis.Analyzers --version 0.6.0-phase6-local --source complexity-analysis-local
+dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
+$packageSource = (Resolve-Path "artifacts/local-packages").Path
+$consumer = Join-Path ([System.IO.Path]::GetTempPath()) ("AnalyzerConsumer-" + [System.Guid]::NewGuid().ToString("N"))
+dotnet new console -o $consumer
+cd $consumer
+dotnet new nugetconfig
+dotnet nuget add source $packageSource --name complexity-analysis-local --configfile NuGet.config
+dotnet add package ComplexityAnalysis.Analyzers --version 0.0.0-local --source $packageSource
 ```
 
 If needed, point the local NuGet source at the directory containing the generated `.nupkg`.
@@ -79,7 +83,7 @@ The analyzer is not a runtime library. Application code does not call its types.
 
 ## Smoke Test Diagnostics
 
-`BIG1001`, `BIG1002`, `BIG1003`, `BIG1004`, and `BIG1005` are enabled by default as `Info` diagnostics. Build output visibility depends on the consuming project and SDK settings. You can promote one locally:
+`BIG1001`, `BIG1002`, `BIG1003`, `BIG1004`, `BIG1005`, and `BIG1006` are enabled by default as `Info` diagnostics. `BIG1006` still needs a configured `maximum_complexity` threshold before it can report. Build output visibility depends on the consuming project and SDK settings. You can promote one locally:
 
 ```ini
 [*.cs]
@@ -95,12 +99,21 @@ Promote the Phase 5 source-call loop diagnostic:
 dotnet_diagnostic.BIG1004.severity = warning
 ```
 
-Promote the Phase 6 exponential-recursion diagnostic:
+Promote the exponential-recursion diagnostic:
 
 ```ini
 [*.cs]
 
 dotnet_diagnostic.BIG1005.severity = warning
+```
+
+Configure and promote the Phase 7 complexity-threshold diagnostic:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_complexity = n_log_n
+dotnet_diagnostic.BIG1006.severity = warning
 ```
 
 `BIG0001` is disabled by default. Enable it when you want method complexity estimates, including supported source-method costs and solved direct recursion:
@@ -128,3 +141,31 @@ dotnet_diagnostic.BIG9000.severity = none
 ```
 
 See [Configuration](configuration.md) for details.
+
+## Compatibility Matrix
+
+CI validates analyzer package consumption on supported SDK hosts:
+
+| SDK host | Consumer target framework |
+| --- | --- |
+| .NET 8 LTS | `net8.0` |
+| .NET 9 STS | `net9.0` |
+| .NET 10 LTS | `net10.0` |
+
+The analyzer assembly targets `netstandard2.0`, but the compatibility check is about compiler hosts loading the analyzer package, not only about the consumer target framework.
+
+## Performance Validation
+
+From `analyzer/`, run the structural performance harness:
+
+```bash
+dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build --filter PerformanceSyntheticCorpusTests
+```
+
+After restore, get the compiler analyzer execution report:
+
+```bash
+dotnet build ./performance/ComplexityAnalysis.Analyzers.Performance/ComplexityAnalysis.Analyzers.Performance.csproj --configuration Release --no-restore -t:Rebuild -p:ReportAnalyzer=true -p:UseSharedCompilation=false -v:detailed
+```
+
+Timing varies by hardware and runner. The useful gate is that the synthetic workload completes, structural invariants hold, and the compiler report includes `ComplexityAnalysis.Analyzers.ComplexityAnalyzer`.
