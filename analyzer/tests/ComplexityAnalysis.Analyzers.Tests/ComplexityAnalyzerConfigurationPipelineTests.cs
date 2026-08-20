@@ -26,6 +26,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
     private const string EstimatedAlgorithmicComplexityId = "BIG0001";
     private const string InputDependentCallInsideIterationId = "BIG1004";
     private const string ExponentialRecursiveGrowthId = "BIG1005";
+    private const string MethodComplexityExceedsConfiguredThresholdId = "BIG1006";
 
     [Theory]
     [InlineData("true", true)]
@@ -255,6 +256,182 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
     }
 
     [Fact]
+    public async Task Maximum_complexity_none_does_not_report_threshold_diagnostic()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(QuadraticLoopSource()),
+            globalOptions: Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "none")));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId);
+    }
+
+    [Fact]
+    public async Task Threshold_does_not_report_when_actual_is_below_threshold()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(
+                """
+                public sealed class Sample
+                {
+                    int M() => 42;
+                }
+                """),
+            globalOptions: Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n")));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId);
+    }
+
+    [Fact]
+    public async Task Threshold_does_not_report_when_actual_equals_threshold()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(LinearLoopSource()),
+            globalOptions: Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n")));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId);
+    }
+
+    [Fact]
+    public async Task Threshold_reports_when_quadratic_exceeds_n_log_n()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(QuadraticLoopSource()),
+            globalOptions: Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n_log_n")));
+
+        AssertThreshold(
+            diagnostics,
+            "M",
+            "Method 'M' has estimated complexity O(n\u00b2), which exceeds the configured maximum O(n log n)");
+    }
+
+    [Fact]
+    public async Task Threshold_reports_when_exponential_exceeds_cubic()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(
+                """
+                public sealed class Sample
+                {
+                    int Fibonacci(int n)
+                    {
+                        if (n <= 1)
+                        {
+                            return n;
+                        }
+
+                        return Fibonacci(n - 1) + Fibonacci(n - 2);
+                    }
+                }
+                """),
+            globalOptions: Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n3")));
+
+        AssertThreshold(
+            diagnostics,
+            "Fibonacci",
+            "Method 'Fibonacci' has estimated complexity O(1.618^n), which exceeds the configured maximum O(n\u00b3)");
+    }
+
+    [Fact]
+    public async Task Threshold_does_not_report_when_actual_is_unknown()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(
+                """
+                public interface CustomCollection
+                {
+                    bool Probe(int value);
+                }
+
+                public sealed class Sample
+                {
+                    bool M(CustomCollection values) => values.Probe(42);
+                }
+                """),
+            globalOptions: Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "constant")));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId);
+    }
+
+    [Fact]
+    public async Task Threshold_does_not_report_when_actual_and_threshold_are_incomparable()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(
+                """
+                public sealed class Sample
+                {
+                    void M(int[] left, int[] right)
+                    {
+                        foreach (var outer in left)
+                        {
+                            Search(right);
+                        }
+                    }
+
+                    private void Search(int[] values)
+                    {
+                        foreach (var value in values)
+                        {
+                            var x = value + 1;
+                        }
+                    }
+                }
+                """),
+            globalOptions: Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n2")));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId);
+    }
+
+    [Fact]
+    public async Task Tree_specific_thresholds_are_preserved_for_different_files()
+    {
+        SyntaxTree linearTree = Parse(
+            """
+            public sealed class LinearSample
+            {
+                void M(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """,
+            "LinearSample.cs");
+        SyntaxTree quadraticTree = Parse(QuadraticLoopSource("QuadraticSample"), "QuadraticSample.cs");
+
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            [linearTree, quadraticTree],
+            treeOptions: ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>.Empty
+                .Add(linearTree, Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n2")))
+                .Add(quadraticTree, Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n"))));
+
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId
+            && diagnostic.Location.SourceTree == linearTree);
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId
+            && diagnostic.Location.SourceTree == quadraticTree
+            && diagnostic.GetMessage(CultureInfo.InvariantCulture) == "Method 'M' has estimated complexity O(n\u00b2), which exceeds the configured maximum O(n)");
+    }
+
+    [Fact]
+    public async Task Threshold_diagnostic_severity_uses_standard_roslyn_override()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(LinearLoopSource()),
+            globalOptions: Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "constant")),
+            thresholdDiagnosticReport: ReportDiagnostic.Warn);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId);
+
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+    }
+
+    [Fact]
     public async Task Tree_specific_options_are_preserved_for_different_files()
     {
         SyntaxTree disabledTree = Parse(
@@ -450,32 +627,44 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
         SyntaxTree syntaxTree,
         bool enableEstimatedComplexity = true,
         AnalyzerConfigOptions? globalOptions = null,
-        ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>? treeOptions = null)
+        ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>? treeOptions = null,
+        ReportDiagnostic? thresholdDiagnosticReport = null)
     {
         return await GetAnalyzerDiagnosticsAsync(
             [syntaxTree],
             enableEstimatedComplexity,
             globalOptions,
-            treeOptions);
+            treeOptions,
+            thresholdDiagnosticReport);
     }
 
     private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
         ImmutableArray<SyntaxTree> syntaxTrees,
         bool enableEstimatedComplexity = true,
         AnalyzerConfigOptions? globalOptions = null,
-        ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>? treeOptions = null)
+        ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>? treeOptions = null,
+        ReportDiagnostic? thresholdDiagnosticReport = null)
     {
-        ImmutableDictionary<string, ReportDiagnostic> specificDiagnosticOptions =
-            enableEstimatedComplexity
-            ? ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(EstimatedAlgorithmicComplexityId, ReportDiagnostic.Info)
-            : [];
+        ImmutableDictionary<string, ReportDiagnostic>.Builder specificDiagnosticOptions =
+            ImmutableDictionary.CreateBuilder<string, ReportDiagnostic>();
+
+        if (enableEstimatedComplexity)
+        {
+            specificDiagnosticOptions.Add(EstimatedAlgorithmicComplexityId, ReportDiagnostic.Info);
+        }
+
+        if (thresholdDiagnosticReport.HasValue)
+        {
+            specificDiagnosticOptions.Add(MethodComplexityExceedsConfiguredThresholdId, thresholdDiagnosticReport.Value);
+        }
+
         CSharpCompilation compilation = CSharpCompilation.Create(
             assemblyName: "ComplexityAnalyzerConfigurationPipelineTests",
             syntaxTrees: syntaxTrees,
             references: BasicReferences,
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
-                specificDiagnosticOptions: specificDiagnosticOptions));
+                specificDiagnosticOptions: specificDiagnosticOptions.ToImmutable()));
         var provider = new TestAnalyzerConfigOptionsProvider(
             globalOptions ?? Options(),
             treeOptions ?? []);
@@ -496,6 +685,19 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
             .Single(diagnostic => GetDiagnosticText(diagnostic) == diagnosticText);
 
         Assert.Equal(expectedMessage, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+    }
+
+    private static void AssertThreshold(
+        ImmutableArray<Diagnostic> diagnostics,
+        string diagnosticText,
+        string expectedMessage)
+    {
+        Diagnostic diagnostic = diagnostics
+            .Where(diagnostic => diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId)
+            .Single(diagnostic => GetDiagnosticText(diagnostic) == diagnosticText);
+
+        Assert.Equal(expectedMessage, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
     }
 
     private static string GetDiagnosticText(Diagnostic diagnostic)
@@ -553,6 +755,42 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
                     foreach (var value in values)
                     {
                         var x = value + 1;
+                    }
+                }
+            }
+            """;
+    }
+
+    private static string LinearLoopSource()
+    {
+        return
+            """
+            public sealed class Sample
+            {
+                void M(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                        var x = value + 1;
+                    }
+                }
+            }
+            """;
+    }
+
+    private static string QuadraticLoopSource(string className = "Sample")
+    {
+        return $$"""
+            public sealed class {{className}}
+            {
+                void M(int[] values)
+                {
+                    foreach (var outer in values)
+                    {
+                        foreach (var inner in values)
+                        {
+                            var x = outer + inner;
+                        }
                     }
                 }
             }

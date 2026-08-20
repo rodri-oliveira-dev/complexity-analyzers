@@ -29,6 +29,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.OrderingInsideIteration,
             DiagnosticDescriptors.InputDependentCallInsideIteration,
             DiagnosticDescriptors.ExponentialRecursiveGrowth,
+            DiagnosticDescriptors.MethodComplexityExceedsConfiguredThreshold,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)
@@ -88,10 +89,36 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        ReportThresholdDiagnosticIfNeeded(context, methodDeclaration, options, complexity);
+
         context.ReportDiagnostic(Diagnostic.Create(
             DiagnosticDescriptors.EstimatedAlgorithmicComplexity,
             methodDeclaration.Identifier.GetLocation(),
             complexity.ToBigONotation()));
+    }
+
+    private static void ReportThresholdDiagnosticIfNeeded(
+        SyntaxNodeAnalysisContext context,
+        MethodDeclarationSyntax methodDeclaration,
+        ComplexityAnalyzerOptions options,
+        ComplexityExpression actualComplexity)
+    {
+        if (!options.MaximumComplexity.TryCreateExpression(out ComplexityExpression thresholdComplexity))
+        {
+            return;
+        }
+
+        if (ComplexityGrowthComparer.Compare(actualComplexity, thresholdComplexity) != GrowthComparison.Greater)
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            DiagnosticDescriptors.MethodComplexityExceedsConfiguredThreshold,
+            methodDeclaration.Identifier.GetLocation(),
+            methodDeclaration.Identifier.ValueText,
+            actualComplexity.ToBigONotation(),
+            thresholdComplexity.ToBigONotation()));
     }
 
     private static void AnalyzeCompilation(CompilationAnalysisContext context)

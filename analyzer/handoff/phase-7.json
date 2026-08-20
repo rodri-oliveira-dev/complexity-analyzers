@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 7 \u2014 Configuration, Performance & NuGet Readiness",
   "currentObjective": "Phase 7 in progress",
-  "completedStep": "3/10 \u2014 configurable analysis budgets and feature controls",
+  "completedStep": "4/10 \u2014 complexity threshold diagnostic",
   "decisions": [
     "Phase 7 starts from factual Phase 6 completion: direct-recursion solving, BIG1005, docs, and tests are present and Release tests pass.",
     "Custom analyzer behavior configuration will use Roslyn AnalyzerConfigOptionsProvider or an equivalent analyzer config mechanism, not a manual .editorconfig parser.",
@@ -20,14 +20,15 @@
     "Tree-specific options are cached per SyntaxTree through the interprocedural analysis context; root budgets remain root-scoped.",
     "Source-method expansion is disabled by complexity_analyzers.interprocedural_analysis=false while BCL/LINQ known operations remain active.",
     "Direct recurrence extraction and solving, including BIG1005, are disabled by complexity_analyzers.recursion_analysis=false.",
-    "Method complexity template cache entries are keyed by source method plus template-affecting feature/budget options, excluding maximum_complexity because threshold reporting is not implemented yet and does not change templates."
+    "Method complexity template cache entries are keyed by source method plus template-affecting feature/budget options, excluding maximum_complexity because threshold reporting does not change templates.",
+    "BIG1006 is implemented for configured maximum_complexity threshold violations and uses ComplexityGrowthComparer rather than textual ranking.",
+    "BIG1006 reports only when the threshold is not none, actual complexity is known, actual and threshold are comparable, and actual is greater than threshold."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
     "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
     "Do not add a manual .editorconfig parser.",
     "Do not replace standard dotnet_diagnostic severity configuration with custom severity options.",
-    "Do not implement BIG1006 until the threshold diagnostic step.",
     "Do not publish packages, create releases, or push without explicit request."
   ],
   "relevantFiles": [
@@ -40,7 +41,9 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityAnalyzerOptions.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityAnalyzerOptionsReader.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityThreshold.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerConfigurationPipelineTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerOptionsReaderTests.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
     ".github/workflows/analyzer-ci.yml",
@@ -56,15 +59,16 @@
     "dotnet build --configuration Release passed for the analyzer workspace.",
     "dotnet test --configuration Release passed with 533 passed, 0 failed, 0 skipped after integrating configurable budgets and feature controls.",
     "dotnet test --configuration Release --no-build passed with 533 passed, 0 failed, 0 skipped.",
+    "dotnet build --configuration Release passed for the analyzer workspace after BIG1006 threshold implementation.",
+    "dotnet test --configuration Release --no-build passed with 543 passed, 0 failed, 0 skipped after BIG1006 threshold implementation.",
     "Reader I/O check found no System.IO, File, Directory, Path, .editorconfig, or source-text reads in ComplexityAnalyzerOptionsReader.cs.",
     "git diff --check passed."
   ],
   "knownPendingItems": [
-    "Implement BIG1006 threshold comparison using the existing growth comparer semantics.",
     "Add repeatable performance workload and CI validation.",
     "Complete factual NuGet metadata, symbols/source debugging decision, package contract tests, consumer smoke tests, and compatibility matrix."
   ],
-  "nextStep": "4/10 \u2014 complexity threshold and BIG1006",
+  "nextStep": "5/10 \u2014 performance harness and baseline",
   "lastCommit": {
     "hash": "a97fa164860e6ecafac63332516192d8b3cacce9",
     "message": "Merge pull request #5 from rodri-oliveira-dev/feature/Phase6"
