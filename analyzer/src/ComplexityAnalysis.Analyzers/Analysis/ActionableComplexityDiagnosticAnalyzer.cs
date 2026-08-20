@@ -34,7 +34,7 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
 
         IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken) as IMethodSymbol
             ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
-        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+        InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
             methodSymbol,
             options,
             cancellationToken);

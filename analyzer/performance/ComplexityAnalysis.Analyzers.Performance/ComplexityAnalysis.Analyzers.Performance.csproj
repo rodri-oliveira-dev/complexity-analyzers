@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
+    <SonarQubeExclude>true</SonarQubeExclude>
     <NoWarn>$(NoWarn);CA1062;CA1822;IDE0022;IDE0059;EnableGenerateDocumentationFile</NoWarn>
   </PropertyGroup>
 

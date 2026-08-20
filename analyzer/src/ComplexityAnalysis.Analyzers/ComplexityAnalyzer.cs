@@ -77,7 +77,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(diagnostic);
         }
 
-        ComplexityExpression complexity = new MethodComplexityExtractor().AnalyzeMethod(
+        ComplexityExpression complexity = MethodComplexityExtractor.AnalyzeMethod(
             methodDeclaration,
             context.SemanticModel,
             interproceduralContext,

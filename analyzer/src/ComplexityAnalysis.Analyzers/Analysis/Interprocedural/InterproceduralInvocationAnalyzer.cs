@@ -43,26 +43,18 @@ internal sealed class InterproceduralInvocationAnalyzer
             callerContext.SemanticModel,
             callerContext.CancellationToken);
 
-        if (resolution.Kind == CallTargetResolutionKind.KnownOperation)
+        return resolution.Kind switch
         {
-            return AnalyzeKnownOperation(invocation, resolution);
-        }
-
-        if (resolution.Kind != CallTargetResolutionKind.SourceMethod)
-        {
-            return ComplexityFactory.Unknown();
-        }
-
-        if (!callerContext.Options.InterproceduralAnalysisEnabled)
-        {
-            return ComplexityFactory.Unknown();
-        }
-
-        return AnalyzeSourceMethodInvocation(
-            invocation,
-            resolution,
-            interproceduralContext,
-            rootState);
+            CallTargetResolutionKind.KnownOperation => AnalyzeKnownOperation(invocation, resolution),
+            CallTargetResolutionKind.SourceMethod when callerContext.Options.InterproceduralAnalysisEnabled =>
+                AnalyzeSourceMethodInvocation(
+                    invocation,
+                    resolution,
+                    interproceduralContext,
+                    rootState),
+            CallTargetResolutionKind.SourceMethod or CallTargetResolutionKind.Unsupported => ComplexityFactory.Unknown(),
+            _ => ComplexityFactory.Unknown(),
+        };
     }
 
     private ComplexityExpression AnalyzeKnownOperation(
@@ -327,14 +319,11 @@ internal sealed class InterproceduralInvocationAnalyzer
     {
         callerContext.CancellationToken.ThrowIfCancellationRequested();
 
-        if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess
-            || (targetMethodSymbol.IsStatic && targetMethodSymbol.ReducedFrom is null))
-        {
-            return ComplexityFactory.Constant();
-        }
-
-        return memberAccess.Expression is ThisExpressionSyntax or BaseExpressionSyntax
-            ? ComplexityFactory.Constant()
-            : new BasicOperationAnalyzer(callerContext).AnalyzeExpression(memberAccess.Expression);
+        return invocation.Expression is MemberAccessExpressionSyntax memberAccess
+            && (!targetMethodSymbol.IsStatic || targetMethodSymbol.ReducedFrom is not null)
+                ? memberAccess.Expression is ThisExpressionSyntax or BaseExpressionSyntax
+                    ? ComplexityFactory.Constant()
+                    : new BasicOperationAnalyzer(callerContext).AnalyzeExpression(memberAccess.Expression)
+                : ComplexityFactory.Constant();
     }
 }

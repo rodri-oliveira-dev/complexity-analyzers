@@ -11,11 +11,11 @@ namespace ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 
 internal sealed class MethodComplexityTemplateCache
 {
-    private readonly ConcurrentDictionary<MethodComplexityCacheKey, MethodComplexityCacheEntry> entries =
+    private readonly ConcurrentDictionary<MethodComplexityCacheKey, MethodComplexityCacheEntry> _entries =
         new(MethodComplexityCacheKey.Comparer);
 
     internal int Count
-        => entries.Count;
+        => _entries.Count;
 
     internal bool TryGetCompleted(
         IMethodSymbol methodSymbol,
@@ -40,7 +40,7 @@ internal sealed class MethodComplexityTemplateCache
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (entries.TryGetValue(MethodComplexityCacheKey.Create(methodSymbol, options), out MethodComplexityCacheEntry? entry)
+        if (_entries.TryGetValue(MethodComplexityCacheKey.Create(methodSymbol, options), out MethodComplexityCacheEntry? entry)
             && entry.Kind == MethodComplexityCacheEntryKind.Completed
             && entry.Result is not null)
         {
@@ -76,7 +76,7 @@ internal sealed class MethodComplexityTemplateCache
         cancellationToken.ThrowIfCancellationRequested();
 
         MethodComplexityCacheKey key = MethodComplexityCacheKey.Create(methodSymbol, options);
-        if (entries.TryAdd(key, MethodComplexityCacheEntry.InProgress()))
+        if (_entries.TryAdd(key, MethodComplexityCacheEntry.InProgress()))
         {
             completedResult = null;
             return true;
@@ -84,7 +84,7 @@ internal sealed class MethodComplexityTemplateCache
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        completedResult = entries.TryGetValue(key, out MethodComplexityCacheEntry? existing)
+        completedResult = _entries.TryGetValue(key, out MethodComplexityCacheEntry? existing)
             && existing.Kind == MethodComplexityCacheEntryKind.Completed
             ? existing.Result
             : null;
@@ -116,7 +116,7 @@ internal sealed class MethodComplexityTemplateCache
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        entries[MethodComplexityCacheKey.Create(methodSymbol, options)] = MethodComplexityCacheEntry.Completed(result);
+        _entries[MethodComplexityCacheKey.Create(methodSymbol, options)] = MethodComplexityCacheEntry.Completed(result);
     }
 
     internal bool AbandonAnalysis(
@@ -140,9 +140,9 @@ internal sealed class MethodComplexityTemplateCache
         cancellationToken.ThrowIfCancellationRequested();
 
         MethodComplexityCacheKey key = MethodComplexityCacheKey.Create(methodSymbol, options);
-        return entries.TryGetValue(key, out MethodComplexityCacheEntry? existing)
+        return _entries.TryGetValue(key, out MethodComplexityCacheEntry? existing)
             && existing.Kind == MethodComplexityCacheEntryKind.InProgress
-            && ((ICollection<KeyValuePair<MethodComplexityCacheKey, MethodComplexityCacheEntry>>)entries)
+            && ((ICollection<KeyValuePair<MethodComplexityCacheKey, MethodComplexityCacheEntry>>)_entries)
                 .Remove(new KeyValuePair<MethodComplexityCacheKey, MethodComplexityCacheEntry>(key, existing));
     }
 }

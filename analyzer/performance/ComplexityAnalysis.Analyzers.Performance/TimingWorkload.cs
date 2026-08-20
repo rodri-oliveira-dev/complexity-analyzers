@@ -65,7 +65,12 @@ public sealed class TimingWorkload
 
     public int UnsupportedRecursive(int n)
     {
-        return UnsupportedRecursive(n - 1);
+        if (n <= 0)
+        {
+            return n;
+        }
+
+        return UnsupportedRecursive(n);
     }
 
     private void SharedCallee(int[] values)

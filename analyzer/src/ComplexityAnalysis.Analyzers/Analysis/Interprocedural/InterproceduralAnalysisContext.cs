@@ -12,11 +12,11 @@ namespace ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 
 internal sealed class InterproceduralAnalysisContext
 {
-    private readonly ConcurrentDictionary<MethodComplexityCacheKey, ComplexityExpression> directRecurrenceSolutions =
+    private readonly ConcurrentDictionary<MethodComplexityCacheKey, ComplexityExpression> _directRecurrenceSolutions =
         new(MethodComplexityCacheKey.Comparer);
-    private readonly ConcurrentDictionary<SyntaxTree, SemanticModel> semanticModels = new();
-    private readonly ConcurrentDictionary<SyntaxTree, ComplexityAnalyzerOptions> treeOptions = new();
-    private readonly Func<SyntaxTree, ComplexityAnalyzerOptions> optionsResolver;
+    private readonly ConcurrentDictionary<SyntaxTree, SemanticModel> _semanticModels = new();
+    private readonly ConcurrentDictionary<SyntaxTree, ComplexityAnalyzerOptions> _treeOptions = new();
+    private readonly Func<SyntaxTree, ComplexityAnalyzerOptions> _optionsResolver;
 
     private InterproceduralAnalysisContext(
         Compilation compilation,
@@ -29,7 +29,7 @@ internal sealed class InterproceduralAnalysisContext
         SourceMethodResolver = sourceMethodResolver;
         TemplateCache = templateCache;
         Budget = budget;
-        this.optionsResolver = optionsResolver ?? throw new ArgumentNullException(nameof(optionsResolver));
+        _optionsResolver = optionsResolver ?? throw new ArgumentNullException(nameof(optionsResolver));
     }
 
     internal Compilation Compilation
@@ -53,10 +53,10 @@ internal sealed class InterproceduralAnalysisContext
     }
 
     internal int DirectRecurrenceCacheCount
-        => directRecurrenceSolutions.Count;
+        => _directRecurrenceSolutions.Count;
 
     internal int SemanticModelCacheCount
-        => semanticModels.Count;
+        => _semanticModels.Count;
 
     internal static InterproceduralAnalysisContext Create(
         Compilation compilation,
@@ -109,7 +109,7 @@ internal sealed class InterproceduralAnalysisContext
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        return treeOptions.GetOrAdd(syntaxTree, optionsResolver);
+        return _treeOptions.GetOrAdd(syntaxTree, _optionsResolver);
     }
 
     internal SemanticModel GetSemanticModel(
@@ -120,7 +120,7 @@ internal sealed class InterproceduralAnalysisContext
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        SemanticModel semanticModel = semanticModels.GetOrAdd(
+        SemanticModel semanticModel = _semanticModels.GetOrAdd(
             syntaxTree,
             tree => Compilation.GetSemanticModel(tree));
 
@@ -153,7 +153,7 @@ internal sealed class InterproceduralAnalysisContext
             cancellationToken);
     }
 
-    internal InterproceduralRootAnalysisState CreateRootState(
+    internal static InterproceduralRootAnalysisState CreateRootState(
         IMethodSymbol rootMethodSymbol,
         ComplexityAnalyzerOptions options,
         CancellationToken cancellationToken)
@@ -180,7 +180,7 @@ internal sealed class InterproceduralAnalysisContext
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        return directRecurrenceSolutions.TryGetValue(
+        return _directRecurrenceSolutions.TryGetValue(
             MethodComplexityCacheKey.Create(methodSymbol, options),
             out complexity);
     }
@@ -197,7 +197,7 @@ internal sealed class InterproceduralAnalysisContext
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        _ = directRecurrenceSolutions.TryAdd(
+        _ = _directRecurrenceSolutions.TryAdd(
             MethodComplexityCacheKey.Create(methodSymbol, options),
             complexity);
     }

@@ -151,7 +151,12 @@ jobs:
           try {
             dotnet new console --framework $env:TARGET_FRAMEWORK --no-restore
             dotnet new nugetconfig
-            dotnet nuget add source $packageSource --name local-complexity-analyzers --configfile NuGet.config
+            $nugetConfig = Join-Path $consumer "nuget.config"
+            if (-not (Test-Path -LiteralPath $nugetConfig)) {
+              $nugetConfig = Join-Path $consumer "NuGet.config"
+            }
+
+            dotnet nuget add source $packageSource --name local-complexity-analyzers --configfile $nugetConfig
             dotnet add package ComplexityAnalysis.Analyzers --version $env:PACKAGE_VERSION --source $packageSource --no-restore
 
             @(
@@ -191,7 +196,7 @@ jobs:
               "}"
             ) | Set-Content -LiteralPath "Program.cs"
 
-            dotnet restore --configfile NuGet.config
+            dotnet restore --configfile $nugetConfig
             $output = & dotnet build --configuration Release --no-restore 2>&1
             $exitCode = $LASTEXITCODE
             $output | Tee-Object -FilePath (Join-Path $artifacts "consumer-build.log")

@@ -615,7 +615,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
             .Single(method => StringComparer.Ordinal.Equals(method.Identifier.ValueText, methodName));
         SemanticModel semanticModel = facts.Compilation.GetSemanticModel(methodDeclaration.SyntaxTree);
 
-        return new MethodComplexityExtractor().AnalyzeMethod(
+        return MethodComplexityExtractor.AnalyzeMethod(
             methodDeclaration,
             semanticModel,
             context,

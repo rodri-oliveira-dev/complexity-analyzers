@@ -14,7 +14,7 @@ namespace ComplexityAnalysis.Analyzers.Analysis;
 
 internal sealed class MethodComplexityExtractor
 {
-    internal ComplexityExpression AnalyzeMethod(
+    internal static ComplexityExpression AnalyzeMethod(
         MethodDeclarationSyntax methodDeclaration,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -30,7 +30,7 @@ internal sealed class MethodComplexityExtractor
         InterproceduralAnalysisContext interproceduralContext = InterproceduralAnalysisContext.Create(
             semanticModel.Compilation,
             cancellationToken);
-        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+        InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
             methodSymbol,
             options,
             cancellationToken);
@@ -45,7 +45,7 @@ internal sealed class MethodComplexityExtractor
             cancellationToken);
     }
 
-    internal ComplexityExpression AnalyzeMethod(
+    internal static ComplexityExpression AnalyzeMethod(
         MethodDeclarationSyntax methodDeclaration,
         SemanticModel semanticModel,
         InterproceduralAnalysisContext interproceduralContext,
@@ -61,7 +61,7 @@ internal sealed class MethodComplexityExtractor
 
         IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken)
             ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
-        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+        InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
             methodSymbol,
             options,
             cancellationToken);
@@ -76,7 +76,7 @@ internal sealed class MethodComplexityExtractor
             cancellationToken);
     }
 
-    internal ComplexityExpression AnalyzeMethod(
+    internal static ComplexityExpression AnalyzeMethod(
         MethodDeclarationSyntax methodDeclaration,
         SemanticModel semanticModel,
         InterproceduralAnalysisContext interproceduralContext,
@@ -94,7 +94,7 @@ internal sealed class MethodComplexityExtractor
             methodDeclaration.SyntaxTree,
             interproceduralContext.Budget,
             cancellationToken);
-        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+        InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
             methodSymbol,
             options,
             cancellationToken);
@@ -169,14 +169,11 @@ internal sealed class MethodComplexityExtractor
         MethodDeclarationSyntax methodDeclaration,
         MethodAnalysisContext context)
     {
-        if (context.Options.RecursionAnalysisEnabled
+        return context.Options.RecursionAnalysisEnabled
             && TrySolveDirectRecurrence(methodDeclaration, context, out ComplexityExpression? recursiveComplexity)
-            && recursiveComplexity is not null)
-        {
-            return recursiveComplexity;
-        }
-
-        return methodDeclaration.Body is not null
+            && recursiveComplexity is not null
+            ? recursiveComplexity
+            : methodDeclaration.Body is not null
             ? AnalyzeBlockCore(methodDeclaration.Body, context)
             : methodDeclaration.ExpressionBody is null
             ? ComplexityFactory.Unknown()
@@ -509,15 +506,12 @@ internal sealed class MethodComplexityExtractor
         AssignmentExpressionSyntax assignment,
         MethodAnalysisContext context)
     {
-        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
-            || !TryGetLocalSymbol(assignment.Left, context, out ISymbol? symbol)
-            || symbol is null
-            || !new LoopBoundAnalyzer(context).TryResolveBoundExpression(assignment.Right, out LoopBoundExpression bound))
-        {
-            return context;
-        }
-
-        return context.WithLocalLoopBound(symbol, bound);
+        return assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+            && TryGetLocalSymbol(assignment.Left, context, out ISymbol? symbol)
+            && symbol is not null
+            && new LoopBoundAnalyzer(context).TryResolveBoundExpression(assignment.Right, out LoopBoundExpression bound)
+                ? context.WithLocalLoopBound(symbol, bound)
+                : context;
     }
 
     private static MethodAnalysisContext RemoveMutatedLocalLoopFacts(

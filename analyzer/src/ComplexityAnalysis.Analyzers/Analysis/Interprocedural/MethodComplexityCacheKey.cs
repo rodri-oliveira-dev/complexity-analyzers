@@ -11,11 +11,11 @@ internal readonly struct MethodComplexityCacheKey : IEquatable<MethodComplexityC
 {
     internal static readonly IEqualityComparer<MethodComplexityCacheKey> Comparer = new MethodComplexityCacheKeyComparer();
 
-    private readonly MethodSymbolKey method;
-    private readonly bool interproceduralAnalysisEnabled;
-    private readonly bool recursionAnalysisEnabled;
-    private readonly int maximumCallDepth;
-    private readonly int maximumMethodsPerRootAnalysis;
+    private readonly MethodSymbolKey _method;
+    private readonly bool _interproceduralAnalysisEnabled;
+    private readonly bool _recursionAnalysisEnabled;
+    private readonly int _maximumCallDepth;
+    private readonly int _maximumMethodsPerRootAnalysis;
 
     private MethodComplexityCacheKey(
         MethodSymbolKey method,
@@ -24,11 +24,11 @@ internal readonly struct MethodComplexityCacheKey : IEquatable<MethodComplexityC
         int maximumCallDepth,
         int maximumMethodsPerRootAnalysis)
     {
-        this.method = method;
-        this.interproceduralAnalysisEnabled = interproceduralAnalysisEnabled;
-        this.recursionAnalysisEnabled = recursionAnalysisEnabled;
-        this.maximumCallDepth = maximumCallDepth;
-        this.maximumMethodsPerRootAnalysis = maximumMethodsPerRootAnalysis;
+        _method = method;
+        _interproceduralAnalysisEnabled = interproceduralAnalysisEnabled;
+        _recursionAnalysisEnabled = recursionAnalysisEnabled;
+        _maximumCallDepth = maximumCallDepth;
+        _maximumMethodsPerRootAnalysis = maximumMethodsPerRootAnalysis;
     }
 
     internal static MethodComplexityCacheKey Create(
@@ -48,11 +48,11 @@ internal readonly struct MethodComplexityCacheKey : IEquatable<MethodComplexityC
 
     public bool Equals(MethodComplexityCacheKey other)
     {
-        return method.Equals(other.method)
-            && interproceduralAnalysisEnabled == other.interproceduralAnalysisEnabled
-            && recursionAnalysisEnabled == other.recursionAnalysisEnabled
-            && maximumCallDepth == other.maximumCallDepth
-            && maximumMethodsPerRootAnalysis == other.maximumMethodsPerRootAnalysis;
+        return _method.Equals(other._method)
+            && _interproceduralAnalysisEnabled == other._interproceduralAnalysisEnabled
+            && _recursionAnalysisEnabled == other._recursionAnalysisEnabled
+            && _maximumCallDepth == other._maximumCallDepth
+            && _maximumMethodsPerRootAnalysis == other._maximumMethodsPerRootAnalysis;
     }
 
     public override bool Equals(object? obj)
@@ -64,11 +64,11 @@ internal readonly struct MethodComplexityCacheKey : IEquatable<MethodComplexityC
     {
         unchecked
         {
-            int hash = method.GetHashCode();
-            hash = (hash * 397) ^ interproceduralAnalysisEnabled.GetHashCode();
-            hash = (hash * 397) ^ recursionAnalysisEnabled.GetHashCode();
-            hash = (hash * 397) ^ maximumCallDepth;
-            hash = (hash * 397) ^ maximumMethodsPerRootAnalysis;
+            int hash = _method.GetHashCode();
+            hash = (hash * 397) ^ _interproceduralAnalysisEnabled.GetHashCode();
+            hash = (hash * 397) ^ _recursionAnalysisEnabled.GetHashCode();
+            hash = (hash * 397) ^ _maximumCallDepth;
+            hash = (hash * 397) ^ _maximumMethodsPerRootAnalysis;
             return hash;
         }
     }

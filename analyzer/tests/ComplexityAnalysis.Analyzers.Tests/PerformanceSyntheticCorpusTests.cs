@@ -313,7 +313,7 @@ public sealed class PerformanceSyntheticCorpusTests
         _ = Assert.Single(actionableDiagnostics, diagnostic => diagnostic.Id == ExponentialRecursiveGrowthId);
         Assert.Equal(1, context.DirectRecurrenceCacheCount);
 
-        ComplexityExpression complexity = new MethodComplexityExtractor().AnalyzeMethod(
+        ComplexityExpression complexity = MethodComplexityExtractor.AnalyzeMethod(
             methodDeclaration,
             semanticModel,
             context,
@@ -330,7 +330,7 @@ public sealed class PerformanceSyntheticCorpusTests
         InterproceduralAnalysisContext context,
         ComplexityAnalyzerOptions options)
     {
-        return new MethodComplexityExtractor().AnalyzeMethod(
+        return MethodComplexityExtractor.AnalyzeMethod(
             methodDeclaration,
             facts.Compilation.GetSemanticModel(methodDeclaration.SyntaxTree),
             context,
