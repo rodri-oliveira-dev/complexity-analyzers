@@ -1,21 +1,29 @@
 {
   "delivery": "Phase 7 \u2014 Configuration, Performance & NuGet Readiness",
   "currentObjective": "Phase 7 in progress",
-  "completedStep": "1/10 \u2014 specification",
+  "completedStep": "2/10 \u2014 analyzer configuration model and parser",
   "decisions": [
     "Phase 7 starts from factual Phase 6 completion: direct-recursion solving, BIG1005, docs, and tests are present and Release tests pass.",
     "Custom analyzer behavior configuration will use Roslyn AnalyzerConfigOptionsProvider or an equivalent analyzer config mechanism, not a manual .editorconfig parser.",
     "Custom options use the complexity_analyzers.* prefix and preserve current Phase 6 behavior by default.",
     "Public budgets default to the real current values: max_call_depth = 5 and max_methods_per_root = 32, with hard limits retained.",
     "BIG1006 is reserved for configurable method complexity threshold reporting because no existing diagnostic uses that ID.",
-    "NuGet readiness remains validation-only in this phase: no NuGet.org publication, GitHub Release, tag, push, or publish token."
+    "NuGet readiness remains validation-only in this phase: no NuGet.org publication, GitHub Release, tag, push, or publish token.",
+    "The Phase 7 options model is immutable, contains no SyntaxNode types, has explicit defaults, and is not integrated into the analyzer pipeline yet.",
+    "ComplexityAnalyzerOptionsReader reads global and syntax-tree options through AnalyzerConfigOptionsProvider; tree-specific options win over global options.",
+    "Boolean options accept only true and false, case-insensitively after trimming surrounding whitespace; invalid values fall back to the option default.",
+    "Integer options use invariant-culture base-10 parsing after trimming surrounding whitespace; signed values, decimals, separators, negative values, and values above hard limits fall back to defaults.",
+    "Public budget hard limits are max_call_depth = 16 and max_methods_per_root = 128.",
+    "maximum_complexity accepts only the Phase 7 grammar values none, constant, log_n, n, n_log_n, n2, n3, exponential, and factorial; unknown values fall back to none.",
+    "The exponential threshold currently maps to the existing comparable model form O(2^n)."
   ],
   "constraints": [
-    "Do not implement production code in the specification step.",
     "Do not modify inherited projects outside analyzer/.",
     "Do not create ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
     "Do not add a manual .editorconfig parser.",
     "Do not replace standard dotnet_diagnostic severity configuration with custom severity options.",
+    "Do not integrate Phase 7 options into the analysis pipeline until the configurable budgets and feature controls step.",
+    "Do not implement BIG1006 until the threshold diagnostic step.",
     "Do not publish packages, create releases, or push without explicit request."
   ],
   "relevantFiles": [
@@ -24,6 +32,10 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/AnalysisBudget.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityAnalyzerOptions.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityAnalyzerOptionsReader.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityThreshold.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerOptionsReaderTests.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
     ".github/workflows/analyzer-ci.yml",
     "analyzer/docs/en/configuration.md",
@@ -34,16 +46,19 @@
     "Root AGENTS.md is absent in this checkout; analyzer/AGENTS.md is present and applicable.",
     "Phase 6 state was confirmed from code, diagnostics, tests, docs, and Release test execution.",
     "dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release passed with 472 passed, 0 failed, 0 skipped.",
-    "The requested Unix find command could not run because /bin/bash is unavailable; specs were listed with the PowerShell equivalent."
+    "The requested Unix find command could not run because /bin/bash is unavailable; specs were listed with the PowerShell equivalent.",
+    "dotnet build --configuration Release passed for the analyzer workspace.",
+    "dotnet test --configuration Release --no-build passed with 518 passed, 0 failed, 0 skipped.",
+    "Reader I/O check found no System.IO, File, Directory, Path, .editorconfig, or source-text reads in ComplexityAnalyzerOptionsReader.cs.",
+    "git diff --check passed."
   ],
   "knownPendingItems": [
-    "Implement ComplexityAnalyzerOptions and safe parsing from AnalyzerConfigOptionsProvider.",
     "Wire feature flags and budget options into the analyzer pipeline without changing defaults.",
     "Implement BIG1006 threshold comparison using the existing growth comparer semantics.",
     "Add repeatable performance workload and CI validation.",
     "Complete factual NuGet metadata, symbols/source debugging decision, package contract tests, consumer smoke tests, and compatibility matrix."
   ],
-  "nextStep": "2/10 \u2014 analyzer configuration model and parser",
+  "nextStep": "3/10 \u2014 configurable analysis budgets and feature controls",
   "lastCommit": {
     "hash": "a97fa164860e6ecafac63332516192d8b3cacce9",
     "message": "Merge pull request #5 from rodri-oliveira-dev/feature/Phase6"
