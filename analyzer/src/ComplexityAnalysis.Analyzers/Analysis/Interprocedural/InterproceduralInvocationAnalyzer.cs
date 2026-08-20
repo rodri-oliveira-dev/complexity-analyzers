@@ -215,8 +215,9 @@ internal sealed class InterproceduralInvocationAnalyzer
     {
         callerContext.CancellationToken.ThrowIfCancellationRequested();
 
-        SemanticModel calleeSemanticModel = interproceduralContext.Compilation.GetSemanticModel(
-            sourceMethodDeclaration.SyntaxTree);
+        SemanticModel calleeSemanticModel = interproceduralContext.GetSemanticModel(
+            sourceMethodDeclaration.SyntaxTree,
+            callerContext.CancellationToken);
         return new MethodComplexityExtractor()
             .AnalyzeSourceMethod(
                 sourceMethodDeclaration,

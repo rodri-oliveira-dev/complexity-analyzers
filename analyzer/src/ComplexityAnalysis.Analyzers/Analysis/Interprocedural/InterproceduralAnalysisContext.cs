@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 
 using ComplexityAnalysis.Analyzers.Configuration;
+using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -11,6 +12,9 @@ namespace ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 
 internal sealed class InterproceduralAnalysisContext
 {
+    private readonly ConcurrentDictionary<MethodComplexityCacheKey, ComplexityExpression> directRecurrenceSolutions =
+        new(MethodComplexityCacheKey.Comparer);
+    private readonly ConcurrentDictionary<SyntaxTree, SemanticModel> semanticModels = new();
     private readonly ConcurrentDictionary<SyntaxTree, ComplexityAnalyzerOptions> treeOptions = new();
     private readonly Func<SyntaxTree, ComplexityAnalyzerOptions> optionsResolver;
 
@@ -47,6 +51,12 @@ internal sealed class InterproceduralAnalysisContext
     {
         get;
     }
+
+    internal int DirectRecurrenceCacheCount
+        => directRecurrenceSolutions.Count;
+
+    internal int SemanticModelCacheCount
+        => semanticModels.Count;
 
     internal static InterproceduralAnalysisContext Create(
         Compilation compilation,
@@ -102,6 +112,23 @@ internal sealed class InterproceduralAnalysisContext
         return treeOptions.GetOrAdd(syntaxTree, optionsResolver);
     }
 
+    internal SemanticModel GetSemanticModel(
+        SyntaxTree syntaxTree,
+        CancellationToken cancellationToken)
+    {
+        _ = syntaxTree ?? throw new ArgumentNullException(nameof(syntaxTree));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        SemanticModel semanticModel = semanticModels.GetOrAdd(
+            syntaxTree,
+            tree => Compilation.GetSemanticModel(tree));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return semanticModel;
+    }
+
     internal ComplexityAnalyzerOptions GetAnalysisOptions(
         SyntaxTree syntaxTree,
         AnalysisBudget rootBudget,
@@ -140,5 +167,38 @@ internal sealed class InterproceduralAnalysisContext
             rootMethodSymbol,
             AnalysisBudget.FromOptions(options),
             cancellationToken);
+    }
+
+    internal bool TryGetDirectRecurrenceSolution(
+        IMethodSymbol methodSymbol,
+        ComplexityAnalyzerOptions options,
+        CancellationToken cancellationToken,
+        out ComplexityExpression complexity)
+    {
+        _ = methodSymbol ?? throw new ArgumentNullException(nameof(methodSymbol));
+        _ = options ?? throw new ArgumentNullException(nameof(options));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return directRecurrenceSolutions.TryGetValue(
+            MethodComplexityCacheKey.Create(methodSymbol, options),
+            out complexity);
+    }
+
+    internal void StoreDirectRecurrenceSolution(
+        IMethodSymbol methodSymbol,
+        ComplexityAnalyzerOptions options,
+        ComplexityExpression complexity,
+        CancellationToken cancellationToken)
+    {
+        _ = methodSymbol ?? throw new ArgumentNullException(nameof(methodSymbol));
+        _ = options ?? throw new ArgumentNullException(nameof(options));
+        _ = complexity ?? throw new ArgumentNullException(nameof(complexity));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _ = directRecurrenceSolutions.TryAdd(
+            MethodComplexityCacheKey.Create(methodSymbol, options),
+            complexity);
     }
 }

@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 7 \u2014 Configuration, Performance & NuGet Readiness",
   "currentObjective": "Phase 7 in progress",
-  "completedStep": "5/10 \u2014 performance harness and baseline",
+  "completedStep": "6/10 \u2014 hot-path and cache hardening",
   "decisions": [
     "Phase 7 starts from factual Phase 6 completion: direct-recursion solving, BIG1005, docs, and tests are present and Release tests pass.",
     "Custom analyzer behavior configuration will use Roslyn AnalyzerConfigOptionsProvider or an equivalent analyzer config mechanism, not a manual .editorconfig parser.",
@@ -25,7 +25,10 @@
     "BIG1006 reports only when the threshold is not none, actual complexity is known, actual and threshold are comparable, and actual is greater than threshold.",
     "Performance validation now uses deterministic synthetic corpus builders and structural invariants instead of narrow CI timing thresholds.",
     "Analyzer execution-time reporting is validated through the official compiler/MSBuild ReportAnalyzer switch with detailed verbosity.",
-    "BenchmarkDotNet was not added because the Phase 7 performance baseline gets useful signal from the Roslyn harness and compiler timing report without a new dependency."
+    "BenchmarkDotNet was not added because the Phase 7 performance baseline gets useful signal from the Roslyn harness and compiler timing report without a new dependency.",
+    "Interprocedural analysis now reuses SemanticModel instances per SyntaxTree inside the per-compilation analysis context, without extending lifetime beyond the Compilation-owned context.",
+    "Solved direct recurrence results are cached per source method and template-affecting options so BIG1005/actionable analysis and estimated-complexity analysis do not solve the same recurrence twice.",
+    "Inconclusive or unsupported recurrence results are intentionally not cached because active call-path context can affect unknown boundaries."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -40,7 +43,10 @@
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/AnalysisBudget.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/InterproceduralAnalysisContext.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/InterproceduralInvocationAnalyzer.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/MethodComplexityCacheKey.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/MethodComplexityExtractor.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityAnalyzerOptions.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityAnalyzerOptionsReader.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityThreshold.cs",
@@ -73,13 +79,19 @@
     "dotnet test --configuration Release --no-build passed with 550 passed, 0 failed, 0 skipped.",
     "dotnet test --configuration Release --no-build --filter PerformanceSyntheticCorpusTests passed with 7 passed, 0 failed, 0 skipped.",
     "Official analyzer timing report command passed: dotnet build ./performance/ComplexityAnalysis.Analyzers.Performance/ComplexityAnalysis.Analyzers.Performance.csproj --configuration Release --no-restore -t:Rebuild -p:ReportAnalyzer=true -p:UseSharedCompilation=false -v:detailed.",
-    "The ReportAnalyzer output included ComplexityAnalysis.Analyzers.ComplexityAnalyzer in the analyzer execution summary."
+    "The ReportAnalyzer output included ComplexityAnalysis.Analyzers.ComplexityAnalyzer in the analyzer execution summary.",
+    "Step 6 baseline before edits: dotnet test --configuration Release --no-build --filter PerformanceSyntheticCorpusTests passed with 7 passed, 0 failed, 0 skipped.",
+    "Step 6 baseline ReportAnalyzer run passed and included ComplexityAnalysis.Analyzers.ComplexityAnalyzer in the analyzer execution summary.",
+    "Step 6 post-change harness passed with 9 passed, 0 failed, 0 skipped; the two additional tests cover SemanticModel cache reuse and solved direct recurrence reuse.",
+    "Step 6 post-change ReportAnalyzer run passed and included ComplexityAnalysis.Analyzers.ComplexityAnalyzer in the analyzer execution summary.",
+    "Step 6 audit found no filesystem I/O, network access, process launch, telemetry, or EventSource usage in analyzer/src/ComplexityAnalysis.Analyzers.",
+    "dotnet build --configuration Release passed after step 6 changes; remaining warnings were in existing tests, not the changed production analyzer files.",
+    "dotnet test --configuration Release --no-build passed with 552 passed, 0 failed, 0 skipped."
   ],
   "knownPendingItems": [
-    "Use the performance harness and ReportAnalyzer summaries in the next step to inspect hot paths and cache behavior before making optimizations.",
     "Complete factual NuGet metadata, symbols/source debugging decision, package contract tests, consumer smoke tests, and compatibility matrix."
   ],
-  "nextStep": "6/10 \u2014 hot-path and cache hardening",
+  "nextStep": "7/10 \u2014 NuGet package hardening and contract tests",
   "lastCommit": {
     "hash": "a97fa164860e6ecafac63332516192d8b3cacce9",
     "message": "Merge pull request #5 from rodri-oliveira-dev/feature/Phase6"

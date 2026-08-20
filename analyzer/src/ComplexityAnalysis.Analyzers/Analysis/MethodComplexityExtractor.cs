@@ -199,6 +199,42 @@ internal sealed class MethodComplexityExtractor
             return false;
         }
 
+        if (context.InterproceduralContext?.TryGetDirectRecurrenceSolution(
+            context.MethodSymbol,
+            context.Options,
+            context.CancellationToken,
+            out ComplexityExpression cachedComplexity) == true)
+        {
+            complexity = cachedComplexity;
+            return true;
+        }
+
+        if (!TrySolveDirectRecurrenceUncached(methodDeclaration, context, out complexity))
+        {
+            return false;
+        }
+
+        if (context.InterproceduralContext is not null
+            && complexity is not null)
+        {
+            context.InterproceduralContext.StoreDirectRecurrenceSolution(
+                context.MethodSymbol,
+                context.Options,
+                complexity,
+                context.CancellationToken);
+        }
+
+        return true;
+    }
+
+    private static bool TrySolveDirectRecurrenceUncached(
+        MethodDeclarationSyntax methodDeclaration,
+        MethodAnalysisContext context,
+        out ComplexityExpression? complexity)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        complexity = null;
         RecurrenceExtractionResult extraction = new RecurrenceExtractor().Extract(
             methodDeclaration,
             context);

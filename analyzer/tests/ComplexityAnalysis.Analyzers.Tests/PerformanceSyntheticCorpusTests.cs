@@ -254,6 +254,76 @@ public sealed class PerformanceSyntheticCorpusTests
         Assert.Equal(1, provider.TreeOptionsReadCount);
     }
 
+    [Fact]
+    public void Semantic_models_are_reused_per_syntax_tree_by_the_analysis_context_cache()
+    {
+        SyntaxTree syntaxTree = Parse(
+            """
+            public sealed class Sample
+            {
+                void M()
+                {
+                }
+            }
+            """);
+        CSharpCompilation compilation = CreateCompilation([syntaxTree]);
+        InterproceduralAnalysisContext context = InterproceduralAnalysisContext.Create(
+            compilation,
+            CancellationToken.None);
+
+        SemanticModel first = context.GetSemanticModel(syntaxTree, CancellationToken.None);
+        SemanticModel second = context.GetSemanticModel(syntaxTree, CancellationToken.None);
+
+        Assert.Same(first, second);
+        Assert.Equal(1, context.SemanticModelCacheCount);
+    }
+
+    [Fact]
+    public void Solved_direct_recurrence_is_reused_between_actionable_and_complexity_passes()
+    {
+        CompilationFacts facts = CreateFacts(
+            """
+            public sealed class Sample
+            {
+                int Fibonacci(int n)
+                {
+                    if (n <= 1)
+                    {
+                        return n;
+                    }
+
+                    return Fibonacci(n - 1) + Fibonacci(n - 2);
+                }
+            }
+            """);
+        MethodDeclarationSyntax methodDeclaration = GetMethodDeclaration(facts, "Fibonacci");
+        SemanticModel semanticModel = facts.Compilation.GetSemanticModel(facts.SyntaxTree);
+        InterproceduralAnalysisContext context = InterproceduralAnalysisContext.Create(
+            facts.Compilation,
+            CancellationToken.None);
+
+        ImmutableArray<Diagnostic> actionableDiagnostics = new ActionableComplexityDiagnosticAnalyzer()
+            .AnalyzeMethod(
+                methodDeclaration,
+                semanticModel,
+                context,
+                ComplexityAnalyzerOptions.Default,
+                CancellationToken.None);
+
+        _ = Assert.Single(actionableDiagnostics, diagnostic => diagnostic.Id == ExponentialRecursiveGrowthId);
+        Assert.Equal(1, context.DirectRecurrenceCacheCount);
+
+        ComplexityExpression complexity = new MethodComplexityExtractor().AnalyzeMethod(
+            methodDeclaration,
+            semanticModel,
+            context,
+            ComplexityAnalyzerOptions.Default,
+            CancellationToken.None);
+
+        Assert.Equal("O(1.618^n)", complexity.ToBigONotation());
+        Assert.Equal(1, context.DirectRecurrenceCacheCount);
+    }
+
     private static ComplexityExpression AnalyzeMethod(
         CompilationFacts facts,
         MethodDeclarationSyntax methodDeclaration,
