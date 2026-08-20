@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 7 \u2014 Configuration, Performance & NuGet Readiness",
   "currentObjective": "Phase 7 in progress",
-  "completedStep": "4/10 \u2014 complexity threshold diagnostic",
+  "completedStep": "5/10 \u2014 performance harness and baseline",
   "decisions": [
     "Phase 7 starts from factual Phase 6 completion: direct-recursion solving, BIG1005, docs, and tests are present and Release tests pass.",
     "Custom analyzer behavior configuration will use Roslyn AnalyzerConfigOptionsProvider or an equivalent analyzer config mechanism, not a manual .editorconfig parser.",
@@ -22,7 +22,10 @@
     "Direct recurrence extraction and solving, including BIG1005, are disabled by complexity_analyzers.recursion_analysis=false.",
     "Method complexity template cache entries are keyed by source method plus template-affecting feature/budget options, excluding maximum_complexity because threshold reporting does not change templates.",
     "BIG1006 is implemented for configured maximum_complexity threshold violations and uses ComplexityGrowthComparer rather than textual ranking.",
-    "BIG1006 reports only when the threshold is not none, actual complexity is known, actual and threshold are comparable, and actual is greater than threshold."
+    "BIG1006 reports only when the threshold is not none, actual complexity is known, actual and threshold are comparable, and actual is greater than threshold.",
+    "Performance validation now uses deterministic synthetic corpus builders and structural invariants instead of narrow CI timing thresholds.",
+    "Analyzer execution-time reporting is validated through the official compiler/MSBuild ReportAnalyzer switch with detailed verbosity.",
+    "BenchmarkDotNet was not added because the Phase 7 performance baseline gets useful signal from the Roslyn harness and compiler timing report without a new dependency."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -46,6 +49,9 @@
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerTests.cs",
     "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerOptionsReaderTests.cs",
     "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
+    "analyzer/performance/README.md",
+    "analyzer/performance/ComplexityAnalysis.Analyzers.Performance/ComplexityAnalysis.Analyzers.Performance.csproj",
+    "analyzer/performance/ComplexityAnalysis.Analyzers.Performance/TimingWorkload.cs",
     ".github/workflows/analyzer-ci.yml",
     "analyzer/docs/en/configuration.md",
     "analyzer/docs/pt-BR/configuration.md"
@@ -62,13 +68,18 @@
     "dotnet build --configuration Release passed for the analyzer workspace after BIG1006 threshold implementation.",
     "dotnet test --configuration Release --no-build passed with 543 passed, 0 failed, 0 skipped after BIG1006 threshold implementation.",
     "Reader I/O check found no System.IO, File, Directory, Path, .editorconfig, or source-text reads in ComplexityAnalyzerOptionsReader.cs.",
-    "git diff --check passed."
+    "git diff --check passed.",
+    "dotnet build --configuration Release passed for the analyzer workspace after adding the performance harness, including the performance timing project.",
+    "dotnet test --configuration Release --no-build passed with 550 passed, 0 failed, 0 skipped.",
+    "dotnet test --configuration Release --no-build --filter PerformanceSyntheticCorpusTests passed with 7 passed, 0 failed, 0 skipped.",
+    "Official analyzer timing report command passed: dotnet build ./performance/ComplexityAnalysis.Analyzers.Performance/ComplexityAnalysis.Analyzers.Performance.csproj --configuration Release --no-restore -t:Rebuild -p:ReportAnalyzer=true -p:UseSharedCompilation=false -v:detailed.",
+    "The ReportAnalyzer output included ComplexityAnalysis.Analyzers.ComplexityAnalyzer in the analyzer execution summary."
   ],
   "knownPendingItems": [
-    "Add repeatable performance workload and CI validation.",
+    "Use the performance harness and ReportAnalyzer summaries in the next step to inspect hot paths and cache behavior before making optimizations.",
     "Complete factual NuGet metadata, symbols/source debugging decision, package contract tests, consumer smoke tests, and compatibility matrix."
   ],
-  "nextStep": "5/10 \u2014 performance harness and baseline",
+  "nextStep": "6/10 \u2014 hot-path and cache hardening",
   "lastCommit": {
     "hash": "a97fa164860e6ecafac63332516192d8b3cacce9",
     "message": "Merge pull request #5 from rodri-oliveira-dev/feature/Phase6"
