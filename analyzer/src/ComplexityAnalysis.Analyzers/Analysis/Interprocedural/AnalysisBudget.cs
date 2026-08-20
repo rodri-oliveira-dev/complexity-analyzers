@@ -1,5 +1,7 @@
 using System;
 
+using ComplexityAnalysis.Analyzers.Configuration;
+
 namespace ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 
 internal sealed class AnalysisBudget
@@ -37,5 +39,14 @@ internal sealed class AnalysisBudget
     internal int MaximumMethodsPerRootAnalysis
     {
         get;
+    }
+
+    internal static AnalysisBudget FromOptions(ComplexityAnalyzerOptions options)
+    {
+        _ = options ?? throw new ArgumentNullException(nameof(options));
+
+        return new AnalysisBudget(
+            options.MaxCallDepth,
+            options.MaxMethodsPerRoot);
     }
 }

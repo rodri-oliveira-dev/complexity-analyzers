@@ -3,6 +3,7 @@ using System.Linq;
 
 using ComplexityAnalysis.Analyzers.Analysis;
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
+using ComplexityAnalysis.Analyzers.Configuration;
 using ComplexityAnalysis.Analyzers.Diagnostics;
 using ComplexityAnalysis.Analyzers.Model;
 
@@ -43,6 +44,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
 
         InterproceduralAnalysisContext interproceduralContext = InterproceduralAnalysisContext.Create(
             context.Compilation,
+            context.Options.AnalyzerConfigOptionsProvider,
             context.CancellationToken);
 
         context.RegisterCompilationEndAction(AnalyzeCompilation);
@@ -60,10 +62,15 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         context.CancellationToken.ThrowIfCancellationRequested();
 
         MethodDeclarationSyntax methodDeclaration = (MethodDeclarationSyntax)context.Node;
+        ComplexityAnalyzerOptions options = interproceduralContext.GetOptions(
+            methodDeclaration.SyntaxTree,
+            context.CancellationToken);
+
         foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMethod(
             methodDeclaration,
             context.SemanticModel,
             interproceduralContext,
+            options,
             context.CancellationToken))
         {
             context.ReportDiagnostic(diagnostic);
@@ -73,6 +80,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             methodDeclaration,
             context.SemanticModel,
             interproceduralContext,
+            options,
             context.CancellationToken);
 
         if (complexity is UnknownComplexity)

@@ -69,6 +69,21 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         get;
     }
 
+    internal ComplexityAnalyzerOptions WithAnalysisBudget(AnalysisBudget budget)
+    {
+        _ = budget ?? throw new ArgumentNullException(nameof(budget));
+
+        return MaxCallDepth == budget.MaximumCallDepth
+            && MaxMethodsPerRoot == budget.MaximumMethodsPerRootAnalysis
+            ? this
+            : new ComplexityAnalyzerOptions(
+                InterproceduralAnalysisEnabled,
+                RecursionAnalysisEnabled,
+                budget.MaximumCallDepth,
+                budget.MaximumMethodsPerRootAnalysis,
+                MaximumComplexity);
+    }
+
     public bool Equals(ComplexityAnalyzerOptions? other)
     {
         return other is not null

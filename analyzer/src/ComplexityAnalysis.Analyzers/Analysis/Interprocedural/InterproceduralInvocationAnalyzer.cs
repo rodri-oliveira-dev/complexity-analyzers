@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Threading;
 
+using ComplexityAnalysis.Analyzers.Configuration;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -47,13 +48,21 @@ internal sealed class InterproceduralInvocationAnalyzer
             return AnalyzeKnownOperation(invocation, resolution);
         }
 
-        return resolution.Kind == CallTargetResolutionKind.SourceMethod
-            ? AnalyzeSourceMethodInvocation(
-                invocation,
-                resolution,
-                interproceduralContext,
-                rootState)
-            : ComplexityFactory.Unknown();
+        if (resolution.Kind != CallTargetResolutionKind.SourceMethod)
+        {
+            return ComplexityFactory.Unknown();
+        }
+
+        if (!callerContext.Options.InterproceduralAnalysisEnabled)
+        {
+            return ComplexityFactory.Unknown();
+        }
+
+        return AnalyzeSourceMethodInvocation(
+            invocation,
+            resolution,
+            interproceduralContext,
+            rootState);
     }
 
     private ComplexityExpression AnalyzeKnownOperation(
@@ -85,6 +94,10 @@ internal sealed class InterproceduralInvocationAnalyzer
         }
 
         IMethodSymbol sourceMethodDefinition = resolution.SourceMethodDefinition;
+        ComplexityAnalyzerOptions calleeOptions = interproceduralContext.GetAnalysisOptions(
+            resolution.SourceMethodDeclaration.SyntaxTree,
+            rootState.Budget,
+            callerContext.CancellationToken);
         if (rootState.ContainsActiveMethod(sourceMethodDefinition))
         {
             return InterproceduralAnalysisResult
@@ -94,6 +107,7 @@ internal sealed class InterproceduralInvocationAnalyzer
 
         if (interproceduralContext.TemplateCache.TryGetCompleted(
             sourceMethodDefinition,
+            calleeOptions,
             callerContext.CancellationToken,
             out InterproceduralAnalysisResult cachedResult))
         {
@@ -119,6 +133,7 @@ internal sealed class InterproceduralInvocationAnalyzer
                 sourceMethodDefinition,
                 resolution.SourceMethodDeclaration,
                 interproceduralContext,
+                calleeOptions,
                 calleeState);
         }
         finally
@@ -137,12 +152,14 @@ internal sealed class InterproceduralInvocationAnalyzer
         IMethodSymbol sourceMethodDefinition,
         MethodDeclarationSyntax sourceMethodDeclaration,
         InterproceduralAnalysisContext interproceduralContext,
+        ComplexityAnalyzerOptions calleeOptions,
         InterproceduralRootAnalysisState calleeState)
     {
         callerContext.CancellationToken.ThrowIfCancellationRequested();
 
         if (!interproceduralContext.TemplateCache.TryReserveAnalysis(
             sourceMethodDefinition,
+            calleeOptions,
             callerContext.CancellationToken,
             out InterproceduralAnalysisResult? completedResult))
         {
@@ -151,6 +168,7 @@ internal sealed class InterproceduralInvocationAnalyzer
                     sourceMethodDefinition,
                     sourceMethodDeclaration,
                     interproceduralContext,
+                    calleeOptions,
                     calleeState);
         }
 
@@ -161,12 +179,14 @@ internal sealed class InterproceduralInvocationAnalyzer
                 sourceMethodDefinition,
                 sourceMethodDeclaration,
                 interproceduralContext,
+                calleeOptions,
                 calleeState);
 
             if (IsCacheable(analyzedResult))
             {
                 interproceduralContext.TemplateCache.StoreCompleted(
                     sourceMethodDefinition,
+                    calleeOptions,
                     analyzedResult,
                     callerContext.CancellationToken);
                 stored = true;
@@ -180,6 +200,7 @@ internal sealed class InterproceduralInvocationAnalyzer
             {
                 _ = interproceduralContext.TemplateCache.AbandonAnalysis(
                     sourceMethodDefinition,
+                    calleeOptions,
                     CancellationToken.None);
             }
         }
@@ -189,6 +210,7 @@ internal sealed class InterproceduralInvocationAnalyzer
         IMethodSymbol sourceMethodDefinition,
         MethodDeclarationSyntax sourceMethodDeclaration,
         InterproceduralAnalysisContext interproceduralContext,
+        ComplexityAnalyzerOptions calleeOptions,
         InterproceduralRootAnalysisState calleeState)
     {
         callerContext.CancellationToken.ThrowIfCancellationRequested();
@@ -202,6 +224,7 @@ internal sealed class InterproceduralInvocationAnalyzer
                 calleeSemanticModel,
                 interproceduralContext,
                 calleeState,
+                calleeOptions,
                 callerContext.CancellationToken);
     }
 

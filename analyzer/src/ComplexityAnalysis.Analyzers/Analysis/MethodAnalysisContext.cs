@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Threading;
 
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
+using ComplexityAnalysis.Analyzers.Configuration;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -19,6 +20,7 @@ internal sealed class MethodAnalysisContext
         ImmutableDictionary<ISymbol, LoopBoundExpression> localLoopBounds,
         InterproceduralAnalysisContext? interproceduralContext,
         InterproceduralRootAnalysisState? interproceduralRootState,
+        ComplexityAnalyzerOptions options,
         bool treatsDirectRecursiveInvocationsAsConstant,
         CancellationToken cancellationToken)
     {
@@ -28,6 +30,7 @@ internal sealed class MethodAnalysisContext
         LocalLoopBounds = localLoopBounds;
         InterproceduralContext = interproceduralContext;
         InterproceduralRootState = interproceduralRootState;
+        Options = options ?? throw new ArgumentNullException(nameof(options));
         TreatsDirectRecursiveInvocationsAsConstant = treatsDirectRecursiveInvocationsAsConstant;
         CancellationToken = cancellationToken;
     }
@@ -58,6 +61,11 @@ internal sealed class MethodAnalysisContext
     }
 
     internal InterproceduralRootAnalysisState? InterproceduralRootState
+    {
+        get;
+    }
+
+    internal ComplexityAnalyzerOptions Options
     {
         get;
     }
@@ -96,6 +104,7 @@ internal sealed class MethodAnalysisContext
         return Create(
             semanticModel,
             methodSymbol,
+            ComplexityAnalyzerOptions.Default,
             interproceduralContext: null,
             interproceduralRootState: null,
             cancellationToken);
@@ -109,7 +118,34 @@ internal sealed class MethodAnalysisContext
         CancellationToken cancellationToken)
     {
         _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+
+        ComplexityAnalyzerOptions options = interproceduralContext is null
+            ? ComplexityAnalyzerOptions.Default
+            : interproceduralContext.GetAnalysisOptions(
+                semanticModel.SyntaxTree,
+                interproceduralRootState?.Budget ?? interproceduralContext.Budget,
+                cancellationToken);
+
+        return Create(
+            semanticModel,
+            methodSymbol,
+            options,
+            interproceduralContext,
+            interproceduralRootState,
+            cancellationToken);
+    }
+
+    internal static MethodAnalysisContext Create(
+        SemanticModel semanticModel,
+        IMethodSymbol methodSymbol,
+        ComplexityAnalyzerOptions options,
+        InterproceduralAnalysisContext? interproceduralContext,
+        InterproceduralRootAnalysisState? interproceduralRootState,
+        CancellationToken cancellationToken)
+    {
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         _ = methodSymbol ?? throw new ArgumentNullException(nameof(methodSymbol));
+        _ = options ?? throw new ArgumentNullException(nameof(options));
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -124,6 +160,7 @@ internal sealed class MethodAnalysisContext
             ImmutableDictionary.Create<ISymbol, LoopBoundExpression>(SymbolEqualityComparer.Default),
             interproceduralContext,
             interproceduralRootState,
+            options,
             treatsDirectRecursiveInvocationsAsConstant: false,
             cancellationToken);
     }
@@ -159,6 +196,7 @@ internal sealed class MethodAnalysisContext
             LocalLoopBounds.SetItem(symbol, bound),
             InterproceduralContext,
             InterproceduralRootState,
+            Options,
             TreatsDirectRecursiveInvocationsAsConstant,
             CancellationToken);
     }
@@ -177,6 +215,7 @@ internal sealed class MethodAnalysisContext
                 LocalLoopBounds.Remove(symbol),
                 InterproceduralContext,
                 InterproceduralRootState,
+                Options,
                 TreatsDirectRecursiveInvocationsAsConstant,
                 CancellationToken)
             : this;
@@ -195,6 +234,7 @@ internal sealed class MethodAnalysisContext
                 LocalLoopBounds,
                 InterproceduralContext,
                 InterproceduralRootState,
+                Options,
                 treatsDirectRecursiveInvocationsAsConstant: true,
                 CancellationToken);
     }
