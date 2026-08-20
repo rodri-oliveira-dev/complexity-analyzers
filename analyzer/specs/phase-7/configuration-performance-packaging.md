@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress.
+Complete.
 
 This document is the Phase 7 specification. It does not implement production code, publish a package, create a GitHub Release, or push repository changes.
 
