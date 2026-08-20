@@ -175,4 +175,4 @@ See [Architecture](docs/en/architecture.md).
 
 ## License
 
-Use the repository license that applies to this project.
+MIT, matching the repository license declaration.

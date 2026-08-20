@@ -41,6 +41,11 @@ analyzers/dotnet/cs/
 ```
 
 O projeto define `PackageReadmeFile` como `README.md`, e o README empacotado e o `analyzer/README.md` em ingles.
+O pacote usa a URL do repositorio como metadata de projeto, declara o tipo de repositorio como `git` e usa a declaracao de licenca MIT do repositorio como expressao de licenca NuGet.
+
+O pacote intencionalmente nao tem asset runtime em `lib/` e nao expoe dependencia Roslyn transitiva. Testes de contrato inspecionam o `.nupkg` gerado como arquivo ZIP.
+
+A geracao de `.snupkg` nao esta habilitada para o layout atual do analyzer porque o pacote mantem a DLL fora do build output convencional e dentro de `analyzers/dotnet/cs/`. O Source Link build tooling e fornecido pelo SDK .NET atual, entao nenhuma referencia de pacote Source Link e necessaria.
 
 ## Consumo Local
 

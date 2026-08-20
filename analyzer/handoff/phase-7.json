@@ -1,7 +1,7 @@
 {
   "delivery": "Phase 7 \u2014 Configuration, Performance & NuGet Readiness",
   "currentObjective": "Phase 7 in progress",
-  "completedStep": "6/10 \u2014 hot-path and cache hardening",
+  "completedStep": "7/10 \u2014 NuGet package hardening and contract tests",
   "decisions": [
     "Phase 7 starts from factual Phase 6 completion: direct-recursion solving, BIG1005, docs, and tests are present and Release tests pass.",
     "Custom analyzer behavior configuration will use Roslyn AnalyzerConfigOptionsProvider or an equivalent analyzer config mechanism, not a manual .editorconfig parser.",
@@ -28,7 +28,14 @@
     "BenchmarkDotNet was not added because the Phase 7 performance baseline gets useful signal from the Roslyn harness and compiler timing report without a new dependency.",
     "Interprocedural analysis now reuses SemanticModel instances per SyntaxTree inside the per-compilation analysis context, without extending lifetime beyond the Compilation-owned context.",
     "Solved direct recurrence results are cached per source method and template-affecting options so BIG1005/actionable analysis and estimated-complexity analysis do not solve the same recurrence twice.",
-    "Inconclusive or unsupported recurrence results are intentionally not cached because active call-path context can affect unknown boundaries."
+    "Inconclusive or unsupported recurrence results are intentionally not cached because active call-path context can affect unknown boundaries.",
+    "Package hardening baseline used the repository-defined implicit package version 1.0.0; the .nupkg already contained README.md and ComplexityAnalysis.Analyzers.dll only under analyzers/dotnet/cs/, with no lib/ runtime asset, dependency groups, inherited assemblies, symbols, or license metadata.",
+    "Package metadata now adds factual Authors=Rodrigo de Oliveira, PackageLicenseExpression=MIT from the repository README license declaration, RepositoryType=git, PublishRepositoryUrl=true, and embedded debug symbols through DebugType=embedded.",
+    "No organization, company, copyright, PackageReleaseNotes, or non-factual project URL was added.",
+    "No Source Link package reference was added because the current .NET SDK includes Source Link build tooling; Source Link build packages would be build-only if ever required later.",
+    ".snupkg generation is not enabled for the current analyzer package: IncludeSymbols=true with IncludeBuildOutput=false produced NU5017, while enabling conventional build output produced extra analyzers/dotnet/cs/netstandard2.0 content and would weaken the exact analyzer asset contract.",
+    "EnablePackageValidation was evaluated with dotnet pack and left disabled because the package has no lib/ref API assets; explicit ZIP-based package contract tests provide the analyzer-specific CI signal.",
+    "Package contract tests now pack the analyzer locally with --no-build and inspect the generated .nupkg via System.IO.Compression for analyzer path, README, license/repository metadata, absence of inherited assemblies, absence of Roslyn runtime dependencies, and absence of unexpected lib runtime assets."
   ],
   "constraints": [
     "Do not modify inherited projects outside analyzer/.",
@@ -86,14 +93,24 @@
     "Step 6 post-change ReportAnalyzer run passed and included ComplexityAnalysis.Analyzers.ComplexityAnalyzer in the analyzer execution summary.",
     "Step 6 audit found no filesystem I/O, network access, process launch, telemetry, or EventSource usage in analyzer/src/ComplexityAnalysis.Analyzers.",
     "dotnet build --configuration Release passed after step 6 changes; remaining warnings were in existing tests, not the changed production analyzer files.",
-    "dotnet test --configuration Release --no-build passed with 552 passed, 0 failed, 0 skipped."
+    "dotnet test --configuration Release --no-build passed with 552 passed, 0 failed, 0 skipped.",
+    "Step 7 baseline pack used dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release with the implicit local version 1.0.0 and produced a .nupkg with README.md, nuspec, and analyzers/dotnet/cs/ComplexityAnalysis.Analyzers.dll only.",
+    "Step 7 baseline package inspection found no lib/ runtime asset, no dependency groups, no inherited assemblies, no symbols package, no license metadata, and default authors metadata.",
+    "Step 7 symbol-package evaluation found IncludeSymbols=true and SymbolPackageFormat=snupkg with IncludeBuildOutput=false produced NU5017; enabling conventional build output created a .snupkg but also introduced an extra analyzers/dotnet/cs/netstandard2.0 analyzer DLL path in the .nupkg.",
+    "Step 7 package validation evaluation passed with -p:EnablePackageValidation=true but produced no analyzer-specific signal because the package has no lib/ref API assets.",
+    "dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build --filter AnalyzerPackageContractTests passed with 5 passed, 0 failed, 0 skipped.",
+    "Final Step 7 validation passed: dotnet restore ComplexityAnalysis.Analyzers.slnx.",
+    "Final Step 7 validation passed: dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore with 0 warnings and 0 errors.",
+    "Final Step 7 validation passed: dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build with 557 passed, 0 failed, 0 skipped.",
+    "Final Step 7 validation passed: dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages.",
+    "Final Step 7 package inspection found README.md, nuspec, and analyzers/dotnet/cs/ComplexityAnalysis.Analyzers.dll only; nuspec includes Authors=Rodrigo de Oliveira, MIT license expression, repository type git, repository commit metadata, no dependency groups, and no lib/ runtime assets."
   ],
   "knownPendingItems": [
-    "Complete factual NuGet metadata, symbols/source debugging decision, package contract tests, consumer smoke tests, and compatibility matrix."
+    "Complete consumer smoke tests and compatibility matrix."
   ],
-  "nextStep": "7/10 \u2014 NuGet package hardening and contract tests",
+  "nextStep": "8/10 \u2014 CI and compatibility matrix",
   "lastCommit": {
-    "hash": "a97fa164860e6ecafac63332516192d8b3cacce9",
-    "message": "Merge pull request #5 from rodri-oliveira-dev/feature/Phase6"
+    "hash": "e7f5ccd1d5dacc081148819596c0503265add333",
+    "message": "perf: harden analyzer execution paths"
   }
 }
