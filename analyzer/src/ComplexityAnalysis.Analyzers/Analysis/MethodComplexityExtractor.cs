@@ -3,6 +3,7 @@ using System.Threading;
 
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Analysis.Recursion;
+using ComplexityAnalysis.Analyzers.Configuration;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -13,7 +14,7 @@ namespace ComplexityAnalysis.Analyzers.Analysis;
 
 internal sealed class MethodComplexityExtractor
 {
-    internal ComplexityExpression AnalyzeMethod(
+    internal static ComplexityExpression AnalyzeMethod(
         MethodDeclarationSyntax methodDeclaration,
         SemanticModel semanticModel,
         CancellationToken cancellationToken)
@@ -25,11 +26,13 @@ internal sealed class MethodComplexityExtractor
 
         IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken)
             ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        ComplexityAnalyzerOptions options = ComplexityAnalyzerOptions.Default;
         InterproceduralAnalysisContext interproceduralContext = InterproceduralAnalysisContext.Create(
             semanticModel.Compilation,
             cancellationToken);
-        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+        InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
             methodSymbol,
+            options,
             cancellationToken);
 
         return AnalyzeMethod(
@@ -38,10 +41,42 @@ internal sealed class MethodComplexityExtractor
             semanticModel,
             interproceduralContext,
             rootState,
+            options,
             cancellationToken);
     }
 
-    internal ComplexityExpression AnalyzeMethod(
+    internal static ComplexityExpression AnalyzeMethod(
+        MethodDeclarationSyntax methodDeclaration,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
+        ComplexityAnalyzerOptions options,
+        CancellationToken cancellationToken)
+    {
+        _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
+        _ = options ?? throw new ArgumentNullException(nameof(options));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken)
+            ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
+            methodSymbol,
+            options,
+            cancellationToken);
+
+        return AnalyzeMethod(
+            methodDeclaration,
+            methodSymbol,
+            semanticModel,
+            interproceduralContext,
+            rootState,
+            options.WithAnalysisBudget(rootState.Budget),
+            cancellationToken);
+    }
+
+    internal static ComplexityExpression AnalyzeMethod(
         MethodDeclarationSyntax methodDeclaration,
         SemanticModel semanticModel,
         InterproceduralAnalysisContext interproceduralContext,
@@ -55,8 +90,13 @@ internal sealed class MethodComplexityExtractor
 
         IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken)
             ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
-        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+        ComplexityAnalyzerOptions options = interproceduralContext.GetAnalysisOptions(
+            methodDeclaration.SyntaxTree,
+            interproceduralContext.Budget,
+            cancellationToken);
+        InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
             methodSymbol,
+            options,
             cancellationToken);
 
         return AnalyzeMethod(
@@ -65,6 +105,7 @@ internal sealed class MethodComplexityExtractor
             semanticModel,
             interproceduralContext,
             rootState,
+            options.WithAnalysisBudget(rootState.Budget),
             cancellationToken);
     }
 
@@ -74,6 +115,7 @@ internal sealed class MethodComplexityExtractor
         SemanticModel semanticModel,
         InterproceduralAnalysisContext interproceduralContext,
         InterproceduralRootAnalysisState rootState,
+        ComplexityAnalyzerOptions options,
         CancellationToken cancellationToken)
     {
         _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
@@ -81,12 +123,14 @@ internal sealed class MethodComplexityExtractor
         _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
         _ = rootState ?? throw new ArgumentNullException(nameof(rootState));
+        _ = options ?? throw new ArgumentNullException(nameof(options));
 
         cancellationToken.ThrowIfCancellationRequested();
 
         MethodAnalysisContext context = MethodAnalysisContext.Create(
             semanticModel,
             methodSymbol,
+            options.WithAnalysisBudget(rootState.Budget),
             interproceduralContext,
             rootState,
             cancellationToken);
@@ -107,11 +151,13 @@ internal sealed class MethodComplexityExtractor
         SemanticModel semanticModel,
         InterproceduralAnalysisContext interproceduralContext,
         InterproceduralRootAnalysisState rootState,
+        ComplexityAnalyzerOptions options,
         CancellationToken cancellationToken)
     {
         MethodAnalysisContext context = MethodAnalysisContext.Create(
             semanticModel,
             methodSymbol,
+            options.WithAnalysisBudget(rootState.Budget),
             interproceduralContext,
             rootState,
             cancellationToken);
@@ -123,13 +169,11 @@ internal sealed class MethodComplexityExtractor
         MethodDeclarationSyntax methodDeclaration,
         MethodAnalysisContext context)
     {
-        if (TrySolveDirectRecurrence(methodDeclaration, context, out ComplexityExpression? recursiveComplexity)
-            && recursiveComplexity is not null)
-        {
-            return recursiveComplexity;
-        }
-
-        return methodDeclaration.Body is not null
+        return context.Options.RecursionAnalysisEnabled
+            && TrySolveDirectRecurrence(methodDeclaration, context, out ComplexityExpression? recursiveComplexity)
+            && recursiveComplexity is not null
+            ? recursiveComplexity
+            : methodDeclaration.Body is not null
             ? AnalyzeBlockCore(methodDeclaration.Body, context)
             : methodDeclaration.ExpressionBody is null
             ? ComplexityFactory.Unknown()
@@ -144,6 +188,47 @@ internal sealed class MethodComplexityExtractor
         _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
         _ = context ?? throw new ArgumentNullException(nameof(context));
 
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        complexity = null;
+        if (!context.Options.RecursionAnalysisEnabled)
+        {
+            return false;
+        }
+
+        if (context.InterproceduralContext?.TryGetDirectRecurrenceSolution(
+            context.MethodSymbol,
+            context.Options,
+            context.CancellationToken,
+            out ComplexityExpression cachedComplexity) == true)
+        {
+            complexity = cachedComplexity;
+            return true;
+        }
+
+        if (!TrySolveDirectRecurrenceUncached(methodDeclaration, context, out complexity))
+        {
+            return false;
+        }
+
+        if (context.InterproceduralContext is not null
+            && complexity is not null)
+        {
+            context.InterproceduralContext.StoreDirectRecurrenceSolution(
+                context.MethodSymbol,
+                context.Options,
+                complexity,
+                context.CancellationToken);
+        }
+
+        return true;
+    }
+
+    private static bool TrySolveDirectRecurrenceUncached(
+        MethodDeclarationSyntax methodDeclaration,
+        MethodAnalysisContext context,
+        out ComplexityExpression? complexity)
+    {
         context.CancellationToken.ThrowIfCancellationRequested();
 
         complexity = null;
@@ -421,15 +506,12 @@ internal sealed class MethodComplexityExtractor
         AssignmentExpressionSyntax assignment,
         MethodAnalysisContext context)
     {
-        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
-            || !TryGetLocalSymbol(assignment.Left, context, out ISymbol? symbol)
-            || symbol is null
-            || !new LoopBoundAnalyzer(context).TryResolveBoundExpression(assignment.Right, out LoopBoundExpression bound))
-        {
-            return context;
-        }
-
-        return context.WithLocalLoopBound(symbol, bound);
+        return assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
+            && TryGetLocalSymbol(assignment.Left, context, out ISymbol? symbol)
+            && symbol is not null
+            && new LoopBoundAnalyzer(context).TryResolveBoundExpression(assignment.Right, out LoopBoundExpression bound)
+                ? context.WithLocalLoopBound(symbol, bound)
+                : context;
     }
 
     private static MethodAnalysisContext RemoveMutatedLocalLoopFacts(

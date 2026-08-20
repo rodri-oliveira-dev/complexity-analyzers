@@ -5,6 +5,7 @@ using System.Threading;
 
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Analysis.KnownOperations;
+using ComplexityAnalysis.Analyzers.Configuration;
 using ComplexityAnalysis.Analyzers.Diagnostics;
 using ComplexityAnalysis.Analyzers.Model;
 
@@ -21,22 +22,26 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         MethodDeclarationSyntax methodDeclaration,
         SemanticModel semanticModel,
         InterproceduralAnalysisContext interproceduralContext,
+        ComplexityAnalyzerOptions options,
         CancellationToken cancellationToken)
     {
         _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
         _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
         _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
+        _ = options ?? throw new ArgumentNullException(nameof(options));
 
         cancellationToken.ThrowIfCancellationRequested();
 
         IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken) as IMethodSymbol
             ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
-        InterproceduralRootAnalysisState rootState = interproceduralContext.CreateRootState(
+        InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
             methodSymbol,
+            options,
             cancellationToken);
         MethodAnalysisContext context = MethodAnalysisContext.Create(
             semanticModel,
             methodSymbol,
+            options.WithAnalysisBudget(rootState.Budget),
             interproceduralContext,
             rootState,
             cancellationToken);
@@ -94,7 +99,8 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
             return;
         }
 
-        if (resolution.Kind == CallTargetResolutionKind.SourceMethod)
+        if (resolution.Kind == CallTargetResolutionKind.SourceMethod
+            && context.Options.InterproceduralAnalysisEnabled)
         {
             AnalyzeSourceMethodInvocation(invocation, context, iterationComplexity, resolution, diagnostics);
         }

@@ -7,6 +7,9 @@
   <Folder Name="/src/">
     <Project Path="src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj" />
   </Folder>
+  <Folder Name="/performance/">
+    <Project Path="performance/ComplexityAnalysis.Analyzers.Performance/ComplexityAnalysis.Analyzers.Performance.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalysis.Analyzers.Tests.csproj" />
   </Folder>

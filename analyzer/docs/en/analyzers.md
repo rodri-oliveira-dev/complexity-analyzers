@@ -2,7 +2,7 @@
 
 [English](analyzers.md) | [Portugues (Brasil)](../pt-BR/analyzers.md)
 
-This page is the public catalog of diagnostics exposed by `ComplexityAnalysis.Analyzers` in Phase 6.
+This page is the public catalog of diagnostics exposed by `ComplexityAnalysis.Analyzers` through Phase 7.
 
 The analyzer resolves known BCL and LINQ operations through Roslyn symbols, can propagate complexity from safe source methods in the same compilation, and can solve selected direct recursive recurrence shapes. Same-name custom methods are not treated as known BCL/LINQ operations. Unsupported, unsafe, cyclic, budget-limited, numerically inconclusive, or unresolved operations remain `Unknown`.
 
@@ -16,6 +16,7 @@ The analyzer resolves known BCL and LINQ operations through Roslyn symbols, can 
 | `BIG1003` | Ordering inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | `true` |
+| `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## BIG0001 - Estimated Algorithmic Complexity
@@ -32,7 +33,7 @@ The analyzer resolves known BCL and LINQ operations through Roslyn symbols, can 
 
 ### Problem Detected
 
-`BIG0001` is informational. It exposes the analyzer's known estimate for a supported method, such as `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`, `O(n^1.585)`, or `O(1.618^n)`. In Phase 6, that estimate can include complexity propagated from safe source-method callees and selected solved direct recursion.
+`BIG0001` is informational. It exposes the analyzer's known estimate for a supported method, such as `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`, `O(n^1.585)`, or `O(1.618^n)`. That estimate can include complexity propagated from safe source-method callees and selected solved direct recursion.
 
 ### Example
 
@@ -438,6 +439,90 @@ Disable it:
 dotnet_diagnostic.BIG1005.severity = none
 ```
 
+## BIG1006 - Method Complexity Exceeds Configured Threshold
+
+| Property | Value |
+| --- | --- |
+| ID | `BIG1006` |
+| Title | `Method complexity exceeds configured threshold` |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Method identifier |
+| Message | `Method '{method}' has estimated complexity {actual}, which exceeds the configured maximum {threshold}` |
+
+### Problem Detected
+
+`BIG1006` reports a method whose known estimated complexity is greater than the configured `complexity_analyzers.maximum_complexity` threshold.
+
+Although the descriptor is enabled by default, the rule is functionally opt-in because the default threshold is `none`.
+
+### Example
+
+```csharp
+public sealed class Sample
+{
+    public int Quadratic(int[] values)
+    {
+        var total = 0;
+        foreach (var outer in values)
+        {
+            foreach (var inner in values)
+            {
+                total += outer + inner;
+            }
+        }
+
+        return total;
+    }
+}
+```
+
+With this configuration, `Quadratic` reports `BIG1006` because `O(n^2)` exceeds `O(n log n)`:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_complexity = n_log_n
+dotnet_diagnostic.BIG1006.severity = warning
+```
+
+### Non-Trigger Cases
+
+No diagnostic is reported when:
+
+- `complexity_analyzers.maximum_complexity` is `none` or invalid;
+- the method estimate is `Unknown`;
+- the estimate is less than or equal to the configured threshold;
+- the estimate and threshold are incomparable by the current model, including some multivariate expressions over independent variables.
+
+`BIG1006` is not a universal mathematical proof. It only compares complexity shapes that the analyzer has proven and can compare safely.
+
+### Configuration
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_complexity = n_log_n
+dotnet_diagnostic.BIG1006.severity = warning
+```
+
+Disable threshold reporting:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_complexity = none
+```
+
+Disable the diagnostic independently:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG1006.severity = none
+```
+
 ## BIG9000 - Analyzer Execution Probe
 
 | Property | Value |
@@ -506,13 +591,13 @@ Source-method interprocedural analysis is limited to ordinary methods in the sam
 
 The traversal is demand-driven: a source callee is analyzed only when an analyzed caller reaches that invocation. The analyzer does not build a mandatory whole-compilation call graph and does not pre-analyze every syntax tree for interprocedural propagation.
 
-Expansion is bounded by internal budgets: maximum call depth is `5`, and maximum uncached source-method expansions per root analysis is `32`. When a budget boundary is reached, the affected call remains `Unknown`; later independent roots can still analyze and cache the same source method when their own budget allows it.
+Expansion is bounded by public options with hard limits. The default maximum call depth is `5`, configurable up to `16`. The default maximum uncached source-method expansions per root analysis is `32`, configurable up to `128`. When a budget boundary is reached, the affected call remains `Unknown`; later independent roots can still analyze and cache the same source method when their own budget allows it.
 
 Out of scope remains full virtual/interface dispatch, external assemblies, constructors, properties, operators, local functions, lambdas as independent targets, whole-compilation call graphs, and whole-solution analysis. Cycles are detected and remain safe; mutual recursion is detected but not solved.
 
 ## Supported Direct-Recursion Scope
 
-Phase 6 solves only bounded direct recursion. A recursive call must resolve semantically to the same method definition, the method must provide compatible base-case evidence, the recursive argument must be provably reducing, and non-recursive local work must be known.
+The analyzer solves only bounded direct recursion. A recursive call must resolve semantically to the same method definition, the method must provide compatible base-case evidence, the recursive argument must be provably reducing, and non-recursive local work must be known.
 
 Supported recurrence families are:
 

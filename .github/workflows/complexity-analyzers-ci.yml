@@ -1,0 +1,283 @@
+name: Complexity Analyzers CI
+
+on:
+  push:
+    paths:
+      - 'analyzer/**'
+      - '.github/workflows/complexity-analyzers-ci.yml'
+  pull_request:
+    paths:
+      - 'analyzer/**'
+      - '.github/workflows/complexity-analyzers-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  PACKAGE_VERSION: 0.0.0-ci.${{ github.run_number }}
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: analyzer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: analyzer/global.json
+
+      - name: Restore
+        run: dotnet restore ComplexityAnalysis.Analyzers.slnx
+
+      - name: Build
+        run: >
+          dotnet build ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-restore
+
+      - name: Test
+        run: >
+          dotnet test ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-build
+          --filter "FullyQualifiedName!~AnalyzerPackageContractTests&FullyQualifiedName!~PerformanceSyntheticCorpusTests"
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: quality
+    defaults:
+      run:
+        working-directory: analyzer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: analyzer/global.json
+
+      - name: Restore
+        run: dotnet restore ComplexityAnalysis.Analyzers.slnx
+
+      - name: Build
+        run: >
+          dotnet build ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-restore
+
+      - name: Pack
+        run: >
+          dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj
+          --configuration Release
+          --no-build
+          --output artifacts/packages
+          -p:PackageVersion=${{ env.PACKAGE_VERSION }}
+
+      - name: Contract tests
+        run: >
+          dotnet test ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-build
+          --filter AnalyzerPackageContractTests
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: complexity-analyzers-nupkg
+          path: analyzer/artifacts/packages/*.nupkg
+          if-no-files-found: error
+
+  compatibility:
+    name: Compatibility (${{ matrix.sdk }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sdk: 8.0.x
+            target_framework: net8.0
+          - sdk: 9.0.x
+            target_framework: net9.0
+          - sdk: 10.0.x
+            target_framework: net10.0
+
+    steps:
+      - name: Setup .NET SDK host
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ matrix.sdk }}
+
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: complexity-analyzers-nupkg
+          path: ${{ runner.temp }}/complexity-analyzers-packages
+
+      - name: Build consumer with local analyzer package
+        shell: pwsh
+        env:
+          TARGET_FRAMEWORK: ${{ matrix.target_framework }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $consumer = Join-Path $env:RUNNER_TEMP "complexity-analyzers-consumer"
+          $packageSource = Join-Path $env:RUNNER_TEMP "complexity-analyzers-packages"
+          $artifacts = Join-Path $consumer "artifacts"
+
+          New-Item -ItemType Directory -Force -Path $consumer | Out-Null
+          New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
+
+          Push-Location $consumer
+          try {
+            dotnet new console --framework $env:TARGET_FRAMEWORK --no-restore
+            dotnet new nugetconfig
+            $nugetConfig = Join-Path $consumer "nuget.config"
+            if (-not (Test-Path -LiteralPath $nugetConfig)) {
+              $nugetConfig = Join-Path $consumer "NuGet.config"
+            }
+
+            dotnet nuget add source $packageSource --name local-complexity-analyzers --configfile $nugetConfig
+            dotnet add package ComplexityAnalysis.Analyzers --version $env:PACKAGE_VERSION --source $packageSource --no-restore
+
+            @(
+              "root = true"
+              ""
+              "[*.cs]"
+              "complexity_analyzers.maximum_complexity = n"
+              "dotnet_diagnostic.BIG1006.severity = warning"
+            ) | Set-Content -LiteralPath ".editorconfig"
+
+            @(
+              "using System;"
+              ""
+              "public static class Program"
+              "{"
+              "    public static void Main()"
+              "    {"
+              "        Console.WriteLine(new Sample().Quadratic(new[] { 1, 2, 3 }));"
+              "    }"
+              "}"
+              ""
+              "public sealed class Sample"
+              "{"
+              "    public int Quadratic(int[] values)"
+              "    {"
+              "        var total = 0;"
+              "        foreach (var outer in values)"
+              "        {"
+              "            foreach (var inner in values)"
+              "            {"
+              "                total += outer + inner;"
+              "            }"
+              "        }"
+              ""
+              "        return total;"
+              "    }"
+              "}"
+            ) | Set-Content -LiteralPath "Program.cs"
+
+            dotnet restore --configfile $nugetConfig
+            $output = & dotnet build --configuration Release --no-restore 2>&1
+            $exitCode = $LASTEXITCODE
+            $output | Tee-Object -FilePath (Join-Path $artifacts "consumer-build.log")
+
+            if ($exitCode -ne 0) {
+              exit $exitCode
+            }
+
+            $joined = $output -join "`n"
+            if ($joined -match "CS8032|CS9057|AD0001|AD0002") {
+              throw "Analyzer load failure or analyzer exception was reported."
+            }
+
+            if ($joined -notmatch "BIG1006") {
+              throw "Expected BIG1006 diagnostic was not reported by the consumer build."
+            }
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Upload consumer smoke log
+        uses: actions/upload-artifact@v4
+        with:
+          name: consumer-smoke-${{ matrix.sdk }}
+          path: ${{ runner.temp }}/complexity-analyzers-consumer/artifacts/consumer-build.log
+          if-no-files-found: error
+
+  performance:
+    name: Performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: quality
+    defaults:
+      run:
+        working-directory: analyzer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: analyzer/global.json
+
+      - name: Restore
+        run: dotnet restore ComplexityAnalysis.Analyzers.slnx
+
+      - name: Build
+        run: >
+          dotnet build ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-restore
+
+      - name: Structural performance harness
+        run: >
+          dotnet test ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-build
+          --filter PerformanceSyntheticCorpusTests
+
+      - name: Analyzer execution reporting
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/performance
+          dotnet build ./performance/ComplexityAnalysis.Analyzers.Performance/ComplexityAnalysis.Analyzers.Performance.csproj \
+            --configuration Release \
+            --no-restore \
+            -t:Rebuild \
+            -p:ReportAnalyzer=true \
+            -p:UseSharedCompilation=false \
+            -v:detailed \
+            | tee artifacts/performance/report-analyzer.log
+
+          grep -F "ComplexityAnalysis.Analyzers.ComplexityAnalyzer" artifacts/performance/report-analyzer.log
+
+      - name: Upload analyzer reporting log
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyzer-reporting
+          path: analyzer/artifacts/performance/report-analyzer.log
+          if-no-files-found: error

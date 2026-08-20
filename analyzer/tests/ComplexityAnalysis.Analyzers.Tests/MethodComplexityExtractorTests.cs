@@ -2185,7 +2185,6 @@ public sealed class MethodComplexityExtractorTests
                 }
             }
             """);
-        var extractor = new MethodComplexityExtractor();
         ComplexityExpression? expectedExpression = null;
         string? expectedNotation = null;
         string[]? expectedVariables = null;
@@ -2196,7 +2195,7 @@ public sealed class MethodComplexityExtractorTests
                 facts.MethodDeclaration,
                 facts.SemanticModel,
                 CancellationToken.None);
-            ComplexityExpression expression = extractor.AnalyzeMethod(
+            ComplexityExpression expression = MethodComplexityExtractor.AnalyzeMethod(
                 facts.MethodDeclaration,
                 facts.SemanticModel,
                 CancellationToken.None);
@@ -3148,10 +3147,9 @@ public sealed class MethodComplexityExtractorTests
             """);
         using var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.Cancel();
-        var extractor = new MethodComplexityExtractor();
 
         _ = Assert.Throws<OperationCanceledException>(() =>
-            extractor.AnalyzeMethod(
+            MethodComplexityExtractor.AnalyzeMethod(
                 facts.MethodDeclaration,
                 facts.SemanticModel,
                 cancellationTokenSource.Token));
@@ -3235,12 +3233,11 @@ public sealed class MethodComplexityExtractorTests
     {
         CompilationFacts compilationFacts = CreateCompilationFacts(sources);
         MethodFacts facts = GetMethodFacts(compilationFacts, "M");
-        var extractor = new MethodComplexityExtractor();
         interproceduralContext = InterproceduralAnalysisContext.Create(
             facts.SemanticModel.Compilation,
             CancellationToken.None);
 
-        return extractor.AnalyzeMethod(
+        return MethodComplexityExtractor.AnalyzeMethod(
             facts.MethodDeclaration,
             facts.SemanticModel,
             interproceduralContext,
@@ -3254,7 +3251,7 @@ public sealed class MethodComplexityExtractorTests
         CancellationToken cancellationToken)
     {
         MethodFacts methodFacts = GetMethodFacts(facts, methodName);
-        return new MethodComplexityExtractor().AnalyzeMethod(
+        return MethodComplexityExtractor.AnalyzeMethod(
             methodFacts.MethodDeclaration,
             methodFacts.SemanticModel,
             interproceduralContext,

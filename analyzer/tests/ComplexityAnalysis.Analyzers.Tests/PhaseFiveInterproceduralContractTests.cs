@@ -772,7 +772,7 @@ public sealed class PhaseFiveInterproceduralContractTests
             budget,
             CancellationToken.None);
 
-        return new MethodComplexityExtractor().AnalyzeMethod(
+        return MethodComplexityExtractor.AnalyzeMethod(
             methodDeclaration,
             semanticModel,
             interproceduralContext,

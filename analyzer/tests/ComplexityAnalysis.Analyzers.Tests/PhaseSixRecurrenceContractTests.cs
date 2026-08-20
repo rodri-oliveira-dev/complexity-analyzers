@@ -523,7 +523,7 @@ public sealed class PhaseSixRecurrenceContractTests
             facts.Compilation,
             CancellationToken.None);
 
-        return new MethodComplexityExtractor().AnalyzeMethod(
+        return MethodComplexityExtractor.AnalyzeMethod(
             methodDeclaration,
             semanticModel,
             interproceduralContext,

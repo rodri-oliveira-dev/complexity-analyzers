@@ -8,7 +8,7 @@ The analyzer is developed under `analyzer/` as a package boundary separate from 
 
 ## Current Status
 
-Phase 1 through Phase 6 are implemented.
+Phase 1 through Phase 7 are implemented.
 
 | Phase | Status | Delivered |
 | --- | --- | --- |
@@ -18,6 +18,7 @@ Phase 1 through Phase 6 are implemented.
 | Phase 4 - BCL, LINQ, and Actionable Diagnostics | Complete | Semantic known-operation mappings for a documented BCL/LINQ subset, `BIG0001`, and actionable `BIG100x` diagnostics. |
 | Phase 5 - Interprocedural Analysis | Complete | Bounded demand-driven propagation from safe source methods in the same compilation, source-call loop diagnostic `BIG1004`, cycle detection, cache, and internal limits. |
 | Phase 6 - Recursion & Recurrence Solving | Complete | Bounded direct-recursion extraction, summation recurrences, simple exponential recursion, Master Theorem, a restricted/bounded Akra-Bazzi subset, fractional powers, and `BIG1005`. |
+| Phase 7 - Configuration, Performance & NuGet Readiness | Complete | Analyzer config options, bounded public budgets, configurable threshold diagnostic `BIG1006`, performance harness, package contract tests, local consumer validation, and CI compatibility checks. |
 
 The analyzer can follow supported source methods in the same compilation when dispatch is safe and the call is reached from the current root method. It can also solve selected direct recursive methods when base-case evidence, argument reduction, local work, and recurrence shape are all proven. It does not build a whole-compilation call graph, solve mutual recursion, or use `Microsoft.CodeAnalysis.Workspaces`.
 
@@ -31,11 +32,14 @@ The analyzer can follow supported source methods in the same compilation when di
 | `BIG1003` | Ordering inside iteration | `Complexity` | `Info` | Yes |
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | Yes |
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | Yes |
+| `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | Yes |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | No |
 
 `BIG0001` is informational and disabled by default. It reports a known method complexity estimate at the method identifier when explicitly enabled.
 
 `BIG1005` reports supported direct recursive methods whose solved recurrence is exponential, such as Fibonacci-like recursion.
+
+`BIG1006` reports when `complexity_analyzers.maximum_complexity` is configured and a method's known, comparable estimate exceeds that threshold. Unknown and incomparable estimates do not report.
 
 `BIG9000` is an infrastructure probe. It proves the analyzer package loaded and ran when explicitly enabled; it is not a performance recommendation.
 
@@ -47,9 +51,9 @@ Phase 5 adds source-method interprocedural analysis: when a caller invokes a sup
 
 Supported source methods are ordinary C# methods with safe dispatch, including static methods, private methods, non-virtual methods, and sealed dispatch when the runtime target is proven. Known BCL and LINQ operations keep precedence over source-method analysis.
 
-Traversal is demand-driven. A callee is analyzed only when the current root method reaches that invocation. The analyzer does not pre-scan every syntax tree or build a complete call graph. Internal limits bound call depth and methods expanded per root analysis.
+Traversal is demand-driven. A callee is analyzed only when the current root method reaches that invocation. The analyzer does not pre-scan every syntax tree or build a complete call graph. Public options expose bounded limits for call depth and methods expanded per root analysis.
 
-Unsupported, unresolved, unsafe, budget-limited, cancelled, or cyclic calls remain `Unknown`. Direct recursion may be solved only by the bounded Phase 6 recurrence pipeline. Mutual recursion is detected but not solved.
+Unsupported, unresolved, unsafe, budget-limited, cancelled, or cyclic calls remain `Unknown`. Direct recursion may be solved only by the bounded recurrence pipeline. Mutual recursion is detected but not solved.
 
 Examples:
 
@@ -64,7 +68,7 @@ A -> B -> C O(log n) => O(log n)
 
 ## Direct Recursion and Recurrences
 
-Phase 6 recognizes direct recursive calls by Roslyn symbol identity and requires compatible base-case evidence before solving. Recursive calls in mutually exclusive branches are counted per path, so binary-search-style code with two syntactic calls in exclusive branches remains `O(log n)`, not `O(n)`.
+The analyzer recognizes direct recursive calls by Roslyn symbol identity and requires compatible base-case evidence before solving. Recursive calls in mutually exclusive branches are counted per path, so binary-search-style code with two syntactic calls in exclusive branches remains `O(log n)`, not `O(n)`.
 
 Supported recurrence families include:
 
@@ -104,7 +108,7 @@ cd analyzer
 dotnet restore ComplexityAnalysis.Analyzers.slnx
 dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
 dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.6.0-phase6-local
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 ```
 
 The package is documented as a local build/package source. Do not assume a NuGet.org release unless one exists independently.
@@ -113,10 +117,16 @@ See [Getting Started](docs/en/getting-started.md).
 
 ## Configuration
 
-Diagnostics use standard Roslyn `.editorconfig` severity configuration. There are no custom analyzer options in Phase 6.
+Phase 7 adds custom analyzer behavior options through Roslyn analyzer config. Diagnostic severities still use standard `dotnet_diagnostic.<RULE_ID>.severity`.
 
 ```ini
 [*.cs]
+
+complexity_analyzers.interprocedural_analysis = true
+complexity_analyzers.recursion_analysis = true
+complexity_analyzers.max_call_depth = 5
+complexity_analyzers.max_methods_per_root = 32
+complexity_analyzers.maximum_complexity = n_log_n
 
 dotnet_diagnostic.BIG0001.severity = suggestion
 dotnet_diagnostic.BIG1001.severity = warning
@@ -124,10 +134,21 @@ dotnet_diagnostic.BIG1002.severity = warning
 dotnet_diagnostic.BIG1003.severity = warning
 dotnet_diagnostic.BIG1004.severity = warning
 dotnet_diagnostic.BIG1005.severity = warning
+dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
+Defaults preserve existing behavior: interprocedural analysis and recursion analysis are enabled, `max_call_depth` is `5`, `max_methods_per_root` is `32`, and `maximum_complexity` is `none`. Threshold reporting only applies to known comparable estimates.
+
 See [Configuration](docs/en/configuration.md).
+
+## Performance and Compatibility
+
+The analyzer is designed to be bounded: no network access, no analyzer hot-path filesystem I/O, no process launch, no telemetry, no mandatory whole-solution scan, bounded source-method traversal, bounded recurrence solving, concurrent execution, generated-code exclusion, and cancellation checks.
+
+The repeatable performance harness is documented in [performance/README.md](performance/README.md). It validates structural behavior and compiler analyzer execution reporting with `ReportAnalyzer=true`; elapsed time is informational because hardware and CI runners vary.
+
+CI validates local package consumption on currently supported SDK hosts from the project matrix: .NET 8 LTS, .NET 9 STS, and .NET 10 LTS. The package is not published to NuGet.org by this repository workflow.
 
 ## Architecture
 
@@ -175,4 +196,4 @@ See [Architecture](docs/en/architecture.md).
 
 ## License
 
-Use the repository license that applies to this project.
+MIT, matching the repository license declaration.

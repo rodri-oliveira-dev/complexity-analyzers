@@ -18,6 +18,7 @@ public sealed class ComplexityAnalyzerTests
     private const string OrderingInsideIterationId = "BIG1003";
     private const string InputDependentCallInsideIterationId = "BIG1004";
     private const string ExponentialRecursiveGrowthId = "BIG1005";
+    private const string MethodComplexityExceedsConfiguredThresholdId = "BIG1006";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -42,6 +43,7 @@ public sealed class ComplexityAnalyzerTests
                 OrderingInsideIterationId,
                 InputDependentCallInsideIterationId,
                 ExponentialRecursiveGrowthId,
+                MethodComplexityExceedsConfiguredThresholdId,
                 AnalyzerExecutionProbeId
             ],
             analyzer.SupportedDiagnostics.Select(descriptor => descriptor.Id));
@@ -67,6 +69,7 @@ public sealed class ComplexityAnalyzerTests
     [InlineData(OrderingInsideIterationId, "Ordering inside iteration")]
     [InlineData(InputDependentCallInsideIterationId, "Input-dependent method call inside iteration")]
     [InlineData(ExponentialRecursiveGrowthId, "Exponential recursive growth")]
+    [InlineData(MethodComplexityExceedsConfiguredThresholdId, "Method complexity exceeds configured threshold")]
     public void Actionable_diagnostics_have_expected_public_descriptor_metadata(
         string diagnosticId,
         string expectedTitle)

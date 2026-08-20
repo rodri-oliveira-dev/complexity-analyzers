@@ -2,7 +2,7 @@
 
 [English](../en/architecture.md) | Portugues (Brasil)
 
-`ComplexityAnalysis.Analyzers` e um workspace isolado de pacote Roslyn analyzer. Ate a Phase 6, ele contem infraestrutura do analyzer, modelo de complexidade sem Roslyn, extracao de metodos, mapping semantico de operacoes conhecidas, analise interprocedural limitada de metodos fonte, solucao limitada de recorrencias de recursao direta e diagnostics publicos.
+`ComplexityAnalysis.Analyzers` e um workspace isolado de pacote Roslyn analyzer. Ate a Phase 7, ele contem infraestrutura do analyzer, modelo de complexidade sem Roslyn, extracao de metodos, mapping semantico de operacoes conhecidas, analise interprocedural limitada de metodos fonte, solucao limitada de recorrencias de recursao direta, configuracao do analyzer, validacao de performance, validacao de contrato de pacote e diagnostics publicos.
 
 ## Pipeline Atual
 
@@ -15,6 +15,7 @@ Roslyn Syntax + SemanticModel
     v
 Analysis
     |
+    +-- opcoes de analyzer config
     +-- resolucao de tamanho de entrada
     +-- operacoes basicas
     +-- limites de loop
@@ -41,6 +42,7 @@ DiagnosticAnalyzer
     +-- BIG1003 ordenacao dentro de iteracao
     +-- BIG1004 chamada fonte dentro de iteracao
     +-- BIG1005 crescimento recursivo exponencial
+    +-- BIG1006 threshold configurado excedido
     `-- BIG9000 probe de infraestrutura
 ```
 
@@ -100,7 +102,7 @@ A camada de analise fica em:
 analyzer/src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-Ela parte de um metodo por vez. A Phase 6 pode seguir chamadas de metodos fonte suportados sob demanda e resolver recursao direta selecionada, mas nao cria call graph da compilation inteira, nao resolve recursao mutua e nao inspeciona corpos de metodos nao relacionados.
+Ela parte de um metodo por vez. O analyzer pode seguir chamadas de metodos fonte suportados sob demanda e resolver recursao direta selecionada, mas nao cria call graph da compilation inteira, nao resolve recursao mutua e nao inspeciona corpos de metodos nao relacionados.
 
 Responsabilidades principais:
 
@@ -151,7 +153,7 @@ O traversal e sob demanda. Um callee fonte e analisado apenas quando uma invocac
 
 Dispatch fonte seguro inclui metodos static, private, ordinarios nao virtuais e dispatch sealed quando o alvo de runtime e comprovado. Dispatch de interface, dispatch virtual inseguro, dynamic dispatch, invocacao de delegate, reflection, metodos externos apenas em metadata, construtores, propriedades, operadores, local functions e lambdas como alvos independentes continuam fora de escopo.
 
-Limites internos restringem profundidade de chamada e metodos expandidos por analise raiz. Resultados `Unknown` continuam conservadores para chamadas nao resolvidas, dispatch inseguro, fonte indisponivel, binding de argumento nao comprovado, fronteiras de budget, cancellation e ciclos. Recursao direta pode ser resolvida apenas pelo pipeline de recorrencia abaixo. Recursao mutua e detectada, mas nao resolvida.
+Configuracao publica expoe limites controlados para profundidade de chamada e metodos expandidos por analise raiz. Os defaults sao profundidade `5` e metodos por raiz `32`; os hard limits publicos sao `16` e `128`. Resultados `Unknown` continuam conservadores para chamadas nao resolvidas, dispatch inseguro, fonte indisponivel, binding de argumento nao comprovado, fronteiras de budget, cancellation e ciclos. Recursao direta pode ser resolvida apenas pelo pipeline de recorrencia abaixo. Recursao mutua e detectada, mas nao resolvida.
 
 ## Recursao Direta e Solucao de Recorrencias
 
@@ -193,10 +195,31 @@ Invocacoes nao suportadas ou nao resolvidas continuam como `Unknown`.
 - `BIG1003` na invocacao de ordenacao deferred somente quando consumo suportado e comprovado dentro de iteracao analisavel.
 - `BIG1004` na chamada de metodo fonte suportada com complexidade conhecida dependente de entrada dentro de iteracao analisavel.
 - `BIG1005` no metodo recursivo suportado cuja recorrencia direta resolvida e exponencial.
+- `BIG1006` no identificador do metodo quando `complexity_analyzers.maximum_complexity` esta configurado e a estimativa conhecida e comparavel excede o threshold.
 - `BIG9000` uma vez por compilation quando habilitado explicitamente.
 
 Analise de codigo gerado e desabilitada, execucao concorrente e habilitada, e hot paths do analyzer devem continuar livres de I/O, rede, execucao de processos e comportamento pesado baseado em reflection.
 
+## Camada de Configuracao
+
+A configuracao e lida por APIs Roslyn de analyzer config a partir de `AnalyzerConfigOptionsProvider`; o analyzer nao faz parsing manual de arquivos `.editorconfig`. Opcoes especificas de syntax tree sobrescrevem opcoes globais para aquela syntax tree.
+
+As opcoes publicas de comportamento sao:
+
+- `complexity_analyzers.interprocedural_analysis`;
+- `complexity_analyzers.recursion_analysis`;
+- `complexity_analyzers.max_call_depth`;
+- `complexity_analyzers.max_methods_per_root`;
+- `complexity_analyzers.maximum_complexity`.
+
+Valores invalidos voltam aos defaults e nao reportam falhas do analyzer. Severidade de diagnostics continua usando a configuracao Roslyn padrao `dotnet_diagnostic.<RULE_ID>.severity`.
+
+## Performance e Validacao de Pacote
+
+A validacao de performance usa workloads sinteticos deterministicos e invariantes estruturais em vez de thresholds estreitos de milissegundos. O caminho oficial do compilador `ReportAnalyzer=true` e usado para validar reporting de execucao do analyzer quando suportado pelo toolchain.
+
+O contrato do pacote mantem `ComplexityAnalysis.Analyzers.dll` em `analyzers/dotnet/cs/`, nao em `lib/`. Dependencias Roslyn usadas para autoria sao assets privados e nao sao expostas transitivamente aos consumidores. O pacote atual embute simbolos de debug na DLL do analyzer e nao emite `.snupkg`.
+
 ## Por Que Nao Ha Workspaces
 
-`Microsoft.CodeAnalysis.Workspaces` esta intencionalmente ausente. A Phase 6 nao implementa `CodeFixProvider`, analise de graph de projeto inteiro, carregamento de solution ou recursos de workspace de IDE que justificariam essa dependencia.
+`Microsoft.CodeAnalysis.Workspaces` esta intencionalmente ausente. O analyzer nao implementa `CodeFixProvider`, analise de graph de projeto inteiro, carregamento de solution ou recursos de workspace de IDE que justificariam essa dependencia.

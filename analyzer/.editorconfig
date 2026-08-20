@@ -163,6 +163,11 @@ dotnet_naming_style.end_with_async_style.capitalization = pascal_case
 [*.{designer.cs,Designer.cs,g.cs,g.i.cs,generated.cs,Generated.cs}]
 generated_code = true
 
-[**/tests/**/*.cs]
+[tests/**/*.cs]
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.IDE0008.severity = none
+dotnet_diagnostic.IDE1006.severity = none
+dotnet_diagnostic.IDE0301.severity = none
+dotnet_diagnostic.IDE0303.severity = none
+dotnet_diagnostic.IDE0305.severity = none

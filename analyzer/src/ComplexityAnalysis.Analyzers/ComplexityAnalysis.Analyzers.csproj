@@ -9,11 +9,16 @@
     <PackageId>ComplexityAnalysis.Analyzers</PackageId>
     <Title>ComplexityAnalysis.Analyzers</Title>
     <Description>Roslyn analyzer package for algorithmic complexity diagnostics in C#.</Description>
+    <Authors>Rodrigo de Oliveira</Authors>
     <PackageTags>roslyn;analyzer;complexity;big-o;csharp</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <DebugType>embedded</DebugType>
 
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>

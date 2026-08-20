@@ -1,0 +1,76 @@
+{
+  "delivery": "Phase 7 - Configuration, Performance & NuGet Readiness",
+  "currentObjective": "Phase 7 complete",
+  "completedStep": "10/10 - validation and closure",
+  "decisions": [
+    "Custom analyzer behavior configuration is read through Roslyn AnalyzerConfigOptionsProvider with tree-specific options winning over global options.",
+    "Public options use the complexity_analyzers.* prefix and preserve Phase 6 behavior by default.",
+    "Public budgets remain bounded: max_call_depth defaults to 5 and is limited to 16; max_methods_per_root defaults to 32 and is limited to 128.",
+    "BIG1006 reports only configured, known, comparable complexity estimates greater than the configured maximum; Unknown, equal, lower, and incomparable estimates do not report.",
+    "Diagnostic severity remains standard dotnet_diagnostic.<RULE_ID>.severity configuration.",
+    "Performance validation uses deterministic synthetic workloads, structural invariant tests, cache checks, and compiler ReportAnalyzer output instead of narrow timing gates.",
+    "The package remains analyzer-only under analyzers/dotnet/cs with no runtime lib asset and no transitive Roslyn dependency.",
+    "Symbols are embedded with DebugType=embedded; .snupkg generation remains intentionally disabled for the current analyzer-only package layout.",
+    "No NuGet.org publication, GitHub Release, tag, push, or publish token is part of Phase 7."
+  ],
+  "constraints": [
+    "Do not modify inherited projects outside analyzer/.",
+    "Do not add ProjectReference, binary reference, local package dependency, or transitive dependency on inherited projects.",
+    "Do not publish packages, create releases, create tags, or push without explicit request.",
+    "Consult the repository roadmap before defining further work."
+  ],
+  "relevantFiles": [
+    "analyzer/specs/phase-7/configuration-performance-packaging.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalyzer.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Diagnostics/DiagnosticDescriptors.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityAnalyzerOptions.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityAnalyzerOptionsReader.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Configuration/ComplexityThreshold.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Interprocedural/AnalysisBudget.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerOptionsReaderTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalyzerConfigurationPipelineTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/PerformanceSyntheticCorpusTests.cs",
+    "analyzer/tests/ComplexityAnalysis.Analyzers.Tests/AnalyzerPackageContractTests.cs",
+    "analyzer/src/ComplexityAnalysis.Analyzers/AnalyzerReleases.Unshipped.md",
+    "analyzer/src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
+    "analyzer/performance/README.md",
+    ".github/workflows/complexity-analyzers-ci.yml",
+    "analyzer/docs/en/configuration.md",
+    "analyzer/docs/pt-BR/configuration.md",
+    "analyzer/docs/en/analyzers.md",
+    "analyzer/docs/pt-BR/analyzers.md",
+    "analyzer/docs/en/getting-started.md",
+    "analyzer/docs/pt-BR/getting-started.md",
+    "analyzer/README.md",
+    "analyzer/README.pt-BR.md"
+  ],
+  "validations": [
+    "Initial protocol checked git status, branch, HEAD, analyzer/AGENTS.md, Phase 7 spec, handoff README, and Phase 7 handoff; root AGENTS.md is absent in this checkout.",
+    "Configuration audit confirmed defaults, invalid fallback, tree/global precedence, feature flags, budgets, hard limits, and threshold grammar from code and tests.",
+    "Diagnostics audit confirmed SupportedDiagnostics, DiagnosticDescriptors, AnalyzerReleases.Unshipped.md, docs/en/analyzers.md, and docs/pt-BR/analyzers.md are consistent.",
+    "dotnet restore passed in analyzer/.",
+    "dotnet build --configuration Release --no-restore passed in analyzer/ with existing style warnings only.",
+    "dotnet test --configuration Release --no-build passed with 557 passed, 0 failed, 0 skipped.",
+    "dotnet pack produced artifacts/local-packages/ComplexityAnalysis.Analyzers.0.0.0-local.nupkg.",
+    "Manual package inspection confirmed analyzer DLL under analyzers/dotnet/cs, README, MIT license expression, git repository metadata, no lib runtime asset, no inherited DLLs, and no dependency elements.",
+    "AnalyzerPackageContractTests passed with 5 passed.",
+    "PerformanceSyntheticCorpusTests passed with 9 passed.",
+    "ReportAnalyzer build passed and listed ComplexityAnalysis.Analyzers.ComplexityAnalyzer with BIG0001, BIG1001, BIG1002, BIG1003, BIG1004, BIG1005, BIG1006, and BIG9000.",
+    "Consumer smoke passed on local package for defaults without complexity_analyzers.* options and configured Phase 7 threshold/recursion settings.",
+    "Local SDK compatibility passed for SDK 8.0.424/net8.0 and SDK 10.0.303/net10.0; SDK 9 is not installed locally and remains covered by the CI matrix.",
+    "Official Microsoft .NET support policy checked on 2026-08-20 confirms .NET 8 LTS, .NET 9 STS, and .NET 10 LTS are supported.",
+    "Analyzer dependency audit passed with no vulnerable direct or transitive packages.",
+    "Phase 7 CI YAML lint passed and workflow is validation-only with contents: read permissions and no NuGet publish step.",
+    "Analyzer hot-path audit found no filesystem I/O, network, process execution, telemetry, Workspaces, MathNet, SymPy, inherited ProjectReference, or global lock in the shipping analyzer assembly.",
+    "Diff against main shows no inherited existing files modified; only a dedicated root workflow was added outside analyzer/.",
+    "Inherited root solution build was attempted and failed in existing upstream MkDocsSharp documentation generation because docs/api/complexityanalysis-core/index.md was locked; no upstream files were changed."
+  ],
+  "knownPendingItems": [
+    "Inherited root solution build currently fails outside Phase 7 in the existing upstream documentation target due a locked docs/api/complexityanalysis-core/index.md file; the inherited solution also reports existing System.Text.Json vulnerability warnings."
+  ],
+  "nextStep": "consult repository roadmap before defining further work",
+  "lastCommit": {
+    "hash": "e038752d3ed0924f03a275f6a467b4320dacf4e6",
+    "message": "docs: document analyzer product configuration"
+  }
+}

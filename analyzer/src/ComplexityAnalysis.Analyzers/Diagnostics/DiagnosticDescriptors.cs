@@ -58,6 +58,15 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports recursive methods whose supported recurrence solves to exponential time complexity.");
 
+    internal static readonly DiagnosticDescriptor MethodComplexityExceedsConfiguredThreshold = new(
+        id: "BIG1006",
+        title: "Method complexity exceeds configured threshold",
+        messageFormat: "Method '{0}' has estimated complexity {1}, which exceeds the configured maximum {2}",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports methods whose known estimated time complexity exceeds the configured maximum complexity.");
+
     internal static readonly DiagnosticDescriptor AnalyzerExecutionProbe = new(
         id: "BIG9000",
         title: "Analyzer execution probe",
