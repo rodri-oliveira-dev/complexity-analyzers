@@ -2,6 +2,12 @@
 
 [English](README.md) | Portugues (Brasil)
 
+[![Build & Tests](https://github.com/rodri-oliveira-dev/complexity-analyzers/actions/workflows/complexity-analyzers-ci.yml/badge.svg)](https://github.com/rodri-oliveira-dev/complexity-analyzers/actions/workflows/complexity-analyzers-ci.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/mit)
+
 ComplexityAnalysis.Analyzers e um pacote Roslyn analyzer independente para expor informacoes de complexidade algoritmica em builds e IDEs C#.
 
 O analyzer e desenvolvido diretamente a partir da raiz do repositorio. A antiga fronteira de workspace em `analyzer/` foi removida, e o repositorio agora representa o proprio produto analyzer. O projeto original `complexity-hints` ainda pode ser usado como referencia externa quando util, mas este pacote nao possui `ProjectReference`, dependencia binaria ou dependencia de pacote local com ele.
