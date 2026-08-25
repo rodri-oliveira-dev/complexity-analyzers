@@ -2,13 +2,7 @@ name: Complexity Analyzers CI
 
 on:
   push:
-    paths:
-      - 'analyzer/**'
-      - '.github/workflows/complexity-analyzers-ci.yml'
   pull_request:
-    paths:
-      - 'analyzer/**'
-      - '.github/workflows/complexity-analyzers-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -27,9 +21,6 @@ jobs:
     name: Quality
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: analyzer
 
     steps:
       - name: Checkout
@@ -38,7 +29,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          global-json-file: analyzer/global.json
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore ComplexityAnalysis.Analyzers.slnx
@@ -61,9 +52,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: quality
-    defaults:
-      run:
-        working-directory: analyzer
 
     steps:
       - name: Checkout
@@ -72,7 +60,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          global-json-file: analyzer/global.json
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore ComplexityAnalysis.Analyzers.slnx
@@ -102,7 +90,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: complexity-analyzers-nupkg
-          path: analyzer/artifacts/packages/*.nupkg
+          path: artifacts/packages/*.nupkg
           if-no-files-found: error
 
   compatibility:
@@ -230,9 +218,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: quality
-    defaults:
-      run:
-        working-directory: analyzer
 
     steps:
       - name: Checkout
@@ -241,7 +226,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          global-json-file: analyzer/global.json
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore ComplexityAnalysis.Analyzers.slnx
@@ -279,5 +264,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: analyzer-reporting
-          path: analyzer/artifacts/performance/report-analyzer.log
+          path: artifacts/performance/report-analyzer.log
           if-no-files-found: error
