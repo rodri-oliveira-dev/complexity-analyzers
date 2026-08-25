@@ -97,19 +97,6 @@ internal sealed class InterproceduralInvocationAnalyzer
                 .Complexity;
         }
 
-        if (interproceduralContext.TemplateCache.TryGetCompleted(
-            sourceMethodDefinition,
-            calleeOptions,
-            callerContext.CancellationToken,
-            out InterproceduralAnalysisResult cachedResult))
-        {
-            return SubstituteCallSiteArguments(
-                invocation,
-                resolution.TargetMethodSymbol,
-                sourceMethodDefinition,
-                cachedResult);
-        }
-
         if (!rootState.TryEnterMethod(
             sourceMethodDefinition,
             out InterproceduralRootAnalysisState calleeState,
@@ -118,26 +105,38 @@ internal sealed class InterproceduralInvocationAnalyzer
             return boundaryResult.Complexity;
         }
 
-        InterproceduralAnalysisResult calleeResult;
         try
         {
-            calleeResult = GetOrAnalyzeCallee(
+            if (interproceduralContext.TemplateCache.TryGetCompleted(
+                sourceMethodDefinition,
+                calleeOptions,
+                callerContext.CancellationToken,
+                out InterproceduralAnalysisResult cachedResult))
+            {
+                return SubstituteCallSiteArguments(
+                    invocation,
+                    resolution.TargetMethodSymbol,
+                    sourceMethodDefinition,
+                    cachedResult);
+            }
+
+            InterproceduralAnalysisResult calleeResult = GetOrAnalyzeCallee(
                 sourceMethodDefinition,
                 resolution.SourceMethodDeclaration,
                 interproceduralContext,
                 calleeOptions,
                 calleeState);
+
+            return SubstituteCallSiteArguments(
+                invocation,
+                resolution.TargetMethodSymbol,
+                sourceMethodDefinition,
+                calleeResult);
         }
         finally
         {
             _ = calleeState.ExitMethod(sourceMethodDefinition);
         }
-
-        return SubstituteCallSiteArguments(
-            invocation,
-            resolution.TargetMethodSymbol,
-            sourceMethodDefinition,
-            calleeResult);
     }
 
     private InterproceduralAnalysisResult GetOrAnalyzeCallee(
@@ -167,6 +166,7 @@ internal sealed class InterproceduralInvocationAnalyzer
         bool stored = false;
         try
         {
+            int expandedMethodCountAtEntry = calleeState.ExpandedMethodCount;
             InterproceduralAnalysisResult analyzedResult = AnalyzeCalleeWithoutCaching(
                 sourceMethodDefinition,
                 sourceMethodDeclaration,
@@ -174,7 +174,10 @@ internal sealed class InterproceduralInvocationAnalyzer
                 calleeOptions,
                 calleeState);
 
-            if (IsCacheable(analyzedResult))
+            if (IsCacheable(
+                analyzedResult,
+                expandedMethodCountAtEntry,
+                calleeState.ExpandedMethodCount))
             {
                 interproceduralContext.TemplateCache.StoreCompleted(
                     sourceMethodDefinition,
@@ -221,9 +224,13 @@ internal sealed class InterproceduralInvocationAnalyzer
                 callerContext.CancellationToken);
     }
 
-    private static bool IsCacheable(InterproceduralAnalysisResult result)
+    private static bool IsCacheable(
+        InterproceduralAnalysisResult result,
+        int expandedMethodCountAtEntry,
+        int expandedMethodCountAfterAnalysis)
     {
-        return result.Kind == InterproceduralAnalysisResultKind.Known;
+        return result.Kind == InterproceduralAnalysisResultKind.Known
+            && expandedMethodCountAfterAnalysis == expandedMethodCountAtEntry;
     }
 
     private ComplexityExpression SubstituteCallSiteArguments(
