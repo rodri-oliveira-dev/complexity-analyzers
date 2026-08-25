@@ -218,6 +218,32 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
 
+      - name: Report Sonar quality gate conditions
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: rodri-oliveira-dev_complexity-analyzers
+          SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          response=$(curl --fail-with-body --silent --show-error \
+            -u "${SONAR_TOKEN}:" \
+            --get "https://sonarcloud.io/api/qualitygates/project_status" \
+            --data-urlencode "projectKey=${SONAR_PROJECT_KEY}" \
+            --data-urlencode "pullRequest=${SONAR_PULL_REQUEST}")
+
+          echo "SonarQube Cloud quality gate conditions:"
+          echo "${response}" | jq '{
+            status: .projectStatus.status,
+            conditions: [.projectStatus.conditions[] | {
+              metricKey,
+              status,
+              errorThreshold,
+              actualValue
+            }]
+          }'
+
   pack:
     name: Pack analyzer
     runs-on: ubuntu-latest
