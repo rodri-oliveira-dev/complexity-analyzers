@@ -2,39 +2,38 @@
 
 ## Objetivo
 
-Desenvolver um Roslyn Analyzer independente para estimativa e diagnostico de complexidade algoritmica em codigo C#, tomando `complexity-hints` como reference implementation, sem criar dependencia binaria ou de projeto com o codigo herdado.
+Desenvolver um Roslyn Analyzer independente para estimativa e diagnostico de complexidade algoritmica em codigo C#, tomando o projeto original `complexity-hints` apenas como referencia conceitual quando necessario, sem criar dependencia binaria, de projeto ou de pacote local com ele.
 
-O trabalho neste workspace deve ser pequeno, verificavel, deterministico e adequado a um analyzer distribuivel futuramente como pacote NuGet. Responda em portugues, salvo pedido explicito em outro idioma.
+O trabalho neste repositorio deve ser pequeno, verificavel, deterministico e adequado a um analyzer distribuivel futuramente como pacote NuGet. Responda em portugues, salvo pedido explicito em outro idioma.
 
-## Escopo do workspace
+## Escopo do repositorio
 
-Todo codigo, configuracao e documentacao especificos do novo analyzer devem permanecer sob `analyzer/`.
+O repositorio inteiro representa o produto `ComplexityAnalysis.Analyzers`. Codigo, configuracao, documentacao, testes, ferramentas e artefatos de desenvolvimento ficam organizados diretamente a partir da raiz.
 
-Arquivos fora de `analyzer/` pertencem ao projeto original herdado e sao read-only, salvo instrucao explicita do usuario.
+Nao existe mais uma fronteira de workspace em `analyzer/`. Caminhos e instrucoes devem considerar a raiz do repositorio como base canonica.
 
 ## Fontes de verdade
 
 Consulte apenas os arquivos relevantes para a tarefa atual:
 
-1. `analyzer/AGENTS.md`
-2. `analyzer/README.md`
-3. `analyzer/Directory.Packages.props`
-4. `analyzer/Directory.Build.props`
-5. `analyzer/Directory.Build.targets`
-6. `analyzer/.editorconfig`
-7. `analyzer/global.json`
-8. `analyzer/ComplexityAnalysis.Analyzers.slnx`
-9. Skills em `analyzer/.agents/skills/`
-10. Projetos e testes dentro de `analyzer/src/` e `analyzer/tests/`
+1. `AGENTS.md`
+2. `README.md`
+3. `README.pt-BR.md`
+4. `Directory.Packages.props`
+5. `Directory.Build.props`
+6. `Directory.Build.targets`
+7. `.editorconfig`
+8. `global.json`
+9. `ComplexityAnalysis.Analyzers.slnx`
+10. Skills em `.agents/skills/`
+11. Projetos em `src/`, testes em `tests/` e harnesses em `performance/`
 
-Nao carregue indiscriminadamente o projeto herdado. Localize primeiro o contexto diretamente relacionado a tarefa.
+Nao carregue indiscriminadamente o repositorio. Localize primeiro o contexto diretamente relacionado a tarefa.
 
 ## Regras obrigatorias
 
-- Codigo herdado fora de `analyzer/` e read-only, salvo instrucao explicita.
-- Nao criar `ProjectReference` para projetos do `complexity-hints`.
-- Nao modificar projetos herdados para facilitar a implementacao.
-- Ao portar logica existente, copie apenas o minimo necessario.
+- Nao criar `ProjectReference`, dependencia binaria ou pacote local para o antigo `complexity-hints`.
+- Ao portar logica de uma referencia externa, copie apenas o minimo necessario.
 - Registre o arquivo/classe de origem quando uma implementacao for portada.
 - Preserve comportamento comprovado por testes.
 - Nao portar dependencias pesadas automaticamente.
@@ -52,29 +51,26 @@ Nao carregue indiscriminadamente o projeto herdado. Localize primeiro o contexto
 
 ## Codigo original como referencia
 
-Os projetos abaixo podem ser consultados para entender e portar algoritmos:
+O projeto original `complexity-hints` pode ser consultado externamente para entender algoritmos ou comportamento historico, mas nao faz parte deste repositorio.
 
-- `src/ComplexityAnalysis.Core`
-- `src/ComplexityAnalysis.Roslyn`
-- `src/ComplexityAnalysis.Solver`
-- `src/ComplexityAnalysis.Engine`
-
-Eles nunca devem ser referenciados pelo novo analyzer por `ProjectReference`, pacote local, copia binaria ou dependencia transitiva. Qualquer logica portada deve ser copiada e adaptada para o workspace `analyzer/`, com testes de caracterizacao e registro claro da origem.
+Ele nunca deve ser referenciado pelo analyzer por `ProjectReference`, pacote local, copia binaria ou dependencia transitiva. Qualquer logica portada deve ser copiada e adaptada para este repositorio, com testes de caracterizacao e registro claro da origem quando aplicavel.
 
 ## Estrutura
 
-- `analyzer/src/ComplexityAnalysis.Analyzers/`: projeto principal do analyzer.
-- `analyzer/tests/`: testes futuros do workspace isolado.
-- `analyzer/.agents/skills/`: skills especificas para governanca, MSBuild, testes, cobertura e desenvolvimento Roslyn.
-- `analyzer/artifacts/`: saidas locais de build, pack, coverage e validacao.
+- `src/ComplexityAnalysis.Analyzers/`: projeto principal do analyzer.
+- `tests/ComplexityAnalysis.Analyzers.Tests/`: testes automatizados.
+- `performance/`: harnesses e validacoes de performance.
+- `docs/`: documentacao do produto.
+- `.agents/skills/`: skills especificas para governanca, MSBuild, testes, cobertura e desenvolvimento Roslyn.
+- `.github/workflows/`: workflows de CI do analyzer.
+- `artifacts/`: saidas locais de build, pack, coverage e validacao; nao versionar.
 
 ## MSBuild e NuGet
 
-- Este workspace usa Central Package Management em `analyzer/Directory.Packages.props`.
-- `PackageReference` em projetos dentro de `analyzer/` nao deve conter `Version=`.
-- Configuracoes globais do analyzer ficam apenas em `analyzer/Directory.Build.props` e `analyzer/Directory.Build.targets`.
-- Nao adicionar configuracoes equivalentes na raiz do repositorio.
-- O projeto do analyzer deve targetear `netstandard2.0`.
+- Este repositorio usa Central Package Management em `Directory.Packages.props`.
+- `PackageReference` nos projetos nao deve conter `Version=` quando a versao estiver centralizada.
+- Configuracoes globais do analyzer ficam em `Directory.Build.props` e `Directory.Build.targets`.
+- O projeto do analyzer deve targetear `netstandard2.0`, salvo decisao explicita de arquitetura em contrario.
 - O pacote deve ser estruturado como Roslyn Analyzer package, com o assembly em `analyzers/dotnet/cs/`.
 - Evite `lib/netstandard2.0/` para o assembly do analyzer.
 
@@ -100,10 +96,11 @@ Execute validacoes proporcionais ao impacto. Para mudancas de bootstrap, MSBuild
 ```bash
 dotnet restore ./ComplexityAnalysis.Analyzers.slnx
 dotnet build ./ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
-dotnet pack ./src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local
+dotnet test ./ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
+dotnet pack ./src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output ./artifacts/local-packages
 ```
 
-Quando a tarefa puder afetar o isolamento, valide tambem a solution herdada na raiz do repositorio.
+Quando a tarefa afetar CI, cobertura, empacotamento ou performance, valide tambem os arquivos e harnesses diretamente relacionados em `.github/workflows/`, `tests/` e `performance/`.
 
 ## Git
 
