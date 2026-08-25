@@ -79,6 +79,51 @@ For changes to analysis hot paths, caching, recursion, interprocedural traversal
 
 Do not introduce `Microsoft.CodeAnalysis.Workspaces` or runtime dependencies unless the feature clearly requires them and the architectural/package impact has been reviewed.
 
+## Releases
+
+Production releases are created manually through the `Release` GitHub Actions workflow in `.github/workflows/release.yml`.
+
+Run the workflow from the `main` branch and provide only the semantic package version, without a `v` prefix:
+
+```text
+1.0.0
+```
+
+The workflow derives the Git tag automatically:
+
+```text
+1.0.0 -> v1.0.0
+```
+
+Prerelease versions are also supported, for example:
+
+```text
+1.1.0-beta.1 -> v1.1.0-beta.1
+```
+
+The release pipeline:
+
+1. validates the semantic version and requires execution from `main`;
+2. restores, builds, tests, packs, and validates `ComplexityAnalysis.Analyzers`;
+3. creates the corresponding `v<version>` Git tag, or verifies it when safely retrying the same release;
+4. publishes the `.nupkg` to NuGet.org using Trusted Publishing and GitHub OIDC;
+5. publishes the same `.nupkg` to GitHub Packages using the workflow `GITHUB_TOKEN`;
+6. creates a GitHub Release for the generated tag and attaches the package artifact.
+
+The NuGet.org Trusted Publishing policy must match the workflow identity exactly:
+
+```text
+Repository owner: rodri-oliveira-dev
+Repository: complexity-analyzers
+Workflow file: release.yml
+Environment: release
+Package: ComplexityAnalysis.Analyzers
+```
+
+The NuGet publishing job uses the GitHub environment named `release` and `id-token: write`; no long-lived NuGet API key should be stored in repository secrets.
+
+Do not manually move, reuse, or recreate an existing release tag for a different commit. Release tags are intended to be immutable.
+
 ## Pull requests
 
 Pull requests should:

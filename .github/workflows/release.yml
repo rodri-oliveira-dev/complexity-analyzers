@@ -1,0 +1,300 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semantic version without the v prefix (for example 1.0.0 or 1.1.0-beta.1)'
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build-and-pack:
+    name: Validate, build, test and pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      package-version: ${{ steps.version.outputs.package_version }}
+      release-tag: ${{ steps.version.outputs.release_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Validate release version
+        id: version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Releases must be started from the main branch. Current ref: $GITHUB_REF"
+            exit 1
+          fi
+
+          if [[ "$VERSION" == v* ]]; then
+            echo "::error::Enter the semantic version without the 'v' prefix (for example 1.0.0)."
+            exit 1
+          fi
+
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$VERSION" =~ $semver ]]; then
+            echo "::error::Invalid semantic version '$VERSION'. Expected a value such as 1.0.0 or 1.1.0-beta.1."
+            exit 1
+          fi
+
+          release_tag="v$VERSION"
+
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+            tag_sha="$(git rev-list -n 1 "$release_tag")"
+            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+              echo "::error::Tag '$release_tag' already exists and points to $tag_sha instead of $GITHUB_SHA."
+              exit 1
+            fi
+
+            echo "Tag '$release_tag' already exists on the validated commit; this run can be safely retried."
+          fi
+
+          echo "package_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION"
+          echo "Release tag: $release_tag"
+
+      - name: Restore
+        run: dotnet restore ComplexityAnalysis.Analyzers.slnx
+
+      - name: Build release
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+        run: >-
+          dotnet build ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-restore
+          -p:Version="$PACKAGE_VERSION"
+          -p:PackageVersion="$PACKAGE_VERSION"
+
+      - name: Run analyzer tests
+        run: >-
+          dotnet test ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-build
+          --filter "FullyQualifiedName!~AnalyzerPackageContractTests&FullyQualifiedName!~PerformanceSyntheticCorpusTests"
+
+      - name: Pack release
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+        run: >-
+          dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj
+          --configuration Release
+          --no-build
+          --output artifacts/packages
+          -p:Version="$PACKAGE_VERSION"
+          -p:PackageVersion="$PACKAGE_VERSION"
+
+      - name: Validate package identity and version
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+        run: |
+          set -euo pipefail
+
+          expected="artifacts/packages/ComplexityAnalysis.Analyzers.${PACKAGE_VERSION}.nupkg"
+          if [[ ! -f "$expected" ]]; then
+            echo "::error::Expected package '$expected' was not produced."
+            find artifacts/packages -maxdepth 1 -type f -print || true
+            exit 1
+          fi
+
+          package_id="$(dotnet msbuild src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj -nologo -getProperty:PackageId | tr -d '\r' | sed '/^[[:space:]]*$/d' | tail -n 1)"
+          if [[ "$package_id" != "ComplexityAnalysis.Analyzers" ]]; then
+            echo "::error::Unexpected PackageId '$package_id'."
+            exit 1
+          fi
+
+      - name: Run package contract tests
+        run: >-
+          dotnet test ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-build
+          --filter AnalyzerPackageContractTests
+
+      - name: Run structural performance tests
+        run: >-
+          dotnet test ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-build
+          --filter PerformanceSyntheticCorpusTests
+
+      - name: Upload release package
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-package
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error
+          retention-days: 7
+
+  ensure-release-tag:
+    name: Create release tag
+    needs: build-and-pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Create or verify tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
+          VALIDATED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tag_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [[ "$tag_sha" != "$VALIDATED_SHA" ]]; then
+              echo "::error::Tag '$RELEASE_TAG' points to $tag_sha instead of $VALIDATED_SHA."
+              exit 1
+            fi
+
+            echo "Tag '$RELEASE_TAG' already exists on the validated commit."
+            exit 0
+          fi
+
+          git tag "$RELEASE_TAG" "$VALIDATED_SHA"
+          git push origin "refs/tags/$RELEASE_TAG"
+
+  publish-nuget:
+    name: Publish to NuGet.org
+    needs:
+      - build-and-pack
+      - ensure-release-tag
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download release package
+        uses: actions/download-artifact@v8
+        with:
+          name: release-package
+          path: artifacts/packages
+
+      - name: Exchange GitHub OIDC token for temporary NuGet API key
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: rodri-oliveira-dev
+
+      - name: Publish to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: >-
+          dotnet nuget push "artifacts/packages/*.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "$NUGET_API_KEY"
+          --skip-duplicate
+
+  publish-github-packages:
+    name: Publish to GitHub Packages
+    needs:
+      - build-and-pack
+      - ensure-release-tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download release package
+        uses: actions/download-artifact@v8
+        with:
+          name: release-package
+          path: artifacts/packages
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_PACKAGE_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          dotnet nuget push "artifacts/packages/*.nupkg"
+          --source "$GITHUB_PACKAGE_SOURCE"
+          --api-key "$GITHUB_PACKAGE_TOKEN"
+          --skip-duplicate
+
+  github-release:
+    name: Create GitHub Release
+    needs:
+      - build-and-pack
+      - ensure-release-tag
+      - publish-nuget
+      - publish-github-packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release package
+        uses: actions/download-artifact@v8
+        with:
+          name: release-package
+          path: artifacts/packages
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "GitHub Release '$RELEASE_TAG' already exists; refreshing package artifact."
+            gh release upload "$RELEASE_TAG" artifacts/packages/*.nupkg --repo "$GH_REPO" --clobber
+            exit 0
+          fi
+
+          release_args=(--verify-tag --generate-notes --title "$RELEASE_TAG")
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            release_args+=(--prerelease)
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            artifacts/packages/*.nupkg \
+            --repo "$GH_REPO" \
+            "${release_args[@]}"
