@@ -5,9 +5,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -21,6 +18,8 @@ jobs:
     name: Quality
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -52,6 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: quality
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -98,6 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: package
+    permissions: {}
     strategy:
       fail-fast: false
       matrix:
@@ -218,6 +220,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: quality
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
