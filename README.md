@@ -6,6 +6,8 @@ English | [Português (Brasil)](README.pt-BR.md)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/ComplexityAnalysis.Analyzers?logo=nuget&label=NuGet)](https://www.nuget.org/packages/ComplexityAnalysis.Analyzers)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/ComplexityAnalysis.Analyzers?logo=nuget&label=Downloads)](https://www.nuget.org/packages/ComplexityAnalysis.Analyzers)
+[![GitHub Release](https://img.shields.io/github/v/release/rodri-oliveira-dev/complexity-analyzers?logo=github&label=Release)](https://github.com/rodri-oliveira-dev/complexity-analyzers/releases/latest)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/mit)
 
