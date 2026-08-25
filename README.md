@@ -2,9 +2,9 @@
 
 English | [Portugues (Brasil)](README.pt-BR.md)
 
-ComplexityAnalysis.Analyzers is an isolated Roslyn analyzer package for surfacing algorithmic-complexity information in C# builds and IDEs.
+ComplexityAnalysis.Analyzers is a standalone Roslyn analyzer package for surfacing algorithmic-complexity information in C# builds and IDEs.
 
-The analyzer is developed under `analyzer/` as a package boundary separate from the inherited `complexity-hints` projects. Inherited projects may be used as reference material, but the analyzer package has no `ProjectReference`, binary dependency, or local package dependency on them.
+The analyzer is developed directly from the repository root. The former `analyzer/` workspace boundary has been removed, and the repository now represents the analyzer product itself. The original `complexity-hints` project may still be used as external reference material when useful, but this package has no `ProjectReference`, binary dependency, or local package dependency on it.
 
 ## Current Status
 
@@ -100,11 +100,12 @@ Unsupported or unresolved operations produce `Unknown`. `Unknown` is not treated
 
 Prerequisites:
 
-- .NET SDK `10.0.100` or a compatible SDK selected by `analyzer/global.json`.
+- .NET SDK `10.0.100` or a compatible SDK selected by `global.json`.
 - A shell capable of running `dotnet` commands.
 
+From the repository root:
+
 ```bash
-cd analyzer
 dotnet restore ComplexityAnalysis.Analyzers.slnx
 dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
 dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
