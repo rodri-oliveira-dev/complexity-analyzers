@@ -97,6 +97,30 @@ internal sealed class InterproceduralInvocationAnalyzer
                 .Complexity;
         }
 
+        // A completed template may avoid consuming the per-root method expansion budget,
+        // but it must never allow a source call to cross the configured call-depth boundary.
+        // Checking the depth before cache lookup keeps results deterministic regardless of
+        // which root method Roslyn happens to analyze first.
+        if (rootState.CurrentDepth >= rootState.Budget.MaximumCallDepth)
+        {
+            return InterproceduralAnalysisResult
+                .BudgetExceeded("Maximum call depth was reached.")
+                .Complexity;
+        }
+
+        if (interproceduralContext.TemplateCache.TryGetCompleted(
+            sourceMethodDefinition,
+            calleeOptions,
+            callerContext.CancellationToken,
+            out InterproceduralAnalysisResult cachedResult))
+        {
+            return SubstituteCallSiteArguments(
+                invocation,
+                resolution.TargetMethodSymbol,
+                sourceMethodDefinition,
+                cachedResult);
+        }
+
         if (!rootState.TryEnterMethod(
             sourceMethodDefinition,
             out InterproceduralRootAnalysisState calleeState,
@@ -105,38 +129,26 @@ internal sealed class InterproceduralInvocationAnalyzer
             return boundaryResult.Complexity;
         }
 
+        InterproceduralAnalysisResult calleeResult;
         try
         {
-            if (interproceduralContext.TemplateCache.TryGetCompleted(
-                sourceMethodDefinition,
-                calleeOptions,
-                callerContext.CancellationToken,
-                out InterproceduralAnalysisResult cachedResult))
-            {
-                return SubstituteCallSiteArguments(
-                    invocation,
-                    resolution.TargetMethodSymbol,
-                    sourceMethodDefinition,
-                    cachedResult);
-            }
-
-            InterproceduralAnalysisResult calleeResult = GetOrAnalyzeCallee(
+            calleeResult = GetOrAnalyzeCallee(
                 sourceMethodDefinition,
                 resolution.SourceMethodDeclaration,
                 interproceduralContext,
                 calleeOptions,
                 calleeState);
-
-            return SubstituteCallSiteArguments(
-                invocation,
-                resolution.TargetMethodSymbol,
-                sourceMethodDefinition,
-                calleeResult);
         }
         finally
         {
             _ = calleeState.ExitMethod(sourceMethodDefinition);
         }
+
+        return SubstituteCallSiteArguments(
+            invocation,
+            resolution.TargetMethodSymbol,
+            sourceMethodDefinition,
+            calleeResult);
     }
 
     private InterproceduralAnalysisResult GetOrAnalyzeCallee(
@@ -166,7 +178,6 @@ internal sealed class InterproceduralInvocationAnalyzer
         bool stored = false;
         try
         {
-            int expandedMethodCountAtEntry = calleeState.ExpandedMethodCount;
             InterproceduralAnalysisResult analyzedResult = AnalyzeCalleeWithoutCaching(
                 sourceMethodDefinition,
                 sourceMethodDeclaration,
@@ -174,10 +185,7 @@ internal sealed class InterproceduralInvocationAnalyzer
                 calleeOptions,
                 calleeState);
 
-            if (IsCacheable(
-                analyzedResult,
-                expandedMethodCountAtEntry,
-                calleeState.ExpandedMethodCount))
+            if (IsCacheable(analyzedResult))
             {
                 interproceduralContext.TemplateCache.StoreCompleted(
                     sourceMethodDefinition,
@@ -224,13 +232,9 @@ internal sealed class InterproceduralInvocationAnalyzer
                 callerContext.CancellationToken);
     }
 
-    private static bool IsCacheable(
-        InterproceduralAnalysisResult result,
-        int expandedMethodCountAtEntry,
-        int expandedMethodCountAfterAnalysis)
+    private static bool IsCacheable(InterproceduralAnalysisResult result)
     {
-        return result.Kind == InterproceduralAnalysisResultKind.Known
-            && expandedMethodCountAfterAnalysis == expandedMethodCountAtEntry;
+        return result.Kind == InterproceduralAnalysisResultKind.Known;
     }
 
     private ComplexityExpression SubstituteCallSiteArguments(
