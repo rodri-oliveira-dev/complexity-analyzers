@@ -1,14 +1,14 @@
-# Catalogo de Analyzers
+# Catálogo de Analyzers
 
-[English](../en/analyzers.md) | Portugues (Brasil)
+[English](../en/analyzers.md) | Português (Brasil)
 
-Esta pagina e o catalogo publico dos diagnostics expostos por `ComplexityAnalysis.Analyzers` ate a Phase 7.
+Esta página documenta os diagnósticos públicos expostos por `ComplexityAnalysis.Analyzers` e as fronteiras de análise que determinam quando cada regra pode reportar.
 
-O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, pode propagar complexidade de metodos fonte seguros na mesma compilation e pode resolver formatos selecionados de recorrencia diretamente recursiva. Metodos customizados com o mesmo nome nao sao tratados como operacoes BCL/LINQ conhecidas. Operacoes nao suportadas, inseguras, ciclicas, limitadas por budget, numericamente inconclusivas ou nao resolvidas continuam como `Unknown`.
+O analyzer resolve operações BCL e LINQ suportadas pela identidade de símbolo do Roslyn, pode propagar complexidade de métodos-fonte seguros dentro da mesma compilation e pode resolver formatos selecionados de recorrência de recursão direta. Comportamentos não suportados, inseguros, cíclicos, limitados por budget, numericamente inconclusivos ou não resolvidos permanecem `Unknown` em vez de serem estimados.
 
 ## Resumo
 
-| ID | Titulo | Categoria | Severidade padrao | Habilitado por padrao |
+| ID | Título | Categoria | Severidade padrão | Habilitado por padrão |
 | --- | --- | --- | --- | --- |
 | `BIG0001` | Estimated algorithmic complexity | `Complexity` | `Info` | `false` |
 | `BIG1001` | Linear lookup inside iteration | `Complexity` | `Info` | `true` |
@@ -19,96 +19,43 @@ O analyzer resolve operacoes conhecidas de BCL e LINQ por simbolos Roslyn, pode 
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
-## BIG0001 - Estimated Algorithmic Complexity
+## Como interpretar os diagnósticos
+
+O analyzer é intencionalmente conservador. Uma regra só reporta quando a sintaxe e o modelo semântico fornecem evidência suficiente para a relação de complexidade relevante. A ausência de um diagnóstico não prova que uma operação seja eficiente; também pode significar que o analyzer não conseguiu comprovar os fatos necessários com segurança.
+
+`Unknown` é, portanto, um resultado de primeira classe e não é convertido para `O(1)` ou qualquer outra classe conhecida.
+
+## BIG0001 — Complexidade algorítmica estimada
+
+`BIG0001` expõe a estimativa conhecida do analyzer para um método suportado, como `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`, `O(n^1.585)` ou `O(1.618^n)`.
 
 | Propriedade | Valor |
 | --- | --- |
-| ID | `BIG0001` |
-| Titulo | `Estimated algorithmic complexity` |
 | Categoria | `Complexity` |
-| Severidade padrao | `Info` |
-| Habilitado por padrao | `false` |
-| Localizacao | Identificador do metodo |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `false` |
+| Localização | Identificador do método |
 | Mensagem | `Estimated time complexity: {complexity}` |
 
-### Problema Detectado
+A estimativa pode incluir limites de loop suportados, operações BCL/LINQ conhecidas, callees de métodos-fonte seguros e formatos selecionados de recursão direta resolvida.
 
-`BIG0001` e informational. Ele expoe a estimativa conhecida do analyzer para um metodo suportado, como `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`, `O(n^1.585)` ou `O(1.618^n)`. Essa estimativa pode incluir complexidade propagada de callees fonte seguros e recursao direta resolvida.
-
-### Exemplo
+Exemplo:
 
 ```csharp
-public sealed class Sample
+public void M(int[] values)
 {
-    public void M(int[] values)
+    foreach (var value in values)
     {
-        foreach (var value in values)
-        {
-            var x = value + 1;
-        }
+        _ = value + 1;
     }
 }
 ```
 
-Quando habilitado, o diagnostic e reportado em `M` com `Estimated time complexity: O(n)`.
+Quando habilitado, `M` reporta `Estimated time complexity: O(n)`.
 
-Exemplo interprocedural com chamada fonte:
+Nenhum diagnóstico é reportado quando a regra não está habilitada, o resultado do método é `Unknown`, uma operação necessária é não suportada ou não resolvida, uma fronteira interprocedural não pode ser comprovada com segurança ou a recursão direta fica fora do modelo de recorrência suportado.
 
-```csharp
-public sealed class Sample
-{
-    public void M(int[] values)
-    {
-        Helper(values);
-    }
-
-    private void Helper(int[] items)
-    {
-        foreach (var item in items)
-        {
-            var x = item + 1;
-        }
-    }
-}
-```
-
-Quando `BIG0001` esta habilitado, `M` reporta `Estimated time complexity: O(n)`.
-
-Exemplo de recursao direta:
-
-```csharp
-public sealed class Sample
-{
-    public int BinarySearch(int n, bool left)
-    {
-        if (n <= 1)
-        {
-            return -1;
-        }
-
-        if (left)
-        {
-            return BinarySearch(n / 2, false);
-        }
-
-        return BinarySearch(n / 2, false);
-    }
-}
-```
-
-Quando `BIG0001` esta habilitado, `BinarySearch` reporta `Estimated time complexity: O(log n)`. As duas chamadas recursivas sintaticas estao em branches exclusivos e nao sao contadas como multiplicidade dois.
-
-### Casos Que Nao Geram Diagnostic
-
-Nenhum diagnostic e reportado quando:
-
-- `BIG0001` nao esta habilitado pela configuracao do consumidor;
-- o resultado do metodo e `Unknown`;
-- o metodo depende de operacoes nao suportadas, inseguras, ciclicas, limitadas por budget, numericamente inconclusivas ou nao resolvidas;
-- recursao direta sem evidencia de base case, com argumentos nao redutores, com trabalho local desconhecido ou fora das familias de recorrencia suportadas;
-- recursao mutua em vez de recursao direta.
-
-### Configuracao
+Habilite com:
 
 ```ini
 [*.cs]
@@ -116,62 +63,33 @@ Nenhum diagnostic e reportado quando:
 dotnet_diagnostic.BIG0001.severity = suggestion
 ```
 
-Use `none` para mante-lo desabilitado:
+## BIG1001 — Busca linear dentro de iteração
 
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG0001.severity = none
-```
-
-## BIG1001 - Linear Lookup Inside Iteration
+`BIG1001` reporta uma busca linear suportada executada dentro de uma iteração analisável.
 
 | Propriedade | Valor |
 | --- | --- |
-| ID | `BIG1001` |
-| Titulo | `Linear lookup inside iteration` |
 | Categoria | `Complexity` |
-| Severidade padrao | `Info` |
-| Habilitado por padrao | `true` |
-| Localizacao | Invocacao de lookup |
-| Mensagem | Operacao de lookup linear, estimativa da iteracao externa e estimativa combinada |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Invocação da busca |
 
-### Problema Detectado
-
-`BIG1001` reporta um lookup linear semanticamente conhecido executado dentro de um loop analisavel. O exemplo principal da Phase 4 e `List<T>.Contains` dentro de um loop sobre outra entrada.
-
-### Exemplo
+Exemplo típico:
 
 ```csharp
-using System.Collections.Generic;
-
-public sealed class Sample
+foreach (var customer in customers)
 {
-    void M(List<int> customers, List<int> blockedCustomers)
+    if (blockedCustomers.Contains(customer))
     {
-        foreach (var customer in customers)
-        {
-            if (blockedCustomers.Contains(customer))
-            {
-            }
-        }
     }
 }
 ```
 
-O diagnostic aponta para `blockedCustomers.Contains(customer)`.
+Quando `blockedCustomers` é um `List<T>` suportado, a busca é linear em relação ao tamanho da coleção e pode compor o custo do loop externo.
 
-### Casos Que Nao Geram Diagnostic
+A regra não reporta a mesma busca fora de um loop, buscas de custo médio constante suportadas como `HashSet<T>.Contains`, métodos customizados com o mesmo nome ou casos em que o tamanho do loop/receptor não pode ser resolvido com segurança.
 
-Nenhum diagnostic e reportado para:
-
-- o mesmo lookup fora de um loop;
-- `HashSet<T>.Contains`, porque o mapping suportado e lookup constante em caso medio;
-- metodos customizados `Contains` com o mesmo nome;
-- loops cuja contagem de iteracoes nao pode ser analisada;
-- lookups cujo tamanho do receiver nao pode ser resolvido com seguranca.
-
-### Configuracao
+Configure com:
 
 ```ini
 [*.cs]
@@ -179,60 +97,29 @@ Nenhum diagnostic e reportado para:
 dotnet_diagnostic.BIG1001.severity = warning
 ```
 
-Desabilite com:
+## BIG1002 — Materialização dentro de iteração
 
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG1001.severity = none
-```
-
-## BIG1002 - Materialization Inside Iteration
+`BIG1002` reporta materialização LINQ suportada e repetida dentro de uma iteração analisável. Os materializadores suportados incluem `ToList`, `ToArray`, `ToDictionary` e `ToHashSet`.
 
 | Propriedade | Valor |
 | --- | --- |
-| ID | `BIG1002` |
-| Titulo | `Materialization inside iteration` |
 | Categoria | `Complexity` |
-| Severidade padrao | `Info` |
-| Habilitado por padrao | `true` |
-| Localizacao | Invocacao de materializacao |
-| Mensagem | Operacao de materializacao, estimativa da iteracao externa e estimativa combinada |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Invocação de materialização |
 
-### Problema Detectado
-
-`BIG1002` reporta materializacao LINQ suportada e repetida dentro de um loop analisavel. Materializadores suportados incluem `ToList`, `ToArray`, `ToDictionary` e `ToHashSet`.
-
-### Exemplo
+Exemplo:
 
 ```csharp
-using System.Collections.Generic;
-using System.Linq;
-
-public sealed class Sample
+foreach (var customer in customers)
 {
-    void M(List<int> customers, IEnumerable<int> items)
-    {
-        foreach (var customer in customers)
-        {
-            var copy = items.ToList();
-        }
-    }
+    var copy = items.ToList();
 }
 ```
 
-O diagnostic aponta para `items.ToList()`.
+A regra não reporta materialização fora de loop, métodos customizados com o mesmo nome, tamanhos de fonte não resolvidos ou loops cuja quantidade de iterações não pode ser analisada.
 
-### Casos Que Nao Geram Diagnostic
-
-Nenhum diagnostic e reportado para:
-
-- materializacao fora de um loop;
-- metodos customizados `ToList` ou `ToArray`;
-- loops cuja contagem de iteracoes nao pode ser analisada;
-- materializadores cujo tamanho da fonte nao pode ser resolvido com seguranca.
-
-### Configuracao
+Configure com:
 
 ```ini
 [*.cs]
@@ -240,61 +127,31 @@ Nenhum diagnostic e reportado para:
 dotnet_diagnostic.BIG1002.severity = warning
 ```
 
-Desabilite com:
+## BIG1003 — Ordenação dentro de iteração
 
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG1002.severity = none
-```
-
-## BIG1003 - Ordering Inside Iteration
+`BIG1003` reporta ordenação deferred suportada quando o analyzer consegue comprovar que a ordenação é consumida dentro de uma iteração analisável.
 
 | Propriedade | Valor |
 | --- | --- |
-| ID | `BIG1003` |
-| Titulo | `Ordering inside iteration` |
 | Categoria | `Complexity` |
-| Severidade padrao | `Info` |
-| Habilitado por padrao | `true` |
-| Localizacao | Invocacao de ordenacao deferred |
-| Mensagem | Operacao de ordenacao, estimativa da iteracao externa e estimativa combinada |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Invocação da ordenação deferred |
 
-### Problema Detectado
+As operações suportadas incluem `OrderBy`, `OrderByDescending`, `ThenBy` e `ThenByDescending`.
 
-`BIG1003` reporta trabalho de ordenacao deferred suportado quando o consumo e comprovado dentro de um loop analisavel. Operacoes suportadas incluem `OrderBy`, `OrderByDescending`, `ThenBy` e `ThenByDescending`.
-
-### Exemplo
+Exemplo:
 
 ```csharp
-using System.Collections.Generic;
-using System.Linq;
-
-public sealed class Sample
+foreach (var customer in customers)
 {
-    void M(List<int> customers, IEnumerable<int> items)
-    {
-        foreach (var customer in customers)
-        {
-            var sorted = items.OrderBy(item => item).ToList();
-        }
-    }
+    var sorted = items.OrderBy(item => item).ToList();
 }
 ```
 
-O diagnostic aponta para `items.OrderBy(item => item)`, nao para `ToList()`.
+O diagnóstico aponta para a operação de ordenação. Criar uma pipeline de ordenação sem consumi-la dentro do loop não reporta, porque o custo completo de ordenação/enumeração ainda não foi comprovado naquele ponto.
 
-### Casos Que Nao Geram Diagnostic
-
-Nenhum diagnostic e reportado para:
-
-- criar uma pipeline `OrderBy` dentro de um loop sem consumi-la;
-- consumir a pipeline ordenada fora do loop;
-- metodos customizados `OrderBy`;
-- loops cuja contagem de iteracoes nao pode ser analisada;
-- cadeias de ordenacao cuja fonte nao pode ser resolvida com seguranca.
-
-### Configuracao
+Configure com:
 
 ```ini
 [*.cs]
@@ -302,67 +159,39 @@ Nenhum diagnostic e reportado para:
 dotnet_diagnostic.BIG1003.severity = warning
 ```
 
-Desabilite com:
+## BIG1004 — Chamada dependente de entrada dentro de iteração
 
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG1003.severity = none
-```
-
-## BIG1004 - Input-Dependent Method Call Inside Iteration
+`BIG1004` reporta uma chamada a método-fonte suportado com complexidade conhecida dependente da entrada quando essa chamada é executada dentro de uma iteração analisável.
 
 | Propriedade | Valor |
 | --- | --- |
-| ID | `BIG1004` |
-| Titulo | `Input-dependent method call inside iteration` |
 | Categoria | `Complexity` |
-| Severidade padrao | `Info` |
-| Habilitado por padrao | `true` |
-| Localizacao | Invocacao de metodo fonte |
-| Mensagem | Metodo fonte, estimativa do callee, estimativa da iteracao externa e estimativa combinada |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Invocação do método-fonte |
 
-### Problema Detectado
-
-`BIG1004` reporta uma chamada de metodo fonte suportada com complexidade conhecida dependente de entrada quando essa chamada executa dentro de um loop analisavel.
-
-### Exemplo
+Exemplo:
 
 ```csharp
-public sealed class Sample
+foreach (var customer in customers)
 {
-    void M(int[] customers, int[] blocked)
-    {
-        foreach (var customer in customers)
-        {
-            CheckAgainstBlacklist(customer, blocked);
-        }
-    }
+    CheckAgainstBlacklist(customer, blocked);
+}
 
-    private void CheckAgainstBlacklist(int customer, int[] blocked)
+private static void CheckAgainstBlacklist(int customer, int[] blocked)
+{
+    foreach (var value in blocked)
     {
-        foreach (var value in blocked)
-        {
-            var x = value + customer;
-        }
+        _ = value + customer;
     }
 }
 ```
 
-O diagnostic aponta para `CheckAgainstBlacklist(customer, blocked)` e reporta o padrao combinado `O(n * m)`.
+O analyzer pode combinar o loop do caller com o custo dependente de entrada substituído do callee, produzindo um padrão como `O(n * m)`.
 
-### Casos Que Nao Geram Diagnostic
+A regra não reporta chamadas-fonte fora de loops, callees cujo custo substituído é `O(1)`, dispatch inseguro, binding de argumentos desconhecido, fronteiras de ciclo/budget ou operações de framework já tratadas pelas regras BCL/LINQ.
 
-Nenhum diagnostic e reportado para:
-
-- chamadas fonte fora de loops;
-- chamadas fonte cuja complexidade substituida e `O(1)`;
-- dispatch virtual ou de interface inseguro;
-- callees ciclicos ou limitados por budget;
-- bindings de argumentos desconhecidos;
-- operacoes BCL/LINQ conhecidas ja tratadas por `BIG1001`, `BIG1002` ou `BIG1003`.
-
-### Configuracao
+Configure com:
 
 ```ini
 [*.cs]
@@ -370,60 +199,37 @@ Nenhum diagnostic e reportado para:
 dotnet_diagnostic.BIG1004.severity = warning
 ```
 
-Desabilite com:
+## BIG1005 — Crescimento recursivo exponencial
 
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG1004.severity = none
-```
-
-## BIG1005 - Exponential Recursive Growth
+`BIG1005` reporta um método de recursão direta suportado cuja recorrência é resolvida como crescimento exponencial.
 
 | Propriedade | Valor |
 | --- | --- |
-| ID | `BIG1005` |
-| Titulo | `Exponential recursive growth` |
 | Categoria | `Complexity` |
-| Severidade padrao | `Info` |
-| Habilitado por padrao | `true` |
-| Localizacao | Identificador do metodo recursivo |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Identificador do método recursivo |
 | Mensagem | `Recursive method '{method}' has estimated exponential time complexity {complexity}` |
 
-### Problema Detectado
-
-`BIG1005` reporta um metodo diretamente recursivo suportado cuja recorrencia resolvida e exponencial. Ele e intencionalmente informational e nao prescreve memoization ou reescrita.
-
-### Exemplo
+Exemplo:
 
 ```csharp
-public sealed class Sample
+int Fibonacci(int n)
 {
-    int Fibonacci(int n)
+    if (n <= 1)
     {
-        if (n <= 1)
-        {
-            return n;
-        }
-
-        return Fibonacci(n - 1) + Fibonacci(n - 2);
+        return n;
     }
+
+    return Fibonacci(n - 1) + Fibonacci(n - 2);
 }
 ```
 
-O diagnostic aponta para `Fibonacci` e reporta `O(1.618^n)`.
+Para a recorrência suportada no estilo Fibonacci, o analyzer reporta crescimento exponencial como `O(1.618^n)`.
 
-### Casos Que Nao Geram Diagnostic
+A regra não reporta recursão resolvida como polinomial/logarítmica, formatos não suportados ou inválidos, ausência de base case, argumentos recursivos não redutores, resultados numericamente inconclusivos ou recursão mútua.
 
-Nenhum diagnostic e reportado para:
-
-- recursao resolvida polinomial ou logaritmica;
-- resultados de recorrencia unknown, unsupported, invalid ou numericamente inconclusivos;
-- evidencia de base case ausente;
-- argumentos recursivos nao redutores como `n` ou `n + 1`;
-- recursao mutua, que e detectada mas nao resolvida.
-
-### Configuracao
+Configure com:
 
 ```ini
 [*.cs]
@@ -431,54 +237,21 @@ Nenhum diagnostic e reportado para:
 dotnet_diagnostic.BIG1005.severity = warning
 ```
 
-Desabilite com:
+## BIG1006 — Complexidade acima do threshold configurado
 
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG1005.severity = none
-```
-
-## BIG1006 - Method Complexity Exceeds Configured Threshold
+`BIG1006` reporta um método cuja complexidade estimada conhecida e comparável é maior que `complexity_analyzers.maximum_complexity`.
 
 | Propriedade | Valor |
 | --- | --- |
-| ID | `BIG1006` |
-| Titulo | `Method complexity exceeds configured threshold` |
 | Categoria | `Complexity` |
-| Severidade padrao | `Info` |
-| Habilitado por padrao | `true` |
-| Localizacao | Identificador do metodo |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Identificador do método |
 | Mensagem | `Method '{method}' has estimated complexity {actual}, which exceeds the configured maximum {threshold}` |
 
-### Problema Detectado
+O descriptor é habilitado por padrão, mas a regra é funcionalmente opt-in porque o threshold padrão é `none`.
 
-`BIG1006` reporta um metodo cuja complexidade estimada conhecida e maior que o threshold configurado em `complexity_analyzers.maximum_complexity`.
-
-Embora o descriptor seja habilitado por default, a regra e funcionalmente opt-in porque o threshold default e `none`.
-
-### Exemplo
-
-```csharp
-public sealed class Sample
-{
-    public int Quadratic(int[] values)
-    {
-        var total = 0;
-        foreach (var outer in values)
-        {
-            foreach (var inner in values)
-            {
-                total += outer + inner;
-            }
-        }
-
-        return total;
-    }
-}
-```
-
-Com esta configuracao, `Quadratic` reporta `BIG1006` porque `O(n^2)` excede `O(n log n)`:
+Exemplo de configuração:
 
 ```ini
 [*.cs]
@@ -487,74 +260,23 @@ complexity_analyzers.maximum_complexity = n_log_n
 dotnet_diagnostic.BIG1006.severity = warning
 ```
 
-### Casos Que Nao Geram Diagnostic
+Um método comprovado como `O(n^2)` excede `n_log_n` e pode reportar. `O(n log n)`, `O(n)`, `Unknown` e expressões multivariadas incomparáveis não reportam para esse threshold.
 
-Nenhum diagnostic e reportado quando:
+`BIG1006` é um sinal prático de análise estática, não uma prova matemática universal.
 
-- `complexity_analyzers.maximum_complexity` e `none` ou invalido;
-- a estimativa do metodo e `Unknown`;
-- a estimativa e menor ou igual ao threshold configurado;
-- a estimativa e o threshold sao incomparaveis pelo modelo atual, incluindo algumas expressoes multivariadas sobre variaveis independentes.
+## BIG9000 — Probe de execução do analyzer
 
-`BIG1006` nao e uma prova matematica universal. Ele compara apenas formatos de complexidade que o analyzer comprovou e consegue comparar com seguranca.
-
-### Configuracao
-
-```ini
-[*.cs]
-
-complexity_analyzers.maximum_complexity = n_log_n
-dotnet_diagnostic.BIG1006.severity = warning
-```
-
-Desabilite reporting de threshold:
-
-```ini
-[*.cs]
-
-complexity_analyzers.maximum_complexity = none
-```
-
-Desabilite o diagnostic independentemente:
-
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG1006.severity = none
-```
-
-## BIG9000 - Analyzer Execution Probe
+`BIG9000` é um diagnóstico de infraestrutura usado para comprovar que o pacote foi carregado, inicializado e executado.
 
 | Propriedade | Valor |
 | --- | --- |
-| ID | `BIG9000` |
-| Titulo | `Analyzer execution probe` |
 | Categoria | `Infrastructure` |
-| Severidade padrao | `Info` |
-| Habilitado por padrao | `false` |
-| Localizacao | Inicio de um arquivo-fonte quando disponivel; caso contrario sem localizacao de fonte |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `false` |
+| Localização | Início de um arquivo-fonte quando disponível; caso contrário, sem localização |
 | Mensagem | `ComplexityAnalysis.Analyzers execution probe is active` |
 
-### Problema Detectado
-
-`BIG9000` nao detecta um problema de codigo. Ele e um probe de infraestrutura usado para provar que o pacote do analyzer foi carregado, inicializado e conseguiu reportar diagnostics.
-
-### Exemplo
-
-Qualquer codigo C# pode produzir o probe quando ele e habilitado explicitamente:
-
-```csharp
-public sealed class Sample
-{
-    public int M() => 42;
-}
-```
-
-### Casos Que Nao Geram Diagnostic
-
-Nenhum diagnostic e reportado quando `BIG9000` nao esta habilitado. Quando habilitado, ele reporta no maximo uma vez por compilation.
-
-### Configuracao
+Habilite temporariamente:
 
 ```ini
 [*.cs]
@@ -562,7 +284,7 @@ Nenhum diagnostic e reportado quando `BIG9000` nao esta habilitado. Quando habil
 dotnet_diagnostic.BIG9000.severity = warning
 ```
 
-Desabilite com:
+Depois do smoke test, desabilite:
 
 ```ini
 [*.cs]
@@ -570,42 +292,87 @@ Desabilite com:
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-## Subconjunto Suportado de Operacoes Conhecidas
+Quando habilitado, reporta no máximo uma vez por compilation.
 
-O analyzer inclui um subconjunto pequeno e documentado:
+## Subconjunto de operações conhecidas
 
-- BCL: operacoes selecionadas de `List<T>`, `Dictionary<TKey,TValue>`, `HashSet<T>`, arrays e string.
-- LINQ imediatas ou terminais: `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max` e `Aggregate`.
-- LINQ deferred: `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct` e `GroupBy`.
+O analyzer documenta deliberadamente um conjunto limitado de operações conhecidas.
 
-A criacao de pipeline LINQ deferred e tratada como trabalho de setup. O custo de enumeracao so e contado quando uma operacao terminal suportada ou `foreach` consome a pipeline.
+Exemplos BCL incluem operações selecionadas de:
 
-## Escopo Suportado de Metodos Fonte
+- `List<T>`;
+- `Dictionary<TKey,TValue>`;
+- `HashSet<T>`;
+- arrays;
+- strings.
 
-A analise interprocedural de metodos fonte e limitada a metodos ordinarios na mesma Roslyn `Compilation` com dispatch seguro:
+Operações LINQ imediatas/terminais suportadas incluem:
 
-- metodos static;
-- metodos private;
-- metodos ordinarios nao virtuais;
-- dispatch sealed quando o alvo de runtime e comprovado.
+- `Any`, `All`, `Contains`, `Count`, `LongCount`;
+- `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`;
+- `Sum`, `Min`, `Max`, `Aggregate`.
 
-A travessia e demand-driven: um callee fonte e analisado somente quando um caller analisado alcanca aquela invocacao. O analyzer nao constroi um call graph obrigatorio da compilation inteira e nao pre-analisa todas as syntax trees para propagacao interprocedural.
+Operações deferred suportadas incluem:
 
-A expansao e limitada por opcoes publicas com hard limits. A profundidade maxima default de chamadas e `5`, configuravel ate `16`. O maximo default de expansoes uncached de metodos fonte por analise raiz e `32`, configuravel ate `128`. Quando uma fronteira de budget e alcancada, a chamada afetada permanece `Unknown`; raizes independentes posteriores ainda podem analisar e cachear o mesmo metodo fonte quando o proprio budget permitir.
+- `Where`, `Select`, `SelectMany`;
+- `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`;
+- `Distinct`, `GroupBy`.
 
-Continuam fora de escopo: dispatch virtual/interface completo, assemblies externos, construtores, propriedades, operadores, local functions, lambdas como alvos independentes, call graph de compilation inteira e analise de solution inteira. Ciclos sao detectados e continuam seguros; recursao mutua e detectada, mas nao resolvida.
+Os mappings são baseados nos símbolos resolvidos. Métodos do usuário com o mesmo nome não são mapeados automaticamente.
 
-## Escopo Suportado de Recursao Direta
+A criação de uma pipeline deferred é tratada como trabalho de setup. O custo de enumeração ou ordenação é cobrado quando o consumo suportado é comprovado.
 
-O analyzer resolve apenas recursao direta limitada. Uma chamada recursiva precisa resolver semanticamente para a mesma definicao de metodo, o metodo precisa fornecer evidencia compativel de base case, o argumento recursivo precisa ser comprovadamente redutor e o trabalho local nao recursivo precisa ser conhecido.
+## Escopo de métodos-fonte suportados
 
-Familias de recorrencia suportadas:
+A análise interprocedural é limitada a métodos-fonte ordinários na mesma Roslyn `Compilation` quando o dispatch é seguro.
 
-- soma/decremento: `T(n)=T(n-c)+f(n)` para `f(n)` polylogaritmico suportado;
-- recursao direta exponencial simples: `aT(n-c)+polylog` para o subconjunto de coeficiente constante suportado, incluindo Fibonacci `T(n-1)+T(n-2)+1`;
-- Master Theorem: um termo de escala `aT(n/b)+f(n)` para tolls polylogaritmicos suportados;
-- subconjunto restrito/limitado de Akra-Bazzi: termos recursivos apenas por escala, sem perturbacoes, e tolls polylogaritmicos suportados.
+Formas suportadas incluem:
 
-Exemplos incluem `T(n)=T(n-1)+1 => O(n)`, `T(n)=T(n-1)+n => O(n^2)`, `T(n)=T(n-1)+log n => O(n log n)`, `2T(n-1)+1 => O(2^n)`, `T(n/2)+1 => O(log n)`, `2T(n/2)+n => O(n log n)`, `3T(n/2)+n => O(n^1.585)` e `T(n/3)+T(2n/3)+n => O(n log n)`.
+- métodos static;
+- métodos private;
+- métodos ordinários não virtuais;
+- dispatch sealed quando o alvo de runtime pode ser comprovado.
 
-O analyzer nao implementa Akra-Bazzi completo, polinomios caracteristicos arbitrarios, parsing simbolico de recorrencias, integracao numerica geral, MathNet, SymPy, Workspaces ou referencias a projetos solver herdados. Casos nao suportados permanecem `Unknown`.
+O traversal é sob demanda e limitado. A profundidade máxima padrão é `5`, configurável até `16`. O máximo padrão de expansões de métodos-fonte por raiz é `32`, configurável até `128`.
+
+Ficam fora do escopo suportado dispatch virtual/interface inseguro, dynamic dispatch, assemblies externos, construtores, propriedades, operadores, local functions, lambdas como alvos independentes, call graphs de compilation inteira e análise de solution inteira.
+
+Ciclos são detectados de forma conservadora. Recursão direta pode ser delegada ao pipeline de recorrências; recursão mútua continua sem suporte para resolução.
+
+## Escopo de recursão direta suportada
+
+Uma recorrência só pode ser resolvida quando o analyzer consegue comprovar recursão direta semântica, evidência compatível de base case, argumento recursivo redutor e trabalho local conhecido.
+
+As famílias suportadas incluem:
+
+- formas de soma/decremento como `T(n)=T(n-c)+f(n)` para tolls suportados;
+- um subconjunto exponencial simples e limitado, incluindo formatos no estilo Fibonacci;
+- formas do Master Theorem;
+- um subconjunto restrito/limitado de Akra-Bazzi com termos recursivos por escala suportados.
+
+Resultados representativos:
+
+```text
+T(n)=T(n-1)+1               => O(n)
+T(n)=T(n-1)+n               => O(n^2)
+T(n)=T(n-1)+log n           => O(n log n)
+2T(n-1)+1                   => O(2^n)
+T(n/2)+1                    => O(log n)
+2T(n/2)+n                   => O(n log n)
+3T(n/2)+n                   => O(n^1.585)
+T(n/3)+T(2n/3)+n            => O(n log n)
+```
+
+O analyzer não implementa Akra-Bazzi completo, resolução arbitrária por polinômio característico, parsing simbólico geral de recorrências, integração numérica geral ou integração com solvers externos MathNet/SymPy.
+
+Casos não suportados permanecem `Unknown`.
+
+## Configuração
+
+Use a configuração padrão de severidade do Roslyn:
+
+```ini
+dotnet_diagnostic.<RULE_ID>.severity = <severity>
+```
+
+Opções comportamentais, como budgets de análise e threshold máximo de complexidade, estão documentadas em [Configuração](configuration.md).
