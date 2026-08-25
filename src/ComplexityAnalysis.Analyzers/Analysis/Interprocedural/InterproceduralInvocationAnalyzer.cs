@@ -307,10 +307,11 @@ internal sealed class InterproceduralInvocationAnalyzer
         }
 
         BasicOperationAnalyzer operationAnalyzer = new(callerContext);
-        foreach (ArgumentSyntax argument in invocation.ArgumentList.Arguments)
+        for (int index = 0; index < invocation.ArgumentList.Arguments.Count; index++)
         {
             callerContext.CancellationToken.ThrowIfCancellationRequested();
 
+            ArgumentSyntax argument = invocation.ArgumentList.Arguments[index];
             ComplexityExpression argumentComplexity = argument.Expression is LambdaExpressionSyntax
                 ? ComplexityFactory.Constant()
                 : operationAnalyzer.AnalyzeExpression(argument.Expression);
@@ -330,11 +331,17 @@ internal sealed class InterproceduralInvocationAnalyzer
     {
         callerContext.CancellationToken.ThrowIfCancellationRequested();
 
-        return invocation.Expression is MemberAccessExpressionSyntax memberAccess
-            && (!targetMethodSymbol.IsStatic || targetMethodSymbol.ReducedFrom is not null)
-                ? memberAccess.Expression is ThisExpressionSyntax or BaseExpressionSyntax
-                    ? ComplexityFactory.Constant()
-                    : new BasicOperationAnalyzer(callerContext).AnalyzeExpression(memberAccess.Expression)
-                : ComplexityFactory.Constant();
+        if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess
+            || (targetMethodSymbol.IsStatic && targetMethodSymbol.ReducedFrom is null))
+        {
+            return ComplexityFactory.Constant();
+        }
+
+        if (memberAccess.Expression is ThisExpressionSyntax or BaseExpressionSyntax)
+        {
+            return ComplexityFactory.Constant();
+        }
+
+        return new BasicOperationAnalyzer(callerContext).AnalyzeExpression(memberAccess.Expression);
     }
 }
