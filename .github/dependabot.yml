@@ -24,11 +24,12 @@ updates:
           - "coverlet.collector"
           - "xunit*"
     ignore:
-      # The analyzer intentionally targets the Roslyn 4.x package family.
-      # Major upgrades should be evaluated explicitly for host compatibility.
+      # Roslyn compiler APIs are intentionally pinned to 4.8.0.
+      # Upgrades require explicit compatibility evaluation against
+      # all supported compiler and SDK hosts.
       - dependency-name: "Microsoft.CodeAnalysis.CSharp"
-        update-types:
-          - "version-update:semver-major"
+        versions:
+          - "> 4.8.0"
       - dependency-name: "Microsoft.CodeAnalysis.Analyzers"
         update-types:
           - "version-update:semver-major"
