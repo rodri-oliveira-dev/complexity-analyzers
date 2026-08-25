@@ -1,6 +1,6 @@
 # ComplexityAnalysis.Analyzers
 
-English | [Portugues (Brasil)](README.pt-BR.md)
+English | [Português (Brasil)](README.pt-BR.md)
 
 [![Build & Tests](https://github.com/rodri-oliveira-dev/complexity-analyzers/actions/workflows/complexity-analyzers-ci.yml/badge.svg)](https://github.com/rodri-oliveira-dev/complexity-analyzers/actions/workflows/complexity-analyzers-ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
@@ -8,25 +8,19 @@ English | [Portugues (Brasil)](README.pt-BR.md)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/mit)
 
-ComplexityAnalysis.Analyzers is a standalone Roslyn analyzer package for surfacing algorithmic-complexity information in C# builds and IDEs.
+`ComplexityAnalysis.Analyzers` is a compile-time Roslyn analyzer for C# that estimates algorithmic complexity and reports diagnostics for costly patterns without adding runtime dependencies or instrumentation to consumer applications.
 
-The analyzer is developed directly from the repository root. The former `analyzer/` workspace boundary has been removed, and the repository now represents the analyzer product itself. The original `complexity-hints` project may still be used as external reference material when useful, but this package has no `ProjectReference`, binary dependency, or local package dependency on it.
+The analyzer is deliberately conservative: when complexity cannot be proven safely from the available syntax and semantic information, it returns `Unknown` instead of guessing.
 
-## Current Status
+## What it does
 
-Phase 1 through Phase 7 are implemented.
-
-| Phase | Status | Delivered |
-| --- | --- | --- |
-| Phase 1 - Analyzer Foundation | Complete | Isolated `netstandard2.0` analyzer project, package layout, and `BIG9000` infrastructure probe. |
-| Phase 2 - Complexity Model | Complete | Roslyn-free Big-O expression model, deterministic formatting, growth comparison, composition, independent variables, and `Unknown`. |
-| Phase 3 - Roslyn Extraction | Complete | Intraprocedural method extraction from Roslyn syntax and semantics. |
-| Phase 4 - BCL, LINQ, and Actionable Diagnostics | Complete | Semantic known-operation mappings for a documented BCL/LINQ subset, `BIG0001`, and actionable `BIG100x` diagnostics. |
-| Phase 5 - Interprocedural Analysis | Complete | Bounded demand-driven propagation from safe source methods in the same compilation, source-call loop diagnostic `BIG1004`, cycle detection, cache, and internal limits. |
-| Phase 6 - Recursion & Recurrence Solving | Complete | Bounded direct-recursion extraction, summation recurrences, simple exponential recursion, Master Theorem, a restricted/bounded Akra-Bazzi subset, fractional powers, and `BIG1005`. |
-| Phase 7 - Configuration, Performance & NuGet Readiness | Complete | Analyzer config options, bounded public budgets, configurable threshold diagnostic `BIG1006`, performance harness, package contract tests, local consumer validation, and CI compatibility checks. |
-
-The analyzer can follow supported source methods in the same compilation when dispatch is safe and the call is reached from the current root method. It can also solve selected direct recursive methods when base-case evidence, argument reduction, local work, and recurrence shape are all proven. It does not build a whole-compilation call graph, solve mutual recursion, or use `Microsoft.CodeAnalysis.Workspaces`.
+- Estimates Big-O complexity for supported C# methods using Roslyn syntax, symbols, and semantic information.
+- Detects costly operations inside iteration, including linear lookups, collection materialization, and ordering.
+- Understands a documented subset of BCL and LINQ operations by resolved symbol identity rather than method name alone.
+- Performs bounded, demand-driven interprocedural analysis for safe source-method calls in the same compilation.
+- Solves selected direct-recursion recurrence families, including decrement recurrences, simple exponential recursion, Master Theorem forms, and a restricted Akra-Bazzi subset.
+- Supports configurable analysis budgets and a maximum-complexity threshold through `.editorconfig`/analyzer config.
+- Runs as a normal Roslyn analyzer during builds and IDE analysis; consumer code does not call the analyzer at runtime.
 
 ## Diagnostics
 
@@ -41,25 +35,40 @@ The analyzer can follow supported source methods in the same compilation when di
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | Yes |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | No |
 
-`BIG0001` is informational and disabled by default. It reports a known method complexity estimate at the method identifier when explicitly enabled.
+`BIG0001` is an opt-in informational diagnostic that reports a known method-complexity estimate at the method identifier.
 
 `BIG1005` reports supported direct recursive methods whose solved recurrence is exponential, such as Fibonacci-like recursion.
 
-`BIG1006` reports when `complexity_analyzers.maximum_complexity` is configured and a method's known, comparable estimate exceeds that threshold. Unknown and incomparable estimates do not report.
+`BIG1006` reports when `complexity_analyzers.maximum_complexity` is configured and a known, comparable estimate exceeds the configured threshold. `Unknown` and incomparable estimates are not reported.
 
-`BIG9000` is an infrastructure probe. It proves the analyzer package loaded and ran when explicitly enabled; it is not a performance recommendation.
+`BIG9000` is an infrastructure probe used to prove that the analyzer package loaded and executed. It is not a performance recommendation.
 
-See [Analyzer Catalog](docs/en/analyzers.md).
+See the [Analyzer Catalog](docs/en/analyzers.md) for rule details.
 
-## Interprocedural Analysis
+## Analysis model
 
-Phase 5 adds source-method interprocedural analysis: when a caller invokes a supported method declared in the same Roslyn `Compilation`, the analyzer can analyze the callee once as a caller-independent template and substitute the caller's arguments into that template.
+### Known BCL and LINQ operations
 
-Supported source methods are ordinary C# methods with safe dispatch, including static methods, private methods, non-virtual methods, and sealed dispatch when the runtime target is proven. Known BCL and LINQ operations keep precedence over source-method analysis.
+Known operations are mapped by Roslyn symbol identity. Custom methods named `Contains`, `Where`, `ToList`, or similar are not treated as BCL/LINQ operations unless their resolved symbol belongs to the supported subset.
 
-Traversal is demand-driven. A callee is analyzed only when the current root method reaches that invocation. The analyzer does not pre-scan every syntax tree or build a complete call graph. Public options expose bounded limits for call depth and methods expanded per root analysis.
+Implemented examples include:
 
-Unsupported, unresolved, unsafe, budget-limited, cancelled, or cyclic calls remain `Unknown`. Direct recursion may be solved only by the bounded recurrence pipeline. Mutual recursion is detected but not solved.
+- `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count`, and the `List<T>` indexer.
+- `Dictionary<TKey,TValue>.ContainsKey` and `Dictionary<TKey,TValue>.ContainsValue`.
+- `HashSet<T>.Contains`.
+- Array and string `Length`.
+- LINQ `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max`, and `Aggregate`.
+- Deferred LINQ operations including `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct`, and `GroupBy`.
+
+Deferred LINQ pipeline creation is not charged as a full enumeration. Enumeration cost is counted when a supported terminal operation or `foreach` consumes the pipeline.
+
+### Interprocedural analysis
+
+When a caller invokes a supported source method declared in the same Roslyn `Compilation`, the analyzer can derive a caller-independent callee template and substitute the caller arguments into that template.
+
+Supported source methods require safe dispatch, such as static methods, private methods, non-virtual methods, or sealed dispatch where the runtime target is proven. Known BCL/LINQ operations take precedence over source-method analysis.
+
+Traversal is demand-driven and bounded. A callee is analyzed only when reached from the current root method. The analyzer does not pre-scan every syntax tree or construct a whole-compilation call graph.
 
 Examples:
 
@@ -72,37 +81,24 @@ B(constant)          => O(1)
 A -> B -> C O(log n) => O(log n)
 ```
 
-## Direct Recursion and Recurrences
+Unsupported, unresolved, unsafe, budget-limited, cancelled, or cyclic calls remain `Unknown`.
 
-The analyzer recognizes direct recursive calls by Roslyn symbol identity and requires compatible base-case evidence before solving. Recursive calls in mutually exclusive branches are counted per path, so binary-search-style code with two syntactic calls in exclusive branches remains `O(log n)`, not `O(n)`.
+### Direct recursion and recurrence solving
+
+The analyzer recognizes direct recursive calls by Roslyn symbol identity and requires compatible base-case evidence before solving a recurrence. Recursive calls in mutually exclusive branches are counted per path, so binary-search-style code remains `O(log n)` rather than being over-counted as linear.
 
 Supported recurrence families include:
 
-- summation/decrement recurrences such as `T(n)=T(n-1)+1`, `T(n)=T(n-1)+n`, and `T(n)=T(n-1)+log n`;
-- simple exponential direct recursion such as `2T(n-1)+1` and Fibonacci-like `T(n-1)+T(n-2)+1`;
+- decrement/summation forms such as `T(n)=T(n-1)+1`, `T(n)=T(n-1)+n`, and `T(n)=T(n-1)+log n`;
+- simple exponential recursion such as `2T(n-1)+1` and Fibonacci-like `T(n-1)+T(n-2)+1`;
 - Master Theorem forms such as `T(n)=T(n/2)+1`, `2T(n/2)+n`, `2T(n/2)+n^2`, and `3T(n/2)+n`;
-- a restricted/bounded Akra-Bazzi subset with scale-only recursive terms and polylogarithmic tolls, for example `T(n)=T(n/3)+T(2n/3)+n`.
+- a restricted, bounded Akra-Bazzi subset with scale-only recursive terms and polylogarithmic tolls, for example `T(n)=T(n/3)+T(2n/3)+n`.
 
-Fractional polynomial powers are represented deterministically, so `3T(n/2)+n` reports `O(n^1.585)`. Unknown local work, missing base cases, non-reducing arguments, unsupported recurrence shapes, numerically inconclusive solving, cancellation, and mutual recursion remain `Unknown`. The analyzer does not claim full Akra-Bazzi, symbolic recurrence solving, memoization detection, or proof of general termination.
+Fractional polynomial powers are represented deterministically, so `3T(n/2)+n` reports `O(n^1.585)`.
 
-## Known Operation Scope
+Missing base cases, non-reducing arguments, unsupported recurrence shapes, unknown local work, numerical inconclusiveness, cancellation, and mutual recursion remain `Unknown`.
 
-Phase 4 maps selected operations by Roslyn symbols, not by method names alone. Custom methods named `Contains`, `Where`, `ToList`, or similar remain unmapped unless their resolved symbol is part of the supported subset.
-
-Implemented examples include:
-
-- `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count`, and `List<T>` indexer.
-- `Dictionary<TKey,TValue>.ContainsKey` and `Dictionary<TKey,TValue>.ContainsValue`.
-- `HashSet<T>.Contains`.
-- Array and string `Length`.
-- LINQ `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max`, `Aggregate`.
-- Deferred LINQ pipeline operations including `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct`, and `GroupBy`.
-
-Deferred LINQ creation is not charged as a full enumeration. Enumeration cost is counted when a supported terminal operation or `foreach` consumes the pipeline.
-
-Unsupported or unresolved operations produce `Unknown`. `Unknown` is not treated as `O(1)` or `O(n)`, and it is not reported by `BIG0001`.
-
-## Quick Start
+## Build from source
 
 Prerequisites:
 
@@ -118,13 +114,13 @@ dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 ```
 
-The package is documented as a local build/package source. Do not assume a NuGet.org release unless one exists independently.
+The repository currently documents local package creation and consumption. Do not assume a NuGet.org release unless one exists independently.
 
 See [Getting Started](docs/en/getting-started.md).
 
 ## Configuration
 
-Phase 7 adds custom analyzer behavior options through Roslyn analyzer config. Diagnostic severities still use standard `dotnet_diagnostic.<RULE_ID>.severity`.
+Analyzer behavior is configurable through Roslyn analyzer config. Diagnostic severities continue to use standard `dotnet_diagnostic.<RULE_ID>.severity` entries.
 
 ```ini
 [*.cs]
@@ -145,21 +141,21 @@ dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-Defaults preserve existing behavior: interprocedural analysis and recursion analysis are enabled, `max_call_depth` is `5`, `max_methods_per_root` is `32`, and `maximum_complexity` is `none`. Threshold reporting only applies to known comparable estimates.
+Defaults keep interprocedural and recursion analysis enabled, `max_call_depth` at `5`, `max_methods_per_root` at `32`, and `maximum_complexity` at `none`. Threshold reporting only applies to known, comparable estimates.
 
 See [Configuration](docs/en/configuration.md).
 
-## Performance and Compatibility
+## Performance and compatibility
 
-The analyzer is designed to be bounded: no network access, no analyzer hot-path filesystem I/O, no process launch, no telemetry, no mandatory whole-solution scan, bounded source-method traversal, bounded recurrence solving, concurrent execution, generated-code exclusion, and cancellation checks.
+The analyzer is designed to remain bounded and suitable for compiler/IDE execution: no network access, no analyzer hot-path filesystem I/O, no process launch, no telemetry, no mandatory whole-solution scan, bounded source-method traversal, bounded recurrence solving, concurrent execution, generated-code exclusion, and cancellation checks.
 
 The repeatable performance harness is documented in [performance/README.md](performance/README.md). It validates structural behavior and compiler analyzer execution reporting with `ReportAnalyzer=true`; elapsed time is informational because hardware and CI runners vary.
 
-CI validates local package consumption on currently supported SDK hosts from the project matrix: .NET 8 LTS, .NET 9 STS, and .NET 10 LTS. The package is not published to NuGet.org by this repository workflow.
+CI validates local package consumption on .NET 8, .NET 9, and .NET 10 SDK hosts to catch analyzer loading and compatibility regressions.
 
 ## Architecture
 
-The package is a compile-time analyzer package, not a runtime library. Consumer applications do not call analyzer classes at runtime.
+The package is a compile-time analyzer, not a runtime library:
 
 ```text
 application source
@@ -187,7 +183,7 @@ See [Architecture](docs/en/architecture.md).
 - [Analyzer Catalog](docs/en/analyzers.md)
 - [Architecture](docs/en/architecture.md)
 - [Configuration](docs/en/configuration.md)
-- [Documentacao em portugues](README.pt-BR.md)
+- [Documentação em português](README.pt-BR.md)
 
 ## Limitations
 
@@ -195,7 +191,7 @@ See [Architecture](docs/en/architecture.md).
 - There is no whole-compilation or whole-solution call graph.
 - Recurrence solving is limited to supported direct-recursion shapes with base-case evidence.
 - Mutual recursion is detected but not solved.
-- Akra-Bazzi support is only a restricted/bounded Akra-Bazzi subset, not the full theorem.
+- Akra-Bazzi support is a restricted/bounded subset, not the full theorem.
 - General characteristic polynomials, general numerical integration, MathNet, SymPy, and inherited solver projects are not used.
 - No `CodeFixProvider` is included.
 - `Microsoft.CodeAnalysis.Workspaces` is not used.
@@ -203,4 +199,4 @@ See [Architecture](docs/en/architecture.md).
 
 ## License
 
-MIT, matching the repository license declaration.
+MIT, matching the package license declaration.

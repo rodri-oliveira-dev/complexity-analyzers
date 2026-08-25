@@ -1,6 +1,6 @@
 # Configuration
 
-[English](configuration.md) | [Portugues (Brasil)](../pt-BR/configuration.md)
+[English](configuration.md) | [Português (Brasil)](../pt-BR/configuration.md)
 
 `ComplexityAnalysis.Analyzers` uses two configuration layers:
 
@@ -11,7 +11,7 @@ Behavior options are read through Roslyn analyzer config APIs. The analyzer does
 
 Invalid values are safe: they do not fail the build or report an analyzer failure. The analyzer falls back to the documented default for that option.
 
-## Analyzer Options
+## Analyzer options
 
 | Option | Type | Default | Allowed values | Purpose |
 | --- | --- | --- | --- | --- |
@@ -39,7 +39,7 @@ complexity_analyzers.maximum_complexity = n_log_n
 dotnet_diagnostic.BIG1006.severity = warning
 ```
 
-## Threshold Behavior
+## Threshold behavior
 
 `complexity_analyzers.maximum_complexity` is opt-in. The default `none` means `BIG1006` does not report.
 
@@ -62,13 +62,13 @@ Examples:
 | `Unknown` | `n` | No report. |
 | Incomparable multivariate expression | `n2` | No report. |
 
-## Feature Flags
+## Feature flags
 
 `complexity_analyzers.interprocedural_analysis = false` prevents expansion into supported source callees. Intraprocedural analysis and supported BCL/LINQ operation analysis remain active.
 
 `complexity_analyzers.recursion_analysis = false` prevents direct-recursion recurrence extraction and solving, including `BIG1005`. Non-recursive intraprocedural analysis and supported non-recursive source-method expansion can still run when interprocedural analysis is enabled.
 
-## Budgets
+## Analysis budgets
 
 The analyzer is bounded by public options and hard limits:
 
@@ -79,7 +79,7 @@ The analyzer is bounded by public options and hard limits:
 
 At a budget boundary, affected calls remain conservative, usually `Unknown`. A small budget is useful for smoke tests or very cautious consumers, but it can reduce `BIG0001`, `BIG1004`, and `BIG1006` coverage for source-call-heavy code.
 
-## Diagnostic Severity
+## Diagnostic severity
 
 Use the standard Roslyn rule-specific format:
 
@@ -100,7 +100,7 @@ default
 
 The compiler and SDK determine the exact build behavior for each severity.
 
-## Diagnostic Defaults
+## Diagnostic defaults
 
 | ID | Default severity | Enabled by default |
 | --- | --- | --- |
@@ -115,7 +115,7 @@ The compiler and SDK determine the exact build behavior for each severity.
 
 `BIG1006` is enabled by default as a descriptor, but it is functionally inactive until `complexity_analyzers.maximum_complexity` is set to a concrete threshold.
 
-## Common Settings
+## Common settings
 
 Enable method estimates:
 
@@ -155,7 +155,7 @@ Keep the infrastructure probe disabled in normal projects:
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-## What Is Not Configurable
+## What is not configurable
 
 The analyzer does not expose options for custom operation mappings, BCL/LINQ mapping behavior, recurrence-family selection, theorem tolerances, whole-solution analysis, code fixes, memory complexity, parallel complexity, or probabilistic complexity.
 

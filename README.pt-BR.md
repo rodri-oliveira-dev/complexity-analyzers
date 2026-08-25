@@ -1,6 +1,6 @@
 # ComplexityAnalysis.Analyzers
 
-[English](README.md) | Portugues (Brasil)
+[English](README.md) | Português (Brasil)
 
 [![Build & Tests](https://github.com/rodri-oliveira-dev/complexity-analyzers/actions/workflows/complexity-analyzers-ci.yml/badge.svg)](https://github.com/rodri-oliveira-dev/complexity-analyzers/actions/workflows/complexity-analyzers-ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
@@ -8,58 +8,67 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/mit)
 
-ComplexityAnalysis.Analyzers e um pacote Roslyn analyzer independente para expor informacoes de complexidade algoritmica em builds e IDEs C#.
+`ComplexityAnalysis.Analyzers` é um Roslyn Analyzer de tempo de compilação para C# que estima complexidade algorítmica e reporta diagnósticos para padrões potencialmente custosos, sem adicionar dependências de runtime ou instrumentação às aplicações consumidoras.
 
-O analyzer e desenvolvido diretamente a partir da raiz do repositorio. A antiga fronteira de workspace em `analyzer/` foi removida, e o repositorio agora representa o proprio produto analyzer. O projeto original `complexity-hints` ainda pode ser usado como referencia externa quando util, mas este pacote nao possui `ProjectReference`, dependencia binaria ou dependencia de pacote local com ele.
+O analyzer é deliberadamente conservador: quando não consegue comprovar a complexidade com segurança a partir das informações sintáticas e semânticas disponíveis, retorna `Unknown` em vez de fazer uma estimativa insegura.
 
-## Estado Atual
+## O que ele faz
 
-Phase 1 ate Phase 7 estao implementadas.
+- Estima complexidade Big-O de métodos C# suportados usando sintaxe, símbolos e informações semânticas do Roslyn.
+- Detecta operações custosas dentro de iterações, incluindo buscas lineares, materialização de coleções e ordenação.
+- Entende um subconjunto documentado de operações BCL e LINQ por identidade do símbolo resolvido, e não apenas pelo nome do método.
+- Executa análise interprocedural limitada e sob demanda para chamadas seguras a métodos-fonte dentro da mesma compilation.
+- Resolve famílias selecionadas de recorrências de recursão direta, incluindo decremento, recursão exponencial simples, formas do Master Theorem e um subconjunto restrito de Akra-Bazzi.
+- Permite configurar budgets de análise e um limite máximo de complexidade via `.editorconfig`/analyzer config.
+- Executa como um Roslyn Analyzer normal durante build e análise na IDE; o código consumidor não chama o analyzer em runtime.
 
-| Phase | Estado | Entrega |
-| --- | --- | --- |
-| Phase 1 - Analyzer Foundation | Completa | Projeto analyzer isolado `netstandard2.0`, layout de pacote e probe de infraestrutura `BIG9000`. |
-| Phase 2 - Complexity Model | Completa | Modelo Big-O sem Roslyn, formatacao deterministica, comparacao de crescimento, composicao, variaveis independentes e `Unknown`. |
-| Phase 3 - Roslyn Extraction | Completa | Extracao intraprocedural de metodos a partir de sintaxe e semantica Roslyn. |
-| Phase 4 - BCL, LINQ and Actionable Diagnostics | Completa | Mapeamentos semanticos de um subconjunto documentado de BCL/LINQ, `BIG0001` e diagnostics acionaveis `BIG100x`. |
-| Phase 5 - Interprocedural Analysis | Completa | Propagacao limitada e sob demanda a partir de metodos fonte seguros na mesma compilation, diagnostic de chamada fonte em loop `BIG1004`, deteccao de ciclos, cache e limites internos. |
-| Phase 6 - Recursion & Recurrence Solving | Completa | Extracao limitada de recursao direta, recorrencias de soma, recursao exponencial simples, Master Theorem, subconjunto restrito/limitado de Akra-Bazzi, potencias fracionarias e `BIG1005`. |
-| Phase 7 - Configuration, Performance & NuGet Readiness | Completa | Opcoes de analyzer config, budgets publicos limitados, diagnostic de threshold configuravel `BIG1006`, harness de performance, testes de contrato do pacote, validacao local de consumidor e checks de compatibilidade em CI. |
+## Diagnósticos
 
-O analyzer pode seguir metodos fonte suportados na mesma compilation quando o dispatch e seguro e a chamada e alcancada a partir do metodo raiz atual. Ele tambem pode resolver metodos diretamente recursivos selecionados quando evidencia de base case, reducao de argumento, trabalho local e formato da recorrencia sao comprovados. Ele nao cria call graph da compilation inteira, nao resolve recursao mutua e nao usa `Microsoft.CodeAnalysis.Workspaces`.
-
-## Diagnostics
-
-| ID | Titulo | Categoria | Severidade padrao | Habilitado por padrao |
+| ID | Título | Categoria | Severidade padrão | Habilitado por padrão |
 | --- | --- | --- | --- | --- |
-| `BIG0001` | Estimated algorithmic complexity | `Complexity` | `Info` | Nao |
+| `BIG0001` | Estimated algorithmic complexity | `Complexity` | `Info` | Não |
 | `BIG1001` | Linear lookup inside iteration | `Complexity` | `Info` | Sim |
 | `BIG1002` | Materialization inside iteration | `Complexity` | `Info` | Sim |
 | `BIG1003` | Ordering inside iteration | `Complexity` | `Info` | Sim |
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | Sim |
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | Sim |
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | Sim |
-| `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | Nao |
+| `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | Não |
 
-`BIG0001` e informational e desabilitado por padrao. Ele reporta uma estimativa conhecida de complexidade do metodo no identificador do metodo quando habilitado explicitamente.
+`BIG0001` é um diagnóstico informativo opt-in que reporta uma estimativa conhecida de complexidade no identificador do método.
 
-`BIG1005` reporta metodos diretamente recursivos suportados cuja recorrencia resolvida e exponencial, como recursao estilo Fibonacci.
+`BIG1005` reporta métodos de recursão direta suportados cuja recorrência resolvida apresenta crescimento exponencial, como em implementações no estilo Fibonacci.
 
-`BIG1006` reporta quando `complexity_analyzers.maximum_complexity` esta configurado e a estimativa conhecida e comparavel de um metodo excede esse threshold. Estimativas `Unknown` e incomparaveis nao reportam.
+`BIG1006` reporta quando `complexity_analyzers.maximum_complexity` está configurado e uma estimativa conhecida e comparável ultrapassa o limite definido. Estimativas `Unknown` e incomparáveis não são reportadas.
 
-`BIG9000` e um probe de infraestrutura. Ele prova que o pacote do analyzer foi carregado e executado quando habilitado explicitamente; ele nao e uma recomendacao de performance.
+`BIG9000` é um probe de infraestrutura usado para comprovar que o pacote do analyzer foi carregado e executado. Ele não representa uma recomendação de performance.
 
-Veja o [Catalogo de Analyzers](docs/pt-BR/analyzers.md).
+Veja o [Catálogo de Analyzers](docs/pt-BR/analyzers.md) para detalhes das regras.
 
-## Analise Interprocedural
+## Modelo de análise
 
-A Phase 5 adiciona analise interprocedural de metodos fonte: quando um caller invoca um metodo suportado declarado na mesma Roslyn `Compilation`, o analyzer pode analisar o callee uma vez como template independente do caller e substituir os argumentos do caller nesse template.
+### Operações BCL e LINQ conhecidas
 
-Metodos fonte suportados sao metodos C# ordinarios com dispatch seguro, incluindo metodos static, private, nao virtuais e dispatch sealed quando o alvo de runtime e comprovado. Operacoes conhecidas de BCL e LINQ mantem precedencia sobre analise de metodo fonte.
+As operações conhecidas são mapeadas por identidade de símbolo do Roslyn. Métodos customizados chamados `Contains`, `Where`, `ToList` ou similares não são tratados como operações BCL/LINQ, a menos que o símbolo resolvido pertença ao subconjunto suportado.
 
-O traversal e sob demanda. Um callee e analisado apenas quando o metodo raiz atual alcanca aquela invocacao. O analyzer nao pre-varre todas as syntax trees e nao cria um call graph completo. Opcoes publicas expoem limites controlados para profundidade de chamada e metodos expandidos por analise raiz.
+Exemplos implementados incluem:
 
-Chamadas nao suportadas, nao resolvidas, inseguras, limitadas por budget, canceladas ou ciclicas continuam `Unknown`. Recursao direta pode ser resolvida apenas pelo pipeline limitado de recorrencias. Recursao mutua e detectada, mas nao resolvida.
+- `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count` e o indexer de `List<T>`.
+- `Dictionary<TKey,TValue>.ContainsKey` e `Dictionary<TKey,TValue>.ContainsValue`.
+- `HashSet<T>.Contains`.
+- `Length` de arrays e strings.
+- LINQ `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max` e `Aggregate`.
+- Operações LINQ deferred como `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct` e `GroupBy`.
+
+A criação de uma pipeline LINQ deferred não é contabilizada como uma enumeração completa. O custo de enumeração é considerado quando uma operação terminal suportada ou um `foreach` consome a pipeline.
+
+### Análise interprocedural
+
+Quando um caller invoca um método-fonte suportado declarado na mesma Roslyn `Compilation`, o analyzer pode derivar um template do callee independente do caller e substituir nesse template os argumentos usados na chamada.
+
+Os métodos-fonte suportados precisam possuir dispatch seguro, como métodos static, private, não virtuais ou dispatch sealed quando o alvo de runtime pode ser comprovado. Operações BCL/LINQ conhecidas têm precedência sobre a análise de métodos-fonte.
+
+O traversal é sob demanda e limitado. Um callee só é analisado quando é alcançado a partir do método raiz atual. O analyzer não pré-varre todas as syntax trees e não constrói um call graph da compilation inteira.
 
 Exemplos:
 
@@ -72,44 +81,31 @@ B(constant)          => O(1)
 A -> B -> C O(log n) => O(log n)
 ```
 
-## Recursao Direta e Recorrencias
+Chamadas não suportadas, não resolvidas, inseguras, limitadas por budget, canceladas ou cíclicas permanecem `Unknown`.
 
-O analyzer reconhece chamadas diretamente recursivas por identidade de simbolos Roslyn e exige evidencia compativel de base case antes de resolver. Chamadas recursivas em branches mutuamente exclusivos sao contadas por caminho, entao codigo estilo binary search com duas chamadas sintaticas em branches exclusivos continua `O(log n)`, nao `O(n)`.
+### Recursão direta e resolução de recorrências
 
-Familias de recorrencia suportadas incluem:
+O analyzer reconhece chamadas diretamente recursivas por identidade de símbolo do Roslyn e exige evidência compatível de base case antes de resolver uma recorrência. Chamadas recursivas em branches mutuamente exclusivos são contabilizadas por caminho, de modo que código no estilo binary search permanece `O(log n)` em vez de ser superestimado como linear.
 
-- recorrencias de soma/decremento como `T(n)=T(n-1)+1`, `T(n)=T(n-1)+n` e `T(n)=T(n-1)+log n`;
-- recursao direta exponencial simples como `2T(n-1)+1` e Fibonacci `T(n-1)+T(n-2)+1`;
-- formas de Master Theorem como `T(n)=T(n/2)+1`, `2T(n/2)+n`, `2T(n/2)+n^2` e `3T(n/2)+n`;
-- um subconjunto restrito/limitado de Akra-Bazzi com termos recursivos apenas por escala e toll polylogaritmico, por exemplo `T(n)=T(n/3)+T(2n/3)+n`.
+As famílias de recorrência suportadas incluem:
 
-Potencias polinomiais fracionarias sao representadas de forma deterministica, entao `3T(n/2)+n` reporta `O(n^1.585)`. Trabalho local desconhecido, base case ausente, argumentos nao redutores, formatos de recorrencia nao suportados, solucao numericamente inconclusiva, cancellation e recursao mutua continuam `Unknown`. O analyzer nao afirma suporte completo a Akra-Bazzi, solucao simbolica geral de recorrencias, deteccao de memoization ou prova geral de terminacao.
+- formas de decremento/somatório como `T(n)=T(n-1)+1`, `T(n)=T(n-1)+n` e `T(n)=T(n-1)+log n`;
+- recursão exponencial simples como `2T(n-1)+1` e Fibonacci `T(n-1)+T(n-2)+1`;
+- formas do Master Theorem como `T(n)=T(n/2)+1`, `2T(n/2)+n`, `2T(n/2)+n^2` e `3T(n/2)+n`;
+- um subconjunto restrito e limitado de Akra-Bazzi com termos recursivos apenas por escala e tolls polilogarítmicos, por exemplo `T(n)=T(n/3)+T(2n/3)+n`.
 
-## Escopo de Operacoes Conhecidas
+Potências polinomiais fracionárias são representadas de forma determinística; por exemplo, `3T(n/2)+n` reporta `O(n^1.585)`.
 
-A Phase 4 mapeia operacoes selecionadas por simbolos Roslyn, nao apenas por nomes de metodos. Metodos customizados chamados `Contains`, `Where`, `ToList` ou similares continuam sem mapping, a menos que o simbolo resolvido faca parte do subconjunto suportado.
+Base case ausente, argumentos não redutores, formatos de recorrência não suportados, trabalho local desconhecido, inconclusão numérica, cancelamento e recursão mútua permanecem `Unknown`.
 
-Exemplos implementados incluem:
+## Build local
 
-- `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count` e indexer de `List<T>`.
-- `Dictionary<TKey,TValue>.ContainsKey` e `Dictionary<TKey,TValue>.ContainsValue`.
-- `HashSet<T>.Contains`.
-- `Length` de array e string.
-- LINQ `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max`, `Aggregate`.
-- Operacoes LINQ deferred incluindo `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct` e `GroupBy`.
+Pré-requisitos:
 
-A criacao de uma pipeline LINQ deferred nao e cobrada como enumeracao completa. O custo de enumeracao e contado quando uma operacao terminal suportada ou um `foreach` consome a pipeline.
-
-Operacoes nao suportadas ou nao resolvidas produzem `Unknown`. `Unknown` nao e tratado como `O(1)` ou `O(n)`, e nao e reportado por `BIG0001`.
-
-## Quick Start
-
-Pre-requisitos:
-
-- .NET SDK `10.0.100` ou um SDK compativel selecionado por `global.json`.
+- .NET SDK `10.0.100` ou um SDK compatível selecionado por `global.json`.
 - Um shell capaz de executar comandos `dotnet`.
 
-A partir da raiz do repositorio:
+A partir da raiz do repositório:
 
 ```bash
 dotnet restore ComplexityAnalysis.Analyzers.slnx
@@ -118,13 +114,13 @@ dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 ```
 
-O pacote e documentado como build/fonte de pacote local. Nao assuma publicacao no NuGet.org sem evidencia independente.
+O repositório atualmente documenta criação e consumo local do pacote. Não presuma uma versão publicada no NuGet.org sem que ela exista de forma independente.
 
 Veja [Primeiros Passos](docs/pt-BR/getting-started.md).
 
-## Configuracao
+## Configuração
 
-A Phase 7 adiciona opcoes customizadas de comportamento via Roslyn analyzer config. Severidades de diagnostics continuam usando `dotnet_diagnostic.<RULE_ID>.severity`.
+O comportamento do analyzer pode ser configurado pelo Roslyn analyzer config. As severidades dos diagnósticos continuam usando as entradas padrão `dotnet_diagnostic.<RULE_ID>.severity`.
 
 ```ini
 [*.cs]
@@ -145,35 +141,35 @@ dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-Os defaults preservam o comportamento existente: analise interprocedural e analise de recursao ficam habilitadas, `max_call_depth` e `5`, `max_methods_per_root` e `32`, e `maximum_complexity` e `none`. O diagnostic de threshold so se aplica a estimativas conhecidas e comparaveis.
+Os valores padrão mantêm análise interprocedural e recursiva habilitadas, `max_call_depth` em `5`, `max_methods_per_root` em `32` e `maximum_complexity` como `none`. O threshold só é aplicado a estimativas conhecidas e comparáveis.
 
-Veja [Configuracao](docs/pt-BR/configuration.md).
+Veja [Configuração](docs/pt-BR/configuration.md).
 
-## Performance e Compatibilidade
+## Performance e compatibilidade
 
-O analyzer foi desenhado para ser limitado: sem acesso de rede, sem I/O de filesystem em hot paths do analyzer, sem execucao de processos, sem telemetria, sem varredura obrigatoria de solution inteira, traversal limitado de metodos fonte, solucao limitada de recorrencias, execucao concorrente, exclusao de codigo gerado e checks de cancellation.
+O analyzer foi projetado para permanecer limitado e adequado à execução dentro do compilador/IDE: sem acesso de rede, sem I/O de filesystem nos hot paths do analyzer, sem execução de processos, sem telemetria, sem varredura obrigatória da solution inteira, traversal limitado de métodos-fonte, resolução limitada de recorrências, execução concorrente, exclusão de código gerado e checks de cancellation.
 
-O harness de performance repetivel esta documentado em [performance/README.md](performance/README.md). Ele valida comportamento estrutural e reporting oficial do compilador com `ReportAnalyzer=true`; tempo decorrido e informativo porque hardware e runners de CI variam.
+O harness de performance reproduzível está documentado em [performance/README.md](performance/README.md). Ele valida comportamento estrutural e o reporting de execução de analyzers do compilador com `ReportAnalyzer=true`; o tempo decorrido é apenas informativo porque hardware e runners de CI variam.
 
-O CI valida consumo local do pacote nos hosts SDK suportados pela matriz do projeto: .NET 8 LTS, .NET 9 STS e .NET 10 LTS. O pacote nao e publicado no NuGet.org por este workflow do repositorio.
+O CI valida o consumo local do pacote em hosts com SDKs .NET 8, .NET 9 e .NET 10 para detectar regressões de carregamento e compatibilidade do analyzer.
 
 ## Arquitetura
 
-O pacote e um analyzer de tempo de compilacao, nao uma biblioteca de runtime. Aplicacoes consumidoras nao chamam classes do analyzer em tempo de execucao.
+O pacote é um analyzer de tempo de compilação, não uma biblioteca de runtime:
 
 ```text
-codigo-fonte da aplicacao
+código-fonte da aplicação
         |
         | compilado por
         v
-compilador Roslyn / host de IDE
+compilador Roslyn / host da IDE
         |
         | carrega
         v
 ComplexityAnalysis.Analyzers
 ```
 
-O assembly do analyzer e empacotado em:
+O assembly do analyzer é empacotado em:
 
 ```text
 analyzers/dotnet/cs/
@@ -181,26 +177,26 @@ analyzers/dotnet/cs/
 
 Veja [Arquitetura](docs/pt-BR/architecture.md).
 
-## Documentacao
+## Documentação
 
 - [Primeiros Passos](docs/pt-BR/getting-started.md)
-- [Catalogo de Analyzers](docs/pt-BR/analyzers.md)
+- [Catálogo de Analyzers](docs/pt-BR/analyzers.md)
 - [Arquitetura](docs/pt-BR/architecture.md)
-- [Configuracao](docs/pt-BR/configuration.md)
+- [Configuração](docs/pt-BR/configuration.md)
 - [Documentation in English](README.md)
 
-## Limitacoes
+## Limitações
 
-- A analise de metodos fonte e limitada a metodos ordinarios com dispatch seguro na mesma compilation.
-- Nao ha call graph de compilation inteira ou solution inteira.
-- Solucao de recorrencias e limitada a formatos de recursao direta suportados com evidencia de base case.
-- Recursao mutua e detectada, mas nao resolvida.
-- Akra-Bazzi e apenas um subconjunto restrito/limitado de Akra-Bazzi, nao o teorema completo.
-- Polinomios caracteristicos gerais, integracao numerica geral, MathNet, SymPy e projetos solver herdados nao sao usados.
-- Nao ha `CodeFixProvider`.
-- `Microsoft.CodeAnalysis.Workspaces` nao e usado.
-- Comportamento nao suportado ou nao comprovado prefere `Unknown` em vez de palpites inseguros.
+- A análise de métodos-fonte é limitada a métodos ordinários com dispatch seguro dentro da mesma compilation.
+- Não há call graph da compilation inteira nem da solution inteira.
+- A resolução de recorrências é limitada às formas suportadas de recursão direta com evidência de base case.
+- Recursão mútua é detectada, mas não resolvida.
+- O suporte a Akra-Bazzi é um subconjunto restrito/limitado, não o teorema completo.
+- Polinômios característicos gerais, integração numérica geral, MathNet, SymPy e projetos solver herdados não são utilizados.
+- Não há `CodeFixProvider`.
+- `Microsoft.CodeAnalysis.Workspaces` não é utilizado.
+- Comportamento não suportado ou não comprovado resulta em `Unknown` em vez de estimativas inseguras.
 
-## Licenca
+## Licença
 
-MIT, conforme a declaracao de licenca do repositorio.
+MIT, conforme a declaração de licença do pacote.

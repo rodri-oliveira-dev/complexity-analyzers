@@ -1,76 +1,81 @@
 # Primeiros Passos
 
-[English](../en/getting-started.md) | Portugues (Brasil)
+[English](../en/getting-started.md) | Português (Brasil)
 
-Esta pagina explica como compilar, testar, empacotar e consumir o workspace isolado do analyzer ate a Phase 7.
+Este guia explica como compilar, testar, empacotar e validar o `ComplexityAnalysis.Analyzers` usando o layout atual do repositório.
 
-## Pre-Requisitos
+## Pré-requisitos
 
-- .NET SDK `10.0.100`, ou um SDK compativel selecionado por `analyzer/global.json`.
+- .NET SDK `10.0.100`, ou um SDK compatível selecionado pelo `global.json` da raiz.
 - Git.
 - Um shell capaz de executar comandos `dotnet`.
 
-O projeto do analyzer targeteia `netstandard2.0` porque Roslyn analyzers sao carregados por hosts de compilador e IDE, nao pelo runtime da aplicacao analisada. O projeto de testes targeteia `net10.0`.
+O projeto do analyzer targeteia `netstandard2.0` porque Roslyn Analyzers são carregados por hosts de compilador e IDE, e não pelo runtime da aplicação analisada. Os testes e as ferramentas do repositório usam o SDK selecionado pelo `global.json`.
 
-## Clone e Build
+## Clonar e compilar
 
-A partir da raiz do repositorio:
+A partir da raiz do repositório:
 
 ```bash
-cd analyzer
 dotnet restore ComplexityAnalysis.Analyzers.slnx
 dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
 dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 ```
 
-A solution e isolada dentro de `analyzer/`. Arquivos fora desse diretorio pertencem a implementacao herdada e sao apenas referencia para este workspace do analyzer.
+O analyzer é o produto representado pela raiz do repositório. O código de produção fica em `src/`, os testes em `tests/`, a validação de performance em `performance/` e a documentação em `docs/`.
 
-## Pack
+## Criar um pacote local
 
-Crie um pacote analyzer local:
+Compile primeiro e depois gere um pacote NuGet local:
 
 ```bash
-cd analyzer
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
+dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj \
+  --configuration Release \
+  --no-build \
+  -p:PackageVersion=0.0.0-local \
+  --output artifacts/local-packages
 ```
 
-O pacote e um pacote Roslyn analyzer. O assembly do analyzer e empacotado em:
+O pacote gerado é um pacote Roslyn Analyzer. O assembly `ComplexityAnalysis.Analyzers.dll` é empacotado em:
 
 ```text
 analyzers/dotnet/cs/
 ```
 
-O projeto define `PackageReadmeFile` como `README.md`, e o README empacotado e o `analyzer/README.md` em ingles.
-O pacote usa a URL do repositorio como metadata de projeto, declara o tipo de repositorio como `git` e usa a declaracao de licenca MIT do repositorio como expressao de licenca NuGet.
+Ele não é empacotado como uma biblioteca de runtime normal em `lib/`. As dependências usadas para autoria do analyzer são assets privados e não devem se tornar dependências transitivas dos projetos consumidores.
 
-O pacote intencionalmente nao tem asset runtime em `lib/` e nao expoe dependencia Roslyn transitiva. Testes de contrato inspecionam o `.nupkg` gerado como arquivo ZIP.
+O projeto usa `README.md` como README do pacote e declara a URL do repositório, o tipo do repositório e a licença MIT nos metadados do pacote.
 
-A geracao de `.snupkg` nao esta habilitada para o layout atual do analyzer porque o pacote mantem a DLL fora do build output convencional e dentro de `analyzers/dotnet/cs/`. O Source Link build tooling e fornecido pelo SDK .NET atual, entao nenhuma referencia de pacote Source Link e necessaria.
+## Consumir o pacote local
 
-## Consumo Local
+O repositório documenta a criação e o consumo local do pacote. Não trate este guia como evidência de que já existe uma versão publicada no NuGet.org.
 
-O pacote atualmente e consumido a partir de uma fonte de pacote local. Nao trate esta documentacao como evidencia de publicacao no NuGet.org.
-
-A partir da raiz do repositorio, um fluxo local em PowerShell e:
+Um fluxo possível em PowerShell é:
 
 ```powershell
-cd analyzer
 dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release
-dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
+dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj `
+  --configuration Release `
+  --no-build `
+  -p:PackageVersion=0.0.0-local `
+  --output artifacts/local-packages
+
 $packageSource = (Resolve-Path "artifacts/local-packages").Path
 $consumer = Join-Path ([System.IO.Path]::GetTempPath()) ("AnalyzerConsumer-" + [System.Guid]::NewGuid().ToString("N"))
+
 dotnet new console -o $consumer
-cd $consumer
+Set-Location $consumer
 dotnet new nugetconfig
 dotnet nuget add source $packageSource --name complexity-analysis-local --configfile NuGet.config
 dotnet add package ComplexityAnalysis.Analyzers --version 0.0.0-local --source $packageSource
 ```
 
-Se necessario, aponte a fonte NuGet local para o diretorio que contem o `.nupkg` gerado.
+Se necessário, aponte a fonte NuGet local diretamente para o diretório que contém o `.nupkg` gerado.
 
 ## PackageReference
 
-Pacotes analyzer normalmente sao referenciados com `PrivateAssets="all"` para afetar a compilacao sem virar dependencia transitiva dos projetos consumidores:
+Pacotes de analyzer normalmente são referenciados com `PrivateAssets="all"` para participarem da compilação sem se tornarem dependências transitivas de runtime:
 
 ```xml
 <PackageReference
@@ -79,11 +84,31 @@ Pacotes analyzer normalmente sao referenciados com `PrivateAssets="all"` para af
     PrivateAssets="all" />
 ```
 
-O analyzer nao e uma biblioteca de runtime. O codigo da aplicacao nao chama seus tipos.
+O código da aplicação consumidora não chama tipos do analyzer em runtime.
 
-## Smoke Tests de Diagnostics
+## Validar que o analyzer está executando
 
-`BIG1001`, `BIG1002`, `BIG1003`, `BIG1004`, `BIG1005` e `BIG1006` sao habilitados por padrao como diagnostics `Info`. `BIG1006` ainda precisa de um threshold `maximum_complexity` configurado antes de reportar. A visibilidade no build depende do projeto consumidor e das configuracoes do SDK. Voce pode promover uma regra localmente:
+`BIG9000` é um probe de infraestrutura opt-in. Habilite-o temporariamente quando precisar comprovar que o pacote foi carregado e o analyzer executou:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG9000.severity = warning
+```
+
+Depois do smoke test, desabilite-o novamente:
+
+```ini
+[*.cs]
+
+dotnet_diagnostic.BIG9000.severity = none
+```
+
+## Experimentar os diagnósticos
+
+`BIG1001` até `BIG1005` são habilitados por padrão com severidade `Info`. `BIG1006` também é habilitado como descriptor, mas só reporta quando um threshold concreto de `maximum_complexity` é configurado. A visibilidade de diagnósticos informativos no build depende do projeto consumidor e das configurações do SDK.
+
+Promova um diagnóstico acionável localmente:
 
 ```ini
 [*.cs]
@@ -91,7 +116,7 @@ O analyzer nao e uma biblioteca de runtime. O codigo da aplicacao nao chama seus
 dotnet_diagnostic.BIG1001.severity = warning
 ```
 
-Promova o diagnostic de chamada fonte em loop da Phase 5:
+Promova o diagnóstico de chamada a método-fonte dentro de loop:
 
 ```ini
 [*.cs]
@@ -99,7 +124,7 @@ Promova o diagnostic de chamada fonte em loop da Phase 5:
 dotnet_diagnostic.BIG1004.severity = warning
 ```
 
-Promova o diagnostic de recursao exponencial:
+Promova o diagnóstico de recursão exponencial:
 
 ```ini
 [*.cs]
@@ -107,7 +132,7 @@ Promova o diagnostic de recursao exponencial:
 dotnet_diagnostic.BIG1005.severity = warning
 ```
 
-Configure e promova o diagnostic de threshold de complexidade da Phase 7:
+Configure um limite máximo de complexidade:
 
 ```ini
 [*.cs]
@@ -116,7 +141,7 @@ complexity_analyzers.maximum_complexity = n_log_n
 dotnet_diagnostic.BIG1006.severity = warning
 ```
 
-`BIG0001` e desabilitado por padrao. Habilite quando quiser estimativas de complexidade por metodo, incluindo custos de metodos fonte suportados e recursao direta resolvida:
+`BIG0001` é desabilitado por padrão. Habilite-o quando quiser estimativas de complexidade por método:
 
 ```ini
 [*.cs]
@@ -124,27 +149,11 @@ dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG0001.severity = suggestion
 ```
 
-`BIG9000` e desabilitado por padrao. Para provar que o analyzer carregou, habilite temporariamente:
+Consulte [Configuração](configuration.md) e o [Catálogo de Analyzers](analyzers.md) para o comportamento completo de cada opção e regra.
 
-```ini
-[*.cs]
+## Matriz de compatibilidade
 
-dotnet_diagnostic.BIG9000.severity = warning
-```
-
-Desabilite o probe depois do smoke test:
-
-```ini
-[*.cs]
-
-dotnet_diagnostic.BIG9000.severity = none
-```
-
-Veja [Configuracao](configuration.md) para detalhes.
-
-## Matriz de Compatibilidade
-
-O CI valida consumo do pacote analyzer nos hosts SDK suportados:
+O CI valida o consumo local do pacote nos hosts de SDK suportados:
 
 | Host SDK | Target framework do consumidor |
 | --- | --- |
@@ -152,20 +161,35 @@ O CI valida consumo do pacote analyzer nos hosts SDK suportados:
 | .NET 9 STS | `net9.0` |
 | .NET 10 LTS | `net10.0` |
 
-O assembly do analyzer targeteia `netstandard2.0`, mas o check de compatibilidade verifica hosts de compilador carregando o pacote do analyzer, nao apenas o target framework do consumidor.
+O assembly do analyzer targeteia `netstandard2.0`. A matriz de compatibilidade verifica se os hosts do compilador conseguem carregar e executar o pacote do analyzer, e não apenas se o projeto consumidor consegue targetear determinado framework.
 
-## Validacao de Performance
+## Validação de performance
 
-A partir de `analyzer/`, execute o harness estrutural de performance:
-
-```bash
-dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build --filter PerformanceSyntheticCorpusTests
-```
-
-Depois do restore, obtenha o report de execucao do analyzer pelo compilador:
+Execute o harness estrutural de performance a partir da raiz do repositório:
 
 ```bash
-dotnet build ./performance/ComplexityAnalysis.Analyzers.Performance/ComplexityAnalysis.Analyzers.Performance.csproj --configuration Release --no-restore -t:Rebuild -p:ReportAnalyzer=true -p:UseSharedCompilation=false -v:detailed
+dotnet test ComplexityAnalysis.Analyzers.slnx \
+  --configuration Release \
+  --no-build \
+  --filter PerformanceSyntheticCorpusTests
 ```
 
-Tempo varia por hardware e runner. O gate util e que o workload sintetico completa, as invariantes estruturais passam e o report do compilador inclui `ComplexityAnalysis.Analyzers.ComplexityAnalyzer`.
+Depois do restore, solicite o relatório de execução de analyzers do compilador:
+
+```bash
+dotnet build performance/ComplexityAnalysis.Analyzers.Performance/ComplexityAnalysis.Analyzers.Performance.csproj \
+  --configuration Release \
+  --no-restore \
+  -t:Rebuild \
+  -p:ReportAnalyzer=true \
+  -p:UseSharedCompilation=false \
+  -v:detailed
+```
+
+O tempo varia conforme hardware e runner de CI. A validação reproduzível é que o workload sintético conclua, as invariantes estruturais sejam atendidas e o relatório do compilador contenha `ComplexityAnalysis.Analyzers.ComplexityAnalyzer`.
+
+## Próximos passos
+
+- Leia o [Catálogo de Analyzers](analyzers.md) para entender cada diagnóstico.
+- Leia [Configuração](configuration.md) para ajustar budgets de análise e severidades.
+- Leia [Arquitetura](architecture.md) para conhecer o pipeline do analyzer e suas fronteiras de design.
