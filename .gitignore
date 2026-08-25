@@ -1,16 +1,36 @@
-/docs/api/
-[Bb]in/
-[Oo]bj/
+# Build output
+bin/
+obj/
+artifacts/
 [Dd]ebug/
-__pycache__/
-.DS_Store
-vsce_vsix_docs/
-node_modules/
-dist/
+[Rr]elease/
 
-# typescript output
-*.js
-*.js.map
-*.d.ts
-*.d.ts.map
+# Test and coverage output
+TestResults/
+**/TestResults/
+coverage/
+coverage-report/
+coverage.*
+CodeCoverage/
+StrykerOutput/
 
+# IDE and editor state
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet and MSBuild artifacts
+*.nupkg
+*.snupkg
+*.binlog
+project.lock.json
+project.fragment.lock.json
+
+# OS and temporary files
+Thumbs.db
+Desktop.ini
+~$*
+*~
