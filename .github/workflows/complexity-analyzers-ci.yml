@@ -23,10 +23,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -56,10 +56,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -88,7 +88,7 @@ jobs:
           --filter AnalyzerPackageContractTests
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: complexity-analyzers-nupkg
           path: artifacts/packages/*.nupkg
@@ -113,12 +113,12 @@ jobs:
 
     steps:
       - name: Setup .NET SDK host
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ matrix.sdk }}
 
       - name: Download package artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: complexity-analyzers-nupkg
           path: ${{ runner.temp }}/complexity-analyzers-packages
@@ -209,7 +209,7 @@ jobs:
           }
 
       - name: Upload consumer smoke log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: consumer-smoke-${{ matrix.sdk }}
           path: ${{ runner.temp }}/complexity-analyzers-consumer/artifacts/consumer-build.log
@@ -225,10 +225,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -265,7 +265,7 @@ jobs:
           grep -F "ComplexityAnalysis.Analyzers.ComplexityAnalyzer" artifacts/performance/report-analyzer.log
 
       - name: Upload analyzer reporting log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: analyzer-reporting
           path: artifacts/performance/report-analyzer.log
