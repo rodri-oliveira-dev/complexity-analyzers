@@ -1,210 +1,204 @@
 # Arquitetura
 
-[English](../en/architecture.md) | Portugues (Brasil)
+[English](../en/architecture.md) | Português (Brasil)
 
-`ComplexityAnalysis.Analyzers` e um workspace isolado de pacote Roslyn analyzer. Ate a Phase 7, ele contem infraestrutura do analyzer, modelo de complexidade sem Roslyn, extracao de metodos, mapping semantico de operacoes conhecidas, analise interprocedural limitada de metodos fonte, solucao limitada de recorrencias de recursao direta, configuracao do analyzer, validacao de performance, validacao de contrato de pacote e diagnostics publicos.
+`ComplexityAnalysis.Analyzers` é um pacote Roslyn Analyzer independente. A raiz do repositório representa a fronteira do produto: o código do analyzer fica em `src/`, os testes em `tests/`, a validação de performance em `performance/` e a documentação em `docs/`.
 
-## Pipeline Atual
+O design prioriza resultados conservadores, análise limitada, comportamento determinístico e compatibilidade com hosts de compilador e IDE.
+
+## Pipeline de análise
 
 ```text
-codigo-fonte C#
+código-fonte C#
     |
     v
-Roslyn Syntax + SemanticModel
+sintaxe Roslyn + SemanticModel
     |
     v
-Analysis
+análise do método
     |
-    +-- opcoes de analyzer config
-    +-- resolucao de tamanho de entrada
-    +-- operacoes basicas
+    +-- configuração do analyzer
+    +-- resolução de tamanho de entrada
+    +-- operações básicas
     +-- limites de loop
-    +-- operacoes conhecidas BCL/LINQ
-    +-- chamadas seguras de metodos fonte
-    +-- extracao de recursao direta
-    +-- solucao de recorrencias
-    +-- extracao de metodo
+    +-- operações BCL/LINQ conhecidas
+    +-- chamadas seguras a métodos-fonte
+    +-- extração de recursão direta
+    +-- resolução de recorrências
     |
     v
-Complexity Model
+modelo de complexidade
     |
-    +-- expressoes atomicas
-    +-- comparacao de crescimento
-    +-- composicao
+    +-- expressões atômicas
+    +-- comparação de crescimento
+    +-- composição
     +-- Unknown
     |
     v
 DiagnosticAnalyzer
     |
     +-- BIG0001 complexidade estimada
-    +-- BIG1001 lookup linear dentro de iteracao
-    +-- BIG1002 materializacao dentro de iteracao
-    +-- BIG1003 ordenacao dentro de iteracao
-    +-- BIG1004 chamada fonte dentro de iteracao
+    +-- BIG1001 busca linear dentro de iteração
+    +-- BIG1002 materialização dentro de iteração
+    +-- BIG1003 ordenação dentro de iteração
+    +-- BIG1004 chamada a método-fonte dentro de iteração
     +-- BIG1005 crescimento recursivo exponencial
     +-- BIG1006 threshold configurado excedido
-    `-- BIG9000 probe de infraestrutura
+    `-- BIG9000 probe de execução
 ```
 
-## Fronteira do Pacote Analyzer
+## Fronteira do pacote
 
-O pacote e carregado por hosts de compilador e IDE:
+O pacote é carregado por hosts de compilador e IDE:
 
 ```text
-codigo-fonte da aplicacao
+código-fonte da aplicação
     |
     | compilado por
     v
-compilador Roslyn / host de IDE
+compilador Roslyn / host da IDE
     |
     | carrega
     v
 ComplexityAnalysis.Analyzers
 ```
 
-O projeto do analyzer targeteia `netstandard2.0` para compatibilidade com hosts. Ele e empacotado como asset de analyzer em:
+O projeto do analyzer targeteia `netstandard2.0` para compatibilidade com hosts e é empacotado como asset de analyzer em:
 
 ```text
 analyzers/dotnet/cs/
 ```
 
-Ele nao e empacotado como uma biblioteca runtime normal. Aplicacoes consumidoras nao chamam classes do analyzer em tempo de execucao.
+Ele não é uma biblioteca de runtime. Aplicações consumidoras não chamam classes do analyzer, e as dependências usadas para autoria com Roslyn permanecem privadas em vez de serem expostas transitivamente.
 
-## Isolamento do Projeto
+## Estrutura do repositório
 
-A implementacao herdada de `complexity-hints` permanece uma referencia conceitual. Nao ha `ProjectReference`, dependencia binaria ou dependencia de pacote local do analyzer isolado para projetos herdados.
-
-Isso mantem o pacote pequeno, deterministico e independente. Dependencias Roslyn usadas para autoria do analyzer sao assets privados e nao devem virar dependencias transitivas do consumidor.
-
-## Complexity Model
-
-O modelo fica em:
+As principais áreas do produto são:
 
 ```text
-analyzer/src/ComplexityAnalysis.Analyzers/Model/
+src/ComplexityAnalysis.Analyzers/
+    Analysis/
+    Configuration/
+    Diagnostics/
+    Model/
+    ComplexityAnalyzer.cs
+
+tests/
+performance/
+docs/
 ```
 
-Ele e intencionalmente livre de Roslyn. Ele representa valores de complexidade independentemente da sintaxe C# para manter as operacoes matematicas imutaveis, deterministicas e testaveis sem APIs do compilador.
+O repositório não depende mais de projetos herdados da implementação anterior. O analyzer é desenvolvido e validado diretamente a partir da solução na raiz.
 
-Comportamentos implementados incluem:
+## Modelo de complexidade
 
-- formas atomicas como constante, polinomial-logaritmica, exponencial, fatorial e `Unknown`;
-- formatacao de formas Big-O comuns, incluindo potencias fracionarias deterministicas como `O(n^1.585)`;
-- comparacao de crescimento para expressoes da mesma variavel;
-- incomparabilidade conservadora para variaveis independentes;
-- composicao sequencial, aninhada e por ramificacao.
-
-## Roslyn Extraction
-
-A camada de analise fica em:
+O modelo independente de Roslyn fica em:
 
 ```text
-analyzer/src/ComplexityAnalysis.Analyzers/Analysis/
+src/ComplexityAnalysis.Analyzers/Model/
 ```
 
-Ela parte de um metodo por vez. O analyzer pode seguir chamadas de metodos fonte suportados sob demanda e resolver recursao direta selecionada, mas nao cria call graph da compilation inteira, nao resolve recursao mutua e nao inspeciona corpos de metodos nao relacionados.
+Ele representa complexidade separadamente da sintaxe C#, mantendo o comportamento matemático imutável, determinístico e testável sem APIs do compilador.
 
-Responsabilidades principais:
+O modelo suporta:
 
-- `MethodComplexityExtractor`: coordena analise de metodo, bloco, statement, loop, ramificacao e switch.
-- `MethodAnalysisContext`: armazena contexto semantico local ao metodo, variaveis canonicas de tamanho de entrada, fatos locais de limite de loop e cancellation.
-- `InputSizeResolver`: mapeia parametros elegiveis para variaveis deterministicas como `n`, `m`, `k`, `p` e `v5`.
-- `BasicOperationAnalyzer`: classifica statements e expressoes comprovadas como constantes e delega operacoes conhecidas suportadas.
-- `LoopBoundAnalyzer`: reconhece limites de loop constantes, lineares, logaritmicos e enumerables conhecidos.
-- `KnownOperationComplexityAnalyzer`: compoe custos de invocacoes BCL/LINQ conhecidas, propriedades, acesso por indice, operacoes terminais e pipelines deferred consumidas.
+- formas constantes, polinomiais/logarítmicas, exponenciais, fatoriais e `Unknown`;
+- formatação determinística, incluindo potências fracionárias como `O(n^1.585)`;
+- comparação de crescimento para expressões comparáveis;
+- incomparabilidade conservadora para variáveis independentes;
+- composição sequencial, aninhada e por branches.
 
-## Chamadas Fonte Interprocedurais
+Quando o analyzer não consegue comprovar um resultado seguro, o modelo preserva `Unknown` em vez de forçar uma classe de complexidade estimada.
 
-Analise interprocedural significa que o analyzer pode incluir o custo de um callee fonte suportado na estimativa do caller. O resultado do callee e cacheado como template relativo aos parametros do proprio callee, e depois a substituicao de argumentos mapeia esse template de volta para as dimensoes do caller.
+## Análise com Roslyn
 
-Fluxo conceitual:
+A principal camada de análise fica em:
+
+```text
+src/ComplexityAnalysis.Analyzers/Analysis/
+```
+
+A análise parte de um método e avalia informações sintáticas e semânticas suportadas. As responsabilidades incluem extração de métodos, resolução de tamanho de entrada, classificação de operações básicas, análise de limites de loop, mapeamento de operações conhecidas, propagação de chamadas a métodos-fonte e tratamento de recursão direta.
+
+Alguns componentes representativos são:
+
+- `MethodComplexityExtractor` para composição do método e de seu corpo;
+- `MethodAnalysisContext` para contexto semântico e dimensões de entrada;
+- `InputSizeResolver` para dimensões canônicas como `n`, `m`, `k`, `p` e variáveis posteriores;
+- `BasicOperationAnalyzer` para trabalho básico comprovado;
+- `LoopBoundAnalyzer` para limites de loop suportados;
+- `KnownOperationComplexityAnalyzer` para custos BCL/LINQ suportados.
+
+O analyzer não exige um call graph completo da compilation ou da solution.
+
+## Operações BCL e LINQ conhecidas
+
+As operações conhecidas são resolvidas pela identidade do símbolo Roslyn, e não apenas pelo nome textual do método. Isso evita que um método definido pelo usuário chamado `Contains`, `Where` ou `ToList` seja interpretado acidentalmente como uma operação do framework.
+
+A infraestrutura de operações conhecidas fica em:
+
+```text
+src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/
+```
+
+Operações LINQ deferred como `Where` e `OrderBy` não são contabilizadas como enumeração completa apenas por serem criadas. O custo de enumeração ou ordenação é aplicado quando o consumo suportado é comprovado, por exemplo por uma operação terminal ou `foreach`.
+
+Operações não suportadas ou não resolvidas permanecem `Unknown`.
+
+## Chamadas interprocedurais a métodos-fonte
+
+A análise interprocedural pode incluir o custo de um callee fonte suportado na estimativa do caller. O resultado do callee pode ser representado como um template relativo aos seus parâmetros e depois substituído usando os argumentos do caller.
 
 ```text
 Caller
   |
   v
-Invocation resolution
+resolução da invocação
   |
-  +-- Known BCL/LINQ
+  +-- operação BCL/LINQ conhecida
   |
-  `-- Source method
+  `-- método-fonte suportado
           |
-      cache/template
+      template/cache
           |
-      substitution
+      substituição de argumentos
           |
           v
-Caller complexity
+complexidade do Caller
 ```
 
-Fronteira de ciclo:
+O traversal é sob demanda. Um método-fonte só é analisado quando é alcançado a partir da raiz atual, a resolução de operação conhecida não se aplica, o dispatch é seguro e o budget configurado/interno permite a expansão.
+
+O dispatch suportado inclui métodos static, private, métodos ordinários não virtuais e dispatch sealed quando o alvo de runtime pode ser comprovado. Dispatch virtual/interface inseguro, dynamic dispatch, delegates, reflection, métodos externos disponíveis apenas em metadata, construtores, propriedades, operadores, local functions e lambdas como alvos independentes permanecem fora do escopo interprocedural suportado.
+
+Ciclos são detectados de forma conservadora. Recursão direta pode ser tratada pelo pipeline de recorrências; recursão mútua é detectada, mas não resolvida.
+
+## Recursão direta e resolução de recorrências
+
+A análise de recorrências fica em:
 
 ```text
-Cycle detected
-      |
-      v
-Unknown
-      |
-      v
-Unknown, exceto quando recursao direta e extraida e resolvida separadamente
+src/ComplexityAnalysis.Analyzers/Analysis/Recursion/
 ```
 
-O traversal e sob demanda. Um callee fonte e analisado apenas quando uma invocacao e visitada a partir do metodo raiz atual, a resolucao de operacao conhecida BCL/LINQ nao se aplica, o dispatch e seguro e o budget interno permite expansao. O analyzer nao pre-analisa todos os metodos e nao cria graph completo da compilation.
+O pipeline separa detecção, extração da recorrência e resolução. Uma recorrência suportada exige recursão direta identificada semanticamente, evidência compatível de base case, argumento comprovadamente redutor e trabalho local conhecido.
 
-Dispatch fonte seguro inclui metodos static, private, ordinarios nao virtuais e dispatch sealed quando o alvo de runtime e comprovado. Dispatch de interface, dispatch virtual inseguro, dynamic dispatch, invocacao de delegate, reflection, metodos externos apenas em metadata, construtores, propriedades, operadores, local functions e lambdas como alvos independentes continuam fora de escopo.
+As famílias de solver suportadas incluem:
 
-Configuracao publica expoe limites controlados para profundidade de chamada e metodos expandidos por analise raiz. Os defaults sao profundidade `5` e metodos por raiz `32`; os hard limits publicos sao `16` e `128`. Resultados `Unknown` continuam conservadores para chamadas nao resolvidas, dispatch inseguro, fonte indisponivel, binding de argumento nao comprovado, fronteiras de budget, cancellation e ciclos. Recursao direta pode ser resolvida apenas pelo pipeline de recorrencia abaixo. Recursao mutua e detectada, mas nao resolvida.
+- recorrências de soma/decremento;
+- um subconjunto exponencial simples e limitado;
+- formas do Master Theorem;
+- um subconjunto restrito e limitado de Akra-Bazzi.
 
-## Recursao Direta e Solucao de Recorrencias
+A implementação é determinística e limitada. Ela não executa resolução simbólica geral de recorrências, integração numérica geral, processos externos, acesso de rede, integração com MathNet/SymPy ou chamadas a projetos solver externos.
 
-A infraestrutura de recorrencias fica em:
+Formatos não suportados, base case ausente, argumentos não redutores, trabalho local desconhecido, cancelamento, inconclusão numérica e recursão mútua permanecem `Unknown`.
 
-```text
-analyzer/src/ComplexityAnalysis.Analyzers/Analysis/Recursion/
-```
+## Configuração
 
-Extracao e solvers sao responsabilidades separadas. `RecursiveCallAnalyzer` identifica invocacoes semanticamente diretas e resume caminhos de execucao recursivos. `RecurrenceExtractor` exige evidencia de base case, seleciona a dimensao da recorrencia, exclui invocacoes diretamente recursivas do custo de trabalho local e cria uma `RecurrenceRelation` interna. `RecurrenceSolver` tenta solvers limitados e retorna resultados explicitos solved, unsupported, invalid ou numerically inconclusive.
+A configuração é lida por meio do `AnalyzerConfigOptionsProvider` do Roslyn; o analyzer não faz parsing manual de `.editorconfig`.
 
-As familias implementadas sao recorrencias de soma/decremento, um subconjunto exponencial simples de coeficiente constante, Master Theorem e um subconjunto restrito/limitado de Akra-Bazzi. Trabalho numerico e deterministico e limitado por caps internos de iteracao. O analyzer nao faz integracao numerica geral, execucao de subprocessos, solucao baseada em reflection, I/O, acesso a rede, MathNet, SymPy, Workspaces, varredura de recorrencias na compilation inteira ou chamadas a projetos solver herdados.
-
-Branches recursivos mutuamente exclusivos sao path-sensitive: branches estilo binary search com uma chamada recursiva por branch produzem um termo recursivo por caminho. Chamadas recursivas sequenciais no mesmo caminho podem somar multiplicidade.
-
-Formatos de recorrencia nao suportados, trabalho local desconhecido, base case ausente, argumentos nao redutores, cancellation, resultado numericamente inconclusivo e recursao mutua continuam `Unknown`.
-
-## Operacoes Conhecidas
-
-A infraestrutura de operacoes conhecidas fica em:
-
-```text
-analyzer/src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/
-```
-
-Mappings carregam identidade semantica, complexidade, tipo de execucao, proveniencia, metadados e informacao de caso quando relevante. A resolucao usa simbolos Roslyn e identidades de operacao, nao apenas nomes textuais de metodos.
-
-Operacoes LINQ deferred como `Where` e `OrderBy` sao cobradas como setup quando criadas. O custo de enumeracao ou ordenacao e contado quando uma operacao terminal suportada ou `foreach` consome a pipeline.
-
-Invocacoes nao suportadas ou nao resolvidas continuam como `Unknown`.
-
-## Camada de Diagnostics
-
-`ComplexityAnalyzer` expoe:
-
-- `BIG0001` no identificador do metodo quando a complexidade estimada e conhecida e o diagnostic esta habilitado.
-- `BIG1001` na invocacao de lookup linear dentro de iteracao analisavel.
-- `BIG1002` na invocacao de materializacao dentro de iteracao analisavel.
-- `BIG1003` na invocacao de ordenacao deferred somente quando consumo suportado e comprovado dentro de iteracao analisavel.
-- `BIG1004` na chamada de metodo fonte suportada com complexidade conhecida dependente de entrada dentro de iteracao analisavel.
-- `BIG1005` no metodo recursivo suportado cuja recorrencia direta resolvida e exponencial.
-- `BIG1006` no identificador do metodo quando `complexity_analyzers.maximum_complexity` esta configurado e a estimativa conhecida e comparavel excede o threshold.
-- `BIG9000` uma vez por compilation quando habilitado explicitamente.
-
-Analise de codigo gerado e desabilitada, execucao concorrente e habilitada, e hot paths do analyzer devem continuar livres de I/O, rede, execucao de processos e comportamento pesado baseado em reflection.
-
-## Camada de Configuracao
-
-A configuracao e lida por APIs Roslyn de analyzer config a partir de `AnalyzerConfigOptionsProvider`; o analyzer nao faz parsing manual de arquivos `.editorconfig`. Opcoes especificas de syntax tree sobrescrevem opcoes globais para aquela syntax tree.
-
-As opcoes publicas de comportamento sao:
+As opções públicas de comportamento são:
 
 - `complexity_analyzers.interprocedural_analysis`;
 - `complexity_analyzers.recursion_analysis`;
@@ -212,14 +206,37 @@ As opcoes publicas de comportamento sao:
 - `complexity_analyzers.max_methods_per_root`;
 - `complexity_analyzers.maximum_complexity`.
 
-Valores invalidos voltam aos defaults e nao reportam falhas do analyzer. Severidade de diagnostics continua usando a configuracao Roslyn padrao `dotnet_diagnostic.<RULE_ID>.severity`.
+Valores específicos por syntax tree sobrescrevem valores globais para aquela árvore. Valores inválidos retornam aos defaults documentados em vez de gerar falhas do analyzer.
 
-## Performance e Validacao de Pacote
+Veja [Configuração](configuration.md) para detalhes.
 
-A validacao de performance usa workloads sinteticos deterministicos e invariantes estruturais em vez de thresholds estreitos de milissegundos. O caminho oficial do compilador `ReportAnalyzer=true` e usado para validar reporting de execucao do analyzer quando suportado pelo toolchain.
+## Diagnósticos
 
-O contrato do pacote mantem `ComplexityAnalysis.Analyzers.dll` em `analyzers/dotnet/cs/`, nao em `lib/`. Dependencias Roslyn usadas para autoria sao assets privados e nao sao expostas transitivamente aos consumidores. O pacote atual embute simbolos de debug na DLL do analyzer e nao emite `.snupkg`.
+`ComplexityAnalyzer` expõe:
 
-## Por Que Nao Ha Workspaces
+- `BIG0001` para estimativas de complexidade por método, opt-in;
+- `BIG1001` para buscas lineares suportadas dentro de iteração analisável;
+- `BIG1002` para materialização suportada dentro de iteração analisável;
+- `BIG1003` para ordenação consumida e suportada dentro de iteração analisável;
+- `BIG1004` para chamadas suportadas a métodos-fonte com custo dependente de entrada dentro de iteração analisável;
+- `BIG1005` para recursão direta suportada com crescimento exponencial resolvido;
+- `BIG1006` para estimativas conhecidas e comparáveis acima de um threshold configurado;
+- `BIG9000` como probe de execução opt-in.
 
-`Microsoft.CodeAnalysis.Workspaces` esta intencionalmente ausente. O analyzer nao implementa `CodeFixProvider`, analise de graph de projeto inteiro, carregamento de solution ou recursos de workspace de IDE que justificariam essa dependencia.
+A análise de código gerado é desabilitada e a execução concorrente do analyzer é habilitada.
+
+Veja o [Catálogo de Analyzers](analyzers.md) para o comportamento de cada regra.
+
+## Performance e validação do pacote
+
+O analyzer foi projetado para execução dentro do compilador/IDE e mantém hot paths livres de acesso de rede, execução de processos, telemetria e scans obrigatórios da solution inteira.
+
+A validação de performance usa workloads sintéticos determinísticos e invariantes estruturais em vez de thresholds estreitos dependentes da máquina. O caminho `ReportAnalyzer=true` do compilador é usado para verificar o reporting de execução do analyzer.
+
+A validação do contrato do pacote garante que `ComplexityAnalysis.Analyzers.dll` seja empacotado em `analyzers/dotnet/cs/`, e não em `lib/`, e que as dependências de autoria não se tornem dependências de runtime do consumidor.
+
+O CI também valida o consumo do pacote com hosts SDK .NET 8, .NET 9 e .NET 10.
+
+## Por que não há dependência de Workspaces
+
+`Microsoft.CodeAnalysis.Workspaces` está intencionalmente ausente. O projeto não implementa `CodeFixProvider`, carregamento de solution, análise baseada em workspace de projeto inteiro ou outros recursos de IDE que exijam essa dependência.
