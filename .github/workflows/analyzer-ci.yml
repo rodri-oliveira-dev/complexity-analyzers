@@ -2,13 +2,7 @@ name: Analyzer CI
 
 on:
   push:
-    paths:
-      - 'analyzer/**'
-      - '.github/workflows/analyzer-ci.yml'
   pull_request:
-    paths:
-      - 'analyzer/**'
-      - '.github/workflows/analyzer-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -41,9 +35,6 @@ jobs:
     name: Validate analyzer
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: analyzer
 
     steps:
       - name: Checkout
@@ -52,7 +43,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          global-json-file: analyzer/global.json
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore ComplexityAnalysis.Analyzers.slnx
@@ -101,7 +92,7 @@ jobs:
 
           $productionSourceFound = @($sourceFiles | Where-Object {
             $_ -like "*src/ComplexityAnalysis.Analyzers*" -or
-            $_ -like "*src\ComplexityAnalysis.Analyzers*"
+            $_ -like "*src\\ComplexityAnalysis.Analyzers*"
           }).Count -gt 0
 
           if (-not $productionSourceFound) {
@@ -112,7 +103,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: analyzer-opencover
-          path: analyzer/artifacts/coverage/validate/opencover/coverage.opencover.xml
+          path: artifacts/coverage/validate/opencover/coverage.opencover.xml
           if-no-files-found: error
 
   sonar:
@@ -121,9 +112,6 @@ jobs:
     timeout-minutes: 30
     needs: validate
     if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
-    defaults:
-      run:
-        working-directory: analyzer
 
     steps:
       - name: Checkout
@@ -144,7 +132,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          global-json-file: analyzer/global.json
+          global-json-file: global.json
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -168,7 +156,7 @@ jobs:
           /o:"rodri-oliveira-dev"
           /d:sonar.token="${SONAR_TOKEN}"
           /d:sonar.host.url="https://sonarcloud.io"
-          /d:sonar.projectBaseDir="${GITHUB_WORKSPACE}/analyzer"
+          /d:sonar.projectBaseDir="${GITHUB_WORKSPACE}"
           /d:sonar.cs.opencover.reportsPaths="artifacts/coverage/sonar/opencover/coverage.opencover.xml"
           /d:sonar.qualitygate.wait=true
           /d:sonar.qualitygate.timeout=300
@@ -217,7 +205,7 @@ jobs:
 
           $productionSourceFound = @($sourceFiles | Where-Object {
             $_ -like "*src/ComplexityAnalysis.Analyzers*" -or
-            $_ -like "*src\ComplexityAnalysis.Analyzers*"
+            $_ -like "*src\\ComplexityAnalysis.Analyzers*"
           }).Count -gt 0
 
           if (-not $productionSourceFound) {
@@ -230,14 +218,37 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
 
+      - name: Report Sonar quality gate conditions
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: rodri-oliveira-dev_complexity-analyzers
+          SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          response=$(curl --fail-with-body --silent --show-error \
+            -u "${SONAR_TOKEN}:" \
+            --get "https://sonarcloud.io/api/qualitygates/project_status" \
+            --data-urlencode "projectKey=${SONAR_PROJECT_KEY}" \
+            --data-urlencode "pullRequest=${SONAR_PULL_REQUEST}")
+
+          echo "SonarQube Cloud quality gate conditions:"
+          echo "${response}" | jq '{
+            status: .projectStatus.status,
+            conditions: [.projectStatus.conditions[] | {
+              metricKey,
+              status,
+              errorThreshold,
+              actualValue
+            }]
+          }'
+
   pack:
     name: Pack analyzer
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: validate
-    defaults:
-      run:
-        working-directory: analyzer
 
     steps:
       - name: Checkout
@@ -246,7 +257,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          global-json-file: analyzer/global.json
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore ComplexityAnalysis.Analyzers.slnx
@@ -293,5 +304,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: analyzer-nuget-package
-          path: analyzer/artifacts/packages/*.nupkg
+          path: artifacts/packages/*.nupkg
           if-no-files-found: error
