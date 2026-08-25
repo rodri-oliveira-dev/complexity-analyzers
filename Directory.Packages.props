@@ -8,7 +8,7 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
 
     <!-- Stable analyzer-authoring rules compatible with the Roslyn 4.x package family. -->
-    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
 
     <!-- Test infrastructure for the isolated analyzer workspace. -->
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
