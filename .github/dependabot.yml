@@ -1,0 +1,65 @@
+version: 2
+
+updates:
+  # Central Package Management + project NuGet dependencies.
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 10
+    rebase-strategy: "auto"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      roslyn:
+        patterns:
+          - "Microsoft.CodeAnalysis*"
+      test-infrastructure:
+        patterns:
+          - "Microsoft.NET.Test.Sdk"
+          - "coverlet.collector"
+          - "xunit*"
+    ignore:
+      # The analyzer intentionally targets the Roslyn 4.x package family.
+      # Major upgrades should be evaluated explicitly for host compatibility.
+      - dependency-name: "Microsoft.CodeAnalysis.CSharp"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "Microsoft.CodeAnalysis.Analyzers"
+        update-types:
+          - "version-update:semver-major"
+
+  # Keep global.json current independently from NuGet packages.
+  - package-ecosystem: "dotnet-sdk"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      time: "09:10"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 2
+    rebase-strategy: "auto"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  # Keep workflow actions current (checkout, setup-dotnet, upload/download-artifact, etc.).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:15"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 10
+    rebase-strategy: "auto"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
