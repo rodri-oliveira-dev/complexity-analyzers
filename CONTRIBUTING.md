@@ -24,15 +24,31 @@ dotnet tool restore
 dotnet restore ComplexityAnalysis.Analyzers.slnx
 ```
 
+## Definition of Done
+
+Use the canonical release-quality policy to classify the change and decide which
+evidence applies:
+
+- [Release Quality Governance](docs/en/development/quality-gates.md)
+- [Governança de Qualidade de Release](docs/pt-BR/development/quality-gates.md)
+
+Validation is proportional to risk. Documentation-only changes can stay light;
+analyzer behavior, performance-sensitive, Roslyn/dependency, packaging, CI, and
+release changes need the focused evidence listed in the policy.
+
 ## Validate a change
 
-Before opening a pull request, run the same core checks expected by CI:
+Before opening a pull request, run the checks required by the change type. For
+broad analyzer, build, package, or repository changes, the common core path is:
 
 ```bash
 dotnet build ComplexityAnalysis.Analyzers.slnx --configuration Release --no-restore
 dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 ```
+
+For docs-only changes, record the lighter review that applies, such as Markdown
+review, link review, `git diff --check`, and no analyzer behavior impact.
 
 When a change touches formatting or analyzer style rules, also run the repository formatting checks configured by the project.
 
@@ -63,7 +79,7 @@ When adding or changing a public diagnostic:
 
 Behavior changes should be covered by tests. Bug fixes should include a regression test when practical. Analyzer rules should normally test both positive and negative cases to reduce false positives.
 
-Changes to interprocedural analysis, recurrence solving, caching, budgets, or package loading should also consider the existing compatibility and performance test suites.
+Changes to interprocedural analysis, recurrence solving, caching, budgets, or package loading should also consider the existing compatibility and performance test suites described by the canonical DoD.
 
 Do not weaken existing validation merely to make a change pass.
 
@@ -130,6 +146,7 @@ Pull requests should:
 
 - explain what changed and why;
 - link the relevant issue when one exists;
+- identify the change type from the canonical DoD;
 - describe how the change was validated;
 - call out diagnostic, compatibility, package, performance, or security impact;
 - update English and Portuguese documentation together when public behavior changes;

@@ -6,6 +6,8 @@ This repository contains `ComplexityAnalysis.Analyzers`, a standalone Roslyn ana
 
 Before making changes, read the root [`AGENTS.md`](../AGENTS.md). It is the primary repository-specific instruction source and contains the detailed architecture, Roslyn, NuGet, performance, validation, and Git rules.
 
+Use the canonical Definition of Done in [`docs/en/development/quality-gates.md`](../docs/en/development/quality-gates.md) to classify the change type and choose proportional validation. Do not duplicate or bypass that policy.
+
 Use the relevant skills under [`.agents/skills/`](../.agents/skills/) when the task touches their area. Do not load unrelated repository content unnecessarily.
 
 ## Core invariants

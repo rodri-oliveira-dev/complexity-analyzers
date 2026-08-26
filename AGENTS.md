@@ -25,8 +25,10 @@ Consulte apenas os arquivos relevantes para a tarefa atual:
 7. `.editorconfig`
 8. `global.json`
 9. `ComplexityAnalysis.Analyzers.slnx`
-10. Skills em `.agents/skills/`
-11. Projetos em `src/`, testes em `tests/` e harnesses em `performance/`
+10. `docs/en/development/quality-gates.md`
+11. `docs/pt-BR/development/quality-gates.md`
+12. Skills em `.agents/skills/`
+13. Projetos em `src/`, testes em `tests/` e harnesses em `performance/`
 
 Nao carregue indiscriminadamente o repositorio. Localize primeiro o contexto diretamente relacionado a tarefa.
 
@@ -44,6 +46,7 @@ Nao carregue indiscriminadamente o repositorio. Localize primeiro o contexto dir
 - Nao introduzir dependencias transitivas desnecessarias no pacote NuGet.
 - Build e testes devem ser deterministicos.
 - Performance do analyzer e requisito funcional.
+- A Definition of Done canonica fica em `docs/en/development/quality-gates.md` com equivalente em `docs/pt-BR/development/quality-gates.md`.
 - Nao executar publish, release ou push sem solicitacao explicita.
 - Usar Conventional Commits.
 - Sempre revisar o diff antes do commit.
@@ -91,7 +94,7 @@ Ele nunca deve ser referenciado pelo analyzer por `ProjectReference`, pacote loc
 
 ## Validacao
 
-Execute validacoes proporcionais ao impacto. Para mudancas de bootstrap, MSBuild, NuGet ou empacotamento:
+Execute validacoes proporcionais ao impacto. Consulte a matriz de tipo de mudanca e risco em `docs/en/development/quality-gates.md` antes de decidir quais validacoes focadas tambem se aplicam. Para mudancas de bootstrap, MSBuild, NuGet ou empacotamento:
 
 ```bash
 dotnet restore ./ComplexityAnalysis.Analyzers.slnx

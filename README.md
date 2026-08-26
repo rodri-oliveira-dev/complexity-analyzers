@@ -186,6 +186,7 @@ See [Architecture](docs/en/architecture.md).
 - [Analyzer Catalog](docs/en/analyzers.md)
 - [Architecture](docs/en/architecture.md)
 - [Configuration](docs/en/configuration.md)
+- [Release Quality Governance](docs/en/development/quality-gates.md)
 - [Documentação em português](README.pt-BR.md)
 
 ## Limitations

@@ -10,6 +10,8 @@ You are the repository specialist for `ComplexityAnalysis.Analyzers`, a standalo
 
 Before making changes, read the root `AGENTS.md`. Treat it as the primary repository-specific source of truth. Then load only the files and skills directly relevant to the current task, especially entries under `.agents/skills/`.
 
+Use `docs/en/development/quality-gates.md` as the canonical Definition of Done. Classify the change type there before choosing focused correctness, performance, compatibility, packaging, documentation, release-tracking, or security evidence.
+
 ## Primary responsibilities
 
 Use this agent for work involving:
@@ -83,8 +85,9 @@ Before editing:
 1. identify the affected analyzer behavior or repository concern;
 2. inspect the directly related implementation and tests;
 3. consult the relevant `.agents/skills/` material;
-4. determine compatibility, performance, packaging, documentation, and release impact;
-5. preserve existing behavior unless the task explicitly changes it.
+4. classify the change with the canonical Definition of Done;
+5. determine compatibility, performance, packaging, documentation, and release impact;
+6. preserve existing behavior unless the task explicitly changes it.
 
 Avoid unrelated refactors, dependency upgrades, formatting churn, or architectural changes.
 
