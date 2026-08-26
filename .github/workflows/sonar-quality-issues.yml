@@ -49,6 +49,7 @@ jobs:
             const projectKey = process.env.SONAR_PROJECT_KEY;
             const labelName = process.env.SONAR_ISSUE_LABEL;
             const sonarToken = process.env.SONAR_TOKEN;
+            const workflowAuthor = "github-actions[bot]";
             const trackedSeverities = new Set(["BLOCKER", "HIGH"]);
             const severityRank = new Map([
               ["BLOCKER", 2],
@@ -56,12 +57,12 @@ jobs:
             ]);
             const syncStart = "<!-- sonar-sync:start -->";
             const syncEnd = "<!-- sonar-sync:end -->";
-            const workflowAuthor = "github-actions[bot]";
 
             core.setSecret(sonarToken);
 
             async function sonarGet(path, params) {
               const url = new URL(`${sonarHost}${path}`);
+
               for (const [key, value] of Object.entries(params)) {
                 if (value !== undefined && value !== null && value !== "") {
                   url.searchParams.set(key, String(value));
@@ -76,9 +77,9 @@ jobs:
               });
 
               if (!response.ok) {
-                const body = await response.text();
+                const responseBody = await response.text();
                 throw new Error(
-                  `Sonar API ${path} failed with HTTP ${response.status}: ${body.slice(0, 500)}`,
+                  `Sonar API ${path} failed with HTTP ${response.status}: ${responseBody.slice(0, 500)}`,
                 );
               }
 
@@ -114,7 +115,12 @@ jobs:
 
             function managedBody(existingBody, nextManagedBody) {
               if (!existingBody) {
-                return `${nextManagedBody}\n\n<!-- Anotações manuais podem ser adicionadas abaixo. Esta área é preservada pelo workflow. -->\n`;
+                return [
+                  nextManagedBody,
+                  "",
+                  "<!-- Anotações manuais podem ser adicionadas abaixo. Esta área é preservada pelo workflow. -->",
+                  "",
+                ].join("\n");
               }
 
               const startIndex = existingBody.indexOf(syncStart);
@@ -129,15 +135,13 @@ jobs:
             }
 
             function extractManagedSonarIssueKey(githubIssue) {
-              // issues.listForRepo also returns pull requests; never treat a PR as a
-              // workflow-managed Sonar issue even if its body contains matching markers.
+              // issues.listForRepo also returns pull requests.
               if (githubIssue.pull_request) {
                 return null;
               }
 
-              // The default GITHUB_TOKEN creates issues as github-actions[bot]. Requiring
-              // that provenance prevents user-authored issues from spoofing a public
-              // Sonar issue key and becoming the canonical sync target.
+              // GITHUB_TOKEN creates issues as github-actions[bot]. Requiring that
+              // provenance prevents user-authored issues from spoofing public Sonar keys.
               if (githubIssue.user?.login !== workflowAuthor) {
                 return null;
               }
@@ -220,7 +224,7 @@ jobs:
 
               if (qualifyingImpacts.length === 0) {
                 throw new Error(
-                  `Sonar returned issue ${issue.key} for impactSeverities=BLOCKER,HIGH without a matching impacts entry. Refusing to sync an unverifiable severity.`,
+                  `Sonar returned issue ${issue.key} for impactSeverities=BLOCKER,HIGH without a matching impacts entry.`,
                 );
               }
 
@@ -229,17 +233,20 @@ jobs:
 
             await ensureLabel();
 
-            // Read every repository issue so a workflow-managed item remains discoverable
-            // even if someone removes its label. Provenance and managed delimiters are
-            // validated before accepting any item as the canonical Sonar sync target.
-            const repositoryIssues = await github.paginate(github.rest.issues.listForRepo, {
-              owner,
-              repo,
-              state: "all",
-              per_page: 100,
-            });
+            // Scan all repository issues so removing the managed label cannot create
+            // duplicates. Provenance and delimiters are validated before accepting a match.
+            const repositoryIssues = await github.paginate(
+              github.rest.issues.listForRepo,
+              {
+                owner,
+                repo,
+                state: "all",
+                per_page: 100,
+              },
+            );
 
             const existingBySonarKey = new Map();
+
             for (const githubIssue of repositoryIssues) {
               const sonarKey = extractManagedSonarIssueKey(githubIssue);
               if (!sonarKey) {
@@ -248,7 +255,7 @@ jobs:
 
               if (existingBySonarKey.has(sonarKey)) {
                 core.warning(
-                  `Multiple workflow-managed GitHub issues reference Sonar issue ${sonarKey}. Keeping #${existingBySonarKey.get(sonarKey).number} as the canonical match.`,
+                  `Multiple workflow-managed GitHub issues reference Sonar issue ${sonarKey}. Keeping #${existingBySonarKey.get(sonarKey).number}.`,
                 );
                 continue;
               }
@@ -264,8 +271,9 @@ jobs:
             for (const { issue, qualifyingImpacts } of findings) {
               const maxSeverity = qualifyingImpacts
                 .map((impact) => impact.severity)
-                .sort((left, right) =>
-                  (severityRank.get(right) ?? 0) - (severityRank.get(left) ?? 0),
+                .sort(
+                  (left, right) =>
+                    (severityRank.get(right) ?? 0) - (severityRank.get(left) ?? 0),
                 )[0];
 
               const affectedQualities = [
@@ -284,10 +292,23 @@ jobs:
               const locationLabel = line
                 ? `${path}:${line}${endLine && endLine !== line ? `-${endLine}` : ""}`
                 : path;
-              const fileUrl = `https://github.com/${owner}/${repo}/blob/${encodeURIComponent(defaultBranch)}/${encodeRepositoryPath(path)}${line ? `#L${line}` : ""}`;
-              const sonarIssueUrl = `${sonarHost}/project/issues?open=${encodeURIComponent(issue.key)}&id=${encodeURIComponent(projectKey)}`;
-              const sonarRuleUrl = `${sonarHost}/coding_rules?open=${encodeURIComponent(issue.rule)}&rule_key=${encodeURIComponent(issue.rule)}`;
-              const projectIssuesUrl = `${sonarHost}/project/issues?impactSeverities=BLOCKER%2CHIGH&issueStatuses=OPEN&id=${encodeURIComponent(projectKey)}`;
+
+              const fileUrl =
+                `https://github.com/${owner}/${repo}/blob/` +
+                `${encodeURIComponent(defaultBranch)}/${encodeRepositoryPath(path)}` +
+                `${line ? `#L${line}` : ""}`;
+
+              const sonarIssueUrl =
+                `${sonarHost}/project/issues?open=${encodeURIComponent(issue.key)}` +
+                `&id=${encodeURIComponent(projectKey)}`;
+
+              const sonarRuleUrl =
+                `${sonarHost}/coding_rules?open=${encodeURIComponent(issue.rule)}` +
+                `&rule_key=${encodeURIComponent(issue.rule)}`;
+
+              const projectIssuesUrl =
+                `${sonarHost}/project/issues?impactSeverities=BLOCKER%2CHIGH` +
+                `&issueStatuses=OPEN&id=${encodeURIComponent(projectKey)}`;
 
               const relatedLocations = (issue.flows ?? [])
                 .flatMap((flow) => flow.locations ?? [])
@@ -295,13 +316,17 @@ jobs:
                 .map((location) => {
                   const relatedPath = componentPath(location.component);
                   const relatedLine = location.textRange?.startLine ?? null;
-                  const relatedFileUrl = `https://github.com/${owner}/${repo}/blob/${encodeURIComponent(defaultBranch)}/${encodeRepositoryPath(relatedPath)}${relatedLine ? `#L${relatedLine}` : ""}`;
+                  const relatedFileUrl =
+                    `https://github.com/${owner}/${repo}/blob/` +
+                    `${encodeURIComponent(defaultBranch)}/${encodeRepositoryPath(relatedPath)}` +
+                    `${relatedLine ? `#L${relatedLine}` : ""}`;
                   const relatedLabel = relatedLine
                     ? `${relatedPath}:${relatedLine}`
                     : relatedPath;
                   const relatedMessage = location.msg
                     ? ` — ${markdownInline(location.msg)}`
                     : "";
+
                   return `- [\`${markdownInline(relatedLabel)}\`](${relatedFileUrl})${relatedMessage}`;
                 });
 
@@ -312,59 +337,111 @@ jobs:
                 )
                 .join(", ");
 
-              const tags = (issue.tags ?? []).length > 0
-                ? issue.tags.map((tag) => `\`${markdownInline(tag)}\``).join(", ")
-                : "Não informadas";
+              const tags =
+                (issue.tags ?? []).length > 0
+                  ? issue.tags
+                      .map((tag) => `\`${markdownInline(tag)}\``)
+                      .join(", ")
+                  : "Não informadas";
 
-              const managed = `${syncStart}
-<!-- sonar-issue-key:${issue.key} -->
-> Sincronizada automaticamente do SonarQube Cloud. Enquanto o finding permanecer **OPEN** com impacto **HIGH** ou **BLOCKER**, esta issue representa o mesmo problema e não deve ser recriada manualmente.
+              const managedLines = [
+                syncStart,
+                `<!-- sonar-issue-key:${issue.key} -->`,
+                "> Sincronizada automaticamente do SonarQube Cloud. Enquanto o finding permanecer **OPEN** com impacto **HIGH** ou **BLOCKER**, esta issue representa o mesmo problema.",
+                "",
+                "## Resumo",
+                "",
+                `- **Impacto:** ${impactText}`,
+                `- **Qualidade afetada:** ${
+                  affectedQualities.length > 0
+                    ? affectedQualities
+                        .map((quality) => `\`${markdownInline(quality)}\``)
+                        .join(", ")
+                    : "Não informada"
+                }`,
+                `- **Regra:** [${markdownInline(ruleName)} (\`${markdownInline(issue.rule)}\`)](${sonarRuleUrl})`,
+                `- **Clean Code attribute:** ${
+                  issue.cleanCodeAttribute
+                    ? `\`${markdownInline(issue.cleanCodeAttribute)}\``
+                    : "Não informado"
+                }`,
+                `- **Categoria:** ${
+                  issue.cleanCodeAttributeCategory
+                    ? `\`${markdownInline(issue.cleanCodeAttributeCategory)}\``
+                    : "Não informada"
+                }`,
+                `- **Localização:** [\`${markdownInline(locationLabel)}\`](${fileUrl})`,
+                `- **Esforço estimado:** ${
+                  issue.effort ? `\`${markdownInline(issue.effort)}\`` : "Não informado"
+                }`,
+                `- **Quick fix indicado pelo Sonar:** ${
+                  issue.quickFixAvailable === true
+                    ? "Sim"
+                    : issue.quickFixAvailable === false
+                      ? "Não"
+                      : "Não informado"
+                }`,
+                `- **Tags:** ${tags}`,
+                `- **Criada no Sonar:** ${
+                  issue.creationDate
+                    ? `\`${markdownInline(issue.creationDate)}\``
+                    : "Não informado"
+                }`,
+                `- **Atualizada no Sonar:** ${
+                  issue.updateDate
+                    ? `\`${markdownInline(issue.updateDate)}\``
+                    : "Não informado"
+                }`,
+                "",
+                "## Diagnóstico do Sonar",
+                "",
+                quoteMarkdown(issue.message),
+                "",
+                "## Orientação para correção",
+                "",
+                "1. Abra o finding original no Sonar e confirme a localização primária e eventuais fluxos/localizações secundárias.",
+                `2. Leia a regra **${markdownInline(ruleName)}** e identifique a causa raiz, evitando apenas silenciar o diagnóstico.`,
+                "3. Aplique a menor alteração que elimine o problema sem alterar comportamento não relacionado.",
+                "4. Adicione ou ajuste testes quando a correção afetar comportamento, contratos ou cenários de borda.",
+                "5. Execute build e testes relevantes localmente e confirme que não surgiram regressões.",
+                "6. Reexecute a análise do Sonar; o finding deve deixar de permanecer OPEN quando a correção for reconhecida.",
+              ];
 
-## Resumo
+              if (relatedLocations.length > 0) {
+                managedLines.push(
+                  "",
+                  "## Localizações relacionadas",
+                  "",
+                  ...relatedLocations,
+                );
+              }
 
-- **Impacto:** ${impactText}
-- **Qualidade afetada:** ${affectedQualities.length > 0 ? affectedQualities.map((quality) => `\`${markdownInline(quality)}\``).join(", ") : "Não informada"}
-- **Regra:** [${markdownInline(ruleName)} (\`${markdownInline(issue.rule)}\`)](${sonarRuleUrl})
-- **Clean Code attribute:** ${issue.cleanCodeAttribute ? `\`${markdownInline(issue.cleanCodeAttribute)}\`` : "Não informado"}
-- **Categoria:** ${issue.cleanCodeAttributeCategory ? `\`${markdownInline(issue.cleanCodeAttributeCategory)}\`` : "Não informada"}
-- **Localização:** [\`${markdownInline(locationLabel)}\`](${fileUrl})
-- **Esforço estimado:** ${issue.effort ? `\`${markdownInline(issue.effort)}\`` : "Não informado"}
-- **Quick fix indicado pelo Sonar:** ${issue.quickFixAvailable === true ? "Sim" : issue.quickFixAvailable === false ? "Não" : "Não informado"}
-- **Tags:** ${tags}
-- **Criada no Sonar:** ${issue.creationDate ? `\`${markdownInline(issue.creationDate)}\`` : "Não informado"}
-- **Atualizada no Sonar:** ${issue.updateDate ? `\`${markdownInline(issue.updateDate)}\`` : "Não informado"}
+              managedLines.push(
+                "",
+                "## Links",
+                "",
+                `- [Abrir este finding no Sonar](${sonarIssueUrl})`,
+                `- [Abrir a regra no Sonar](${sonarRuleUrl})`,
+                `- [Ver todos os findings HIGH/BLOCKER do projeto](${projectIssuesUrl})`,
+                "",
+                syncEnd,
+              );
 
-## Diagnóstico do Sonar
+              const managed = managedLines.join("\n");
 
-${quoteMarkdown(issue.message)}
+              const qualityPrefix =
+                affectedQualities.length > 0
+                  ? `[${affectedQualities.join("/")}]`
+                  : "";
 
-## Orientação para correção
-
-1. Abra o finding original no Sonar e confirme a localização primária e eventuais fluxos/localizações secundárias.
-2. Leia a regra **${markdownInline(ruleName)}** e identifique a causa raiz, evitando apenas silenciar o diagnóstico.
-3. Aplique a menor alteração que elimine o problema sem alterar comportamento não relacionado.
-4. Adicione ou ajuste testes quando a correção afetar comportamento, contratos ou cenários de borda.
-5. Execute build e testes relevantes localmente e confirme que não surgiram regressões.
-6. Reexecute a análise do Sonar; o finding deve deixar de permanecer OPEN quando a correção for reconhecida.
-${relatedLocations.length > 0 ? `\n## Localizações relacionadas\n\n${relatedLocations.join("\n")}` : ""}
-
-## Links
-
-- [Abrir este finding no Sonar](${sonarIssueUrl})
-- [Abrir a regra no Sonar](${sonarRuleUrl})
-- [Ver todos os findings HIGH/BLOCKER do projeto](${projectIssuesUrl})
-
-${syncEnd}`;
-
-              const qualityPrefix = affectedQualities.length > 0
-                ? `[${affectedQualities.join("/")}]`
-                : "";
               const rawTitle = `[Sonar][${maxSeverity}]${qualityPrefix} ${ruleName}`;
-              const title = rawTitle.length <= 240
-                ? rawTitle
-                : `${rawTitle.slice(0, 237)}...`;
+              const title =
+                rawTitle.length <= 240
+                  ? rawTitle
+                  : `${rawTitle.slice(0, 237)}...`;
 
               const existing = existingBySonarKey.get(issue.key);
+
               if (!existing) {
                 const createdIssue = await github.rest.issues.create({
                   owner,
@@ -373,14 +450,18 @@ ${syncEnd}`;
                   body: managedBody("", managed),
                   labels: [labelName],
                 });
+
                 existingBySonarKey.set(issue.key, createdIssue.data);
-                core.info(`Created GitHub issue #${createdIssue.data.number} for Sonar issue ${issue.key}.`);
+                core.info(
+                  `Created GitHub issue #${createdIssue.data.number} for Sonar issue ${issue.key}.`,
+                );
                 created += 1;
                 continue;
               }
 
               const nextBody = managedBody(existing.body ?? "", managed);
-              const needsUpdate = existing.title !== title || existing.body !== nextBody;
+              const needsUpdate =
+                existing.title !== title || existing.body !== nextBody;
               const needsReopen = existing.state === "closed";
               const hasLabel = (existing.labels ?? []).some((label) =>
                 typeof label === "string"
@@ -397,6 +478,7 @@ ${syncEnd}`;
                   body: nextBody,
                   state: needsReopen ? "open" : undefined,
                 });
+
                 updated += 1;
                 if (needsReopen) {
                   reopened += 1;
