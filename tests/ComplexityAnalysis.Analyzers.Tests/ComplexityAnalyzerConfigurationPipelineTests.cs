@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using ComplexityAnalysis.Analyzers.Analysis;
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Configuration;
+using ComplexityAnalysis.Analyzers.Diagnostics;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -58,7 +59,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
 
         if (expectsRootComplexity)
         {
-            AssertComplexity(diagnostics, "M", "Estimated time complexity: O(n)");
+            AssertComplexity(diagnostics, "M", "Estimated algorithmic complexity for 'M' is O(n)");
         }
         else
         {
@@ -67,7 +68,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
                 && GetDiagnosticText(diagnostic) == "M");
         }
 
-        AssertComplexity(diagnostics, "Helper", "Estimated time complexity: O(n)");
+        AssertComplexity(diagnostics, "Helper", "Estimated algorithmic complexity for 'Helper' is O(n)");
     }
 
     [Fact]
@@ -85,7 +86,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
                 """),
             globalOptions: Options((ComplexityAnalyzerOptionsReader.InterproceduralAnalysisKey, "false")));
 
-        AssertComplexity(diagnostics, "M", "Estimated time complexity: O(n)");
+        AssertComplexity(diagnostics, "M", "Estimated algorithmic complexity for 'M' is O(n)");
     }
 
     [Theory]
@@ -115,7 +116,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
 
         if (expectsRecursiveComplexity)
         {
-            AssertComplexity(diagnostics, "M", "Estimated time complexity: O(n)");
+            AssertComplexity(diagnostics, "M", "Estimated algorithmic complexity for 'M' is O(n)");
         }
         else
         {
@@ -192,7 +193,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(Parse(CreateCallChainSource(helperCount: 5)));
 
-        AssertComplexity(diagnostics, "M", "Estimated time complexity: O(n)");
+        AssertComplexity(diagnostics, "M", "Estimated algorithmic complexity for 'M' is O(n)");
     }
 
     [Fact]
@@ -202,7 +203,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
             Parse(CreateCallChainSource(helperCount: 6)),
             globalOptions: Options((ComplexityAnalyzerOptionsReader.MaxCallDepthKey, "16")));
 
-        AssertComplexity(diagnostics, "M", "Estimated time complexity: O(n)");
+        AssertComplexity(diagnostics, "M", "Estimated algorithmic complexity for 'M' is O(n)");
     }
 
     [Fact]
@@ -301,7 +302,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
         AssertThreshold(
             diagnostics,
             "M",
-            "Method 'M' has estimated complexity O(n\u00b2), which exceeds the configured maximum O(n log n)");
+            "Method 'M' has estimated complexity O(n\u00b2), exceeding configured maximum O(n log n)");
     }
 
     [Fact]
@@ -328,7 +329,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
         AssertThreshold(
             diagnostics,
             "Fibonacci",
-            "Method 'Fibonacci' has estimated complexity O(1.618^n), which exceeds the configured maximum O(n\u00b3)");
+            "Method 'Fibonacci' has estimated complexity O(1.618^n), exceeding configured maximum O(n\u00b3)");
     }
 
     [Fact]
@@ -413,7 +414,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
         Assert.Contains(diagnostics, diagnostic =>
             diagnostic.Id == MethodComplexityExceedsConfiguredThresholdId
             && diagnostic.Location.SourceTree == quadraticTree
-            && diagnostic.GetMessage(CultureInfo.InvariantCulture) == "Method 'M' has estimated complexity O(n\u00b2), which exceeds the configured maximum O(n)");
+            && diagnostic.GetMessage(CultureInfo.InvariantCulture) == "Method 'M' has estimated complexity O(n\u00b2), exceeding configured maximum O(n)");
     }
 
     [Fact]
@@ -484,7 +485,7 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
         Assert.Contains(diagnostics, diagnostic =>
             diagnostic.Id == EstimatedAlgorithmicComplexityId
             && diagnostic.Location.SourceTree == enabledTree
-            && diagnostic.GetMessage(CultureInfo.InvariantCulture) == "Estimated time complexity: O(n)");
+            && diagnostic.GetMessage(CultureInfo.InvariantCulture) == "Estimated algorithmic complexity for 'M' is O(n)");
     }
 
     [Fact]
@@ -685,6 +686,10 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
             .Single(diagnostic => GetDiagnosticText(diagnostic) == diagnosticText);
 
         Assert.Equal(expectedMessage, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertProperty(
+            diagnostic,
+            DiagnosticPropertyNames.Complexity,
+            expectedMessage[(expectedMessage.IndexOf(" is ", StringComparison.Ordinal) + " is ".Length)..]);
     }
 
     private static void AssertThreshold(
@@ -698,6 +703,19 @@ public sealed class ComplexityAnalyzerConfigurationPipelineTests
 
         Assert.Equal(expectedMessage, diagnostic.GetMessage(CultureInfo.InvariantCulture));
         Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.True(diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.Complexity, out string? complexity));
+        Assert.True(diagnostic.Properties.TryGetValue(DiagnosticPropertyNames.Threshold, out string? threshold));
+        Assert.Contains(complexity!, expectedMessage, StringComparison.Ordinal);
+        Assert.Contains(threshold!, expectedMessage, StringComparison.Ordinal);
+    }
+
+    private static void AssertProperty(
+        Diagnostic diagnostic,
+        string key,
+        string expectedValue)
+    {
+        Assert.True(diagnostic.Properties.TryGetValue(key, out string? actualValue));
+        Assert.Equal(expectedValue, actualValue);
     }
 
     private static string GetDiagnosticText(Diagnostic diagnostic)

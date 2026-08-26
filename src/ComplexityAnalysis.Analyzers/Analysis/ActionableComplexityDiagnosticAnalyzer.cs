@@ -70,11 +70,16 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
             out ComplexityExpression? complexity)
             && complexity is ExponentialComplexity)
         {
+            string formattedComplexity = complexity.ToBigONotation();
+
             diagnostics.Add(Diagnostic.Create(
                 DiagnosticDescriptors.ExponentialRecursiveGrowth,
                 methodDeclaration.Identifier.GetLocation(),
+                ImmutableDictionary<string, string?>.Empty
+                    .Add(DiagnosticPropertyNames.Complexity, formattedComplexity)
+                    .Add(DiagnosticPropertyNames.RecurrenceClass, "exponential"),
                 FormatOperation(context.MethodSymbol),
-                complexity.ToBigONotation()));
+                formattedComplexity));
         }
     }
 
@@ -281,13 +286,23 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         ComplexityExpression combinedComplexity = ComplexityComposer.Nested(
             iterationComplexity,
             invocationComplexity);
+        string operation = FormatOperation(methodSymbol);
+        string operationComplexityText = invocationComplexity.ToBigONotation();
+        string iterationComplexityText = iterationComplexity.ToBigONotation();
+        string combinedComplexityText = combinedComplexity.ToBigONotation();
 
         diagnostics.Add(Diagnostic.Create(
             DiagnosticDescriptors.LinearLookupInsideIteration,
             invocation.GetLocation(),
-            FormatOperation(methodSymbol),
-            iterationComplexity.ToBigONotation(),
-            combinedComplexity.ToBigONotation()));
+            CreateNestedOperationProperties(
+                operation,
+                operationComplexityText,
+                iterationComplexityText,
+                combinedComplexityText),
+            operation,
+            operationComplexityText,
+            iterationComplexityText,
+            combinedComplexityText));
     }
 
     private static void ReportMaterialization(
@@ -300,13 +315,23 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         ComplexityExpression combinedComplexity = ComplexityComposer.Nested(
             iterationComplexity,
             invocationComplexity);
+        string operation = FormatOperation(methodSymbol);
+        string operationComplexityText = invocationComplexity.ToBigONotation();
+        string iterationComplexityText = iterationComplexity.ToBigONotation();
+        string combinedComplexityText = combinedComplexity.ToBigONotation();
 
         diagnostics.Add(Diagnostic.Create(
             DiagnosticDescriptors.MaterializationInsideIteration,
             invocation.GetLocation(),
-            FormatOperation(methodSymbol),
-            iterationComplexity.ToBigONotation(),
-            combinedComplexity.ToBigONotation()));
+            CreateNestedOperationProperties(
+                operation,
+                operationComplexityText,
+                iterationComplexityText,
+                combinedComplexityText),
+            operation,
+            operationComplexityText,
+            iterationComplexityText,
+            combinedComplexityText));
     }
 
     private static void ReportOrdering(
@@ -319,13 +344,23 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         ComplexityExpression combinedComplexity = ComplexityComposer.Nested(
             iterationComplexity,
             consumedComplexity);
+        string operation = FormatOperation(methodSymbol);
+        string operationComplexityText = consumedComplexity.ToBigONotation();
+        string iterationComplexityText = iterationComplexity.ToBigONotation();
+        string combinedComplexityText = combinedComplexity.ToBigONotation();
 
         diagnostics.Add(Diagnostic.Create(
             DiagnosticDescriptors.OrderingInsideIteration,
             invocation.GetLocation(),
-            FormatOperation(methodSymbol),
-            iterationComplexity.ToBigONotation(),
-            combinedComplexity.ToBigONotation()));
+            CreateNestedOperationProperties(
+                operation,
+                operationComplexityText,
+                iterationComplexityText,
+                combinedComplexityText),
+            operation,
+            operationComplexityText,
+            iterationComplexityText,
+            combinedComplexityText));
     }
 
     private static void ReportInputDependentCall(
@@ -338,14 +373,36 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         ComplexityExpression combinedComplexity = ComplexityComposer.Nested(
             iterationComplexity,
             invocationComplexity);
+        string operation = FormatOperation(methodSymbol);
+        string operationComplexityText = invocationComplexity.ToBigONotation();
+        string iterationComplexityText = iterationComplexity.ToBigONotation();
+        string combinedComplexityText = combinedComplexity.ToBigONotation();
 
         diagnostics.Add(Diagnostic.Create(
             DiagnosticDescriptors.InputDependentCallInsideIteration,
             invocation.GetLocation(),
-            FormatOperation(methodSymbol),
-            invocationComplexity.ToBigONotation(),
-            iterationComplexity.ToBigONotation(),
-            combinedComplexity.ToBigONotation()));
+            CreateNestedOperationProperties(
+                operation,
+                operationComplexityText,
+                iterationComplexityText,
+                combinedComplexityText),
+            operation,
+            operationComplexityText,
+            iterationComplexityText,
+            combinedComplexityText));
+    }
+
+    private static ImmutableDictionary<string, string?> CreateNestedOperationProperties(
+        string operation,
+        string operationComplexity,
+        string iterationComplexity,
+        string combinedComplexity)
+    {
+        return ImmutableDictionary<string, string?>.Empty
+            .Add(DiagnosticPropertyNames.Operation, operation)
+            .Add(DiagnosticPropertyNames.OperationComplexity, operationComplexity)
+            .Add(DiagnosticPropertyNames.IterationComplexity, iterationComplexity)
+            .Add(DiagnosticPropertyNames.CombinedComplexity, combinedComplexity);
     }
 
     private static bool TryGetContainingIterationComplexity(

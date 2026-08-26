@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using ComplexityAnalysis.Analyzers.Analysis;
 using ComplexityAnalysis.Analyzers.Analysis.KnownOperations;
 using ComplexityAnalysis.Analyzers.Configuration;
+using ComplexityAnalysis.Analyzers.Diagnostics;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
@@ -69,6 +70,8 @@ public sealed class AnalyzerCharacterizationBaselineTests
         string source,
         string expectedMessage)
     {
+        _ = expectedMessage ?? throw new ArgumentNullException(nameof(expectedMessage));
+
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
             Parse(source),
             enableEstimatedComplexity: true);
@@ -78,6 +81,10 @@ public sealed class AnalyzerCharacterizationBaselineTests
             .Single(diagnostic => GetDiagnosticText(diagnostic) == "M");
 
         Assert.Equal(expectedMessage, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertProperty(
+            diagnostic,
+            DiagnosticPropertyNames.Complexity,
+            expectedMessage[(expectedMessage.IndexOf(" is ", StringComparison.Ordinal) + " is ".Length)..]);
         Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
         Assert.True(diagnostic.Location.IsInSource);
         _ = scenario;
@@ -194,7 +201,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 }
             }
             """,
-            "Estimated time complexity: O(1)"
+            "Estimated algorithmic complexity for 'M' is O(1)"
         },
         {
             "straight-line block",
@@ -209,7 +216,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 }
             }
             """,
-            "Estimated time complexity: O(1)"
+            "Estimated algorithmic complexity for 'M' is O(1)"
         },
         {
             "expression-bodied method",
@@ -219,7 +226,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 int M(int value) => value + 1;
             }
             """,
-            "Estimated time complexity: O(1)"
+            "Estimated algorithmic complexity for 'M' is O(1)"
         },
         {
             "single loop",
@@ -235,7 +242,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 }
             }
             """,
-            "Estimated time complexity: O(n)"
+            "Estimated algorithmic complexity for 'M' is O(n)"
         },
         {
             "nested loops over same input",
@@ -254,7 +261,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 }
             }
             """,
-            "Estimated time complexity: O(n\u00b2)"
+            "Estimated algorithmic complexity for 'M' is O(n\u00b2)"
         },
         {
             "independent sequential loops",
@@ -275,7 +282,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 }
             }
             """,
-            "Estimated time complexity: O(n + m)"
+            "Estimated algorithmic complexity for 'M' is O(n + m)"
         },
         {
             "independent nested loops",
@@ -294,7 +301,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 }
             }
             """,
-            "Estimated time complexity: O(n \u00b7 m)"
+            "Estimated algorithmic complexity for 'M' is O(n \u00b7 m)"
         }
     };
 
@@ -959,6 +966,15 @@ public sealed class AnalyzerCharacterizationBaselineTests
         ];
 
         Assert.Empty(errors);
+    }
+
+    private static void AssertProperty(
+        Diagnostic diagnostic,
+        string key,
+        string expectedValue)
+    {
+        Assert.True(diagnostic.Properties.TryGetValue(key, out string? actualValue));
+        Assert.Equal(expectedValue, actualValue);
     }
 
     private static TestAnalyzerConfigOptions Options(params (string Key, string Value)[] options)
