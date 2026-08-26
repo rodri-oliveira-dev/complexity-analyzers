@@ -233,6 +233,10 @@ O analyzer foi projetado para execução dentro do compilador/IDE e mantém hot 
 
 A validação de performance usa workloads sintéticos determinísticos e invariantes estruturais em vez de thresholds estreitos dependentes da máquina. O caminho `ReportAnalyzer=true` do compilador é usado para verificar o reporting de execução do analyzer.
 
+Budgets de performance fazem parte do contrato do analyzer. O traversal de métodos-fonte usa por padrão profundidade de chamada `5` e `32` expansões não cacheadas de métodos-fonte por raiz, com hard maximums públicos de `16` e `128`. A resolução de recorrências permanece limitada pelas formas suportadas e por limites numéricos fixos no solver restrito de Akra-Bazzi. Nas fronteiras de budget, o analyzer mantém os resultados afetados conservadores, normalmente `Unknown`.
+
+O CI trata checks estruturais determinísticos como gates bloqueantes: traversal limitado, ownership de cache, comportamento de cancellation, exclusão de código gerado, layout do pacote e compatibilidade de consumo. Tempo decorrido e timing de analyzer reportado pelo compilador são sinais informativos de tendência, a menos que evidência repetida mostre uma regressão material. A política detalhada de regressão e os comandos locais estão documentados em [`performance/README.md`](../../performance/README.md).
+
 A validação do contrato do pacote garante que `ComplexityAnalysis.Analyzers.dll` seja empacotado em `analyzers/dotnet/cs/`, e não em `lib/`, e que as dependências de autoria não se tornem dependências de runtime do consumidor.
 
 O CI também valida o consumo do pacote com hosts SDK .NET 8, .NET 9 e .NET 10.

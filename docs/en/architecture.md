@@ -233,6 +233,10 @@ The analyzer is designed for compiler/IDE execution and keeps hot paths free of 
 
 Performance validation uses deterministic synthetic workloads and structural invariants rather than narrow machine-specific timing thresholds. The compiler `ReportAnalyzer=true` path is used to verify analyzer execution reporting.
 
+Performance budgets are part of the analyzer contract. Source-method traversal defaults to call depth `5` and `32` uncached source-method expansions per root, with public hard maximums of `16` and `128`. Recurrence solving remains bounded by supported recurrence shapes and fixed numerical limits for the restricted Akra-Bazzi solver. At budget boundaries, the analyzer keeps affected results conservative, normally `Unknown`.
+
+CI treats deterministic structural checks as hard gates: bounded traversal, cache ownership, cancellation behavior, generated-code exclusion, package layout, and consumer compatibility. Elapsed time and compiler analyzer timing are informational trend signals unless repeated evidence shows a material regression. The detailed regression policy and local commands are documented in [`performance/README.md`](../../performance/README.md).
+
 Package contract validation ensures that `ComplexityAnalysis.Analyzers.dll` is packed under `analyzers/dotnet/cs/`, not `lib/`, and that authoring dependencies do not become consumer runtime dependencies.
 
 CI also validates package consumption with .NET 8, .NET 9, and .NET 10 SDK hosts.
