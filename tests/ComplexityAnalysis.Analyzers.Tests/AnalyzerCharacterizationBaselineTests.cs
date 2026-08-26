@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using ComplexityAnalysis.Analyzers.Analysis;
+using ComplexityAnalysis.Analyzers.Analysis.KnownOperations;
 using ComplexityAnalysis.Analyzers.Configuration;
 using ComplexityAnalysis.Analyzers.Model;
 
@@ -100,11 +101,30 @@ public sealed class AnalyzerCharacterizationBaselineTests
     public void Custom_same_name_operations_are_not_classified_as_bcl_or_linq_by_name(
         string scenario,
         string source,
-        string expectedComplexity)
+        string expectedComplexity,
+        string expectedContainingType)
     {
-        ComplexityExpression complexity = AnalyzeMethod(source);
+        MethodFacts facts = CreateMethodFacts(source);
+        InvocationExpressionSyntax invocation = facts.MethodDeclaration
+            .DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Single();
+        IMethodSymbol methodSymbol = facts.SemanticModel
+            .GetSymbolInfo(invocation, CancellationToken.None)
+            .Symbol as IMethodSymbol
+            ?? throw new InvalidOperationException("Expected invocation to resolve to a method symbol.");
+        var resolver = new KnownOperationResolver(KnownOperationRegistry.Default);
+
+        ComplexityExpression complexity = MethodComplexityExtractor.AnalyzeMethod(
+            facts.MethodDeclaration,
+            facts.SemanticModel,
+            CancellationToken.None);
 
         Assert.Equal(expectedComplexity, complexity.ToBigONotation());
+        Assert.Equal(
+            expectedContainingType,
+            methodSymbol.ContainingType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat));
+        Assert.False(resolver.TryResolve(methodSymbol, CancellationToken.None, out _));
         _ = scenario;
     }
 
@@ -140,22 +160,23 @@ public sealed class AnalyzerCharacterizationBaselineTests
     }
 
     [Fact]
-    public async Task Analyzer_pipeline_respects_an_already_cancelled_token()
+    public void Analyzer_callback_path_passes_cancellation_to_method_extractor()
     {
-        SyntaxTree syntaxTree = Parse(
+        MethodFacts facts = CreateMethodFacts(
             """
             public sealed class Sample
             {
                 int M() => 42;
             }
             """);
-        CSharpCompilation compilation = CreateCompilation([syntaxTree], enableEstimatedComplexity: true);
-        CompilationWithAnalyzers compilationWithAnalyzers = compilation.WithAnalyzers([new ComplexityAnalyzer()]);
         using var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.Cancel();
 
-        _ = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync(cancellationTokenSource.Token));
+        _ = Assert.Throws<OperationCanceledException>(() =>
+            MethodComplexityExtractor.AnalyzeMethod(
+                facts.MethodDeclaration,
+                facts.SemanticModel,
+                cancellationTokenSource.Token));
     }
 
     public static TheoryData<string, string, string> BasicAndIterationEstimateCases
@@ -757,7 +778,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
         }
     };
 
-    public static TheoryData<string, string, string> CustomSameNameOperationCases
+    public static TheoryData<string, string, string, string> CustomSameNameOperationCases
     {
         get;
     } = new()
@@ -775,7 +796,8 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 bool M(CustomCollection values) => values.Contains(42);
             }
             """,
-            "O(1)"
+            "O(1)",
+            "CustomCollection"
         },
         {
             "custom Where extension method",
@@ -795,7 +817,8 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 }
             }
             """,
-            "O(1)"
+            "O(1)",
+            "MyCompany.QueryExtensions"
         },
         {
             "custom ToList instance method",
@@ -810,7 +833,8 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 int M(CustomSequence values) => values.ToList();
             }
             """,
-            "O(1)"
+            "O(1)",
+            "CustomSequence"
         },
         {
             "custom Count extension method",
@@ -830,11 +854,22 @@ public sealed class AnalyzerCharacterizationBaselineTests
                 }
             }
             """,
-            "O(1)"
+            "O(1)",
+            "MyCompany.QueryExtensions"
         }
     };
 
     private static ComplexityExpression AnalyzeMethod(string source)
+    {
+        MethodFacts facts = CreateMethodFacts(source);
+
+        return MethodComplexityExtractor.AnalyzeMethod(
+            facts.MethodDeclaration,
+            facts.SemanticModel,
+            CancellationToken.None);
+    }
+
+    private static MethodFacts CreateMethodFacts(string source)
     {
         SyntaxTree syntaxTree = Parse(source);
         CSharpCompilation compilation = CreateCompilation([syntaxTree]);
@@ -847,10 +882,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
             .Single(method => StringComparer.Ordinal.Equals(method.Identifier.ValueText, "M"));
         SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
 
-        return MethodComplexityExtractor.AnalyzeMethod(
-            methodDeclaration,
-            semanticModel,
-            CancellationToken.None);
+        return new MethodFacts(methodDeclaration, semanticModel);
     }
 
     private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
@@ -1004,4 +1036,8 @@ public sealed class AnalyzerCharacterizationBaselineTests
         string Category,
         DiagnosticSeverity DefaultSeverity,
         bool IsEnabledByDefault);
+
+    private sealed record MethodFacts(
+        MethodDeclarationSyntax MethodDeclaration,
+        SemanticModel SemanticModel);
 }
