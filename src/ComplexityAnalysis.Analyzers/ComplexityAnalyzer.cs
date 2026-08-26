@@ -50,11 +50,24 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationEndAction(AnalyzeCompilation);
         context.RegisterSyntaxNodeAction(
-            syntaxContext => AnalyzeMethodDeclaration(syntaxContext, interproceduralContext),
-            SyntaxKind.MethodDeclaration);
+            syntaxContext => AnalyzeExecutableMember(syntaxContext, interproceduralContext),
+            SyntaxKind.MethodDeclaration,
+            SyntaxKind.ConstructorDeclaration,
+            SyntaxKind.GetAccessorDeclaration,
+            SyntaxKind.SetAccessorDeclaration,
+            SyntaxKind.InitAccessorDeclaration,
+            SyntaxKind.AddAccessorDeclaration,
+            SyntaxKind.RemoveAccessorDeclaration,
+            SyntaxKind.OperatorDeclaration,
+            SyntaxKind.ConversionOperatorDeclaration,
+            SyntaxKind.LocalFunctionStatement,
+            SyntaxKind.SimpleLambdaExpression,
+            SyntaxKind.ParenthesizedLambdaExpression,
+            SyntaxKind.AnonymousMethodExpression,
+            SyntaxKind.PropertyDeclaration);
     }
 
-    private static void AnalyzeMethodDeclaration(
+    private static void AnalyzeExecutableMember(
         SyntaxNodeAnalysisContext context,
         InterproceduralAnalysisContext interproceduralContext)
     {
@@ -62,9 +75,8 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
 
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        MethodDeclarationSyntax methodDeclaration = (MethodDeclarationSyntax)context.Node;
-        if (!ExecutableMember.TryCreateOrdinaryMethod(
-            methodDeclaration,
+        if (!ExecutableMember.TryCreate(
+            context.Node,
             context.SemanticModel,
             context.CancellationToken,
             out ExecutableMember? member)

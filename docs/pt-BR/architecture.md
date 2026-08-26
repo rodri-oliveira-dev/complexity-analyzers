@@ -16,7 +16,7 @@ sintaxe Roslyn + SemanticModel
     |
     v
 análise de executable member
-    (atualmente registrada apenas para métodos ordinários)
+    (constructs executáveis C# suportados)
     |
     +-- configuração do analyzer
     +-- resolução de tamanho de entrada
@@ -136,11 +136,12 @@ A principal camada de análise fica em:
 src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-A análise parte de uma abstração interna de executable member e avalia informações sintáticas e semânticas suportadas. No escopo público atual do analyzer, essa abstração é criada apenas para métodos C# ordinários, incluindo métodos ordinários com bloco e expression body. As responsabilidades incluem extração de membro/body, resolução de tamanho de entrada, classificação de operações básicas, análise de limites de loop, mapeamento de operações conhecidas, propagação de chamadas a métodos-fonte e tratamento de recursão direta.
+A análise parte de uma abstração interna de executable member e avalia informações sintáticas e semânticas suportadas. O analyzer normaliza métodos ordinários, construtores, accessors de propriedades/eventos, operadores, operadores de conversão, local functions, lambdas, anonymous methods e formas expression-bodied suportadas para o mesmo pipeline quando identidade de símbolo, ownership de body e localização de diagnóstico estão disponíveis. As responsabilidades incluem extração de membro/body, resolução de tamanho de entrada, classificação de operações básicas, análise de limites de loop, mapeamento de operações conhecidas, propagação de chamadas a métodos-fonte e tratamento de recursão direta.
 
 Alguns componentes representativos são:
 
 - `ExecutableMember` para identidade, body, nome de exibição e localização de diagnóstico do membro analisado;
+- `ExecutableMemberSyntax` para fronteiras de body executável que impedem local functions, lambdas e anonymous methods aninhados de inflarem o pai lexical;
 - `MethodComplexityExtractor` para composição do método e de seu corpo;
 - `MethodAnalysisContext` para contexto semântico e dimensões de entrada;
 - `InputSizeResolver` para dimensões canônicas como `n`, `m`, `k`, `p` e variáveis posteriores;
@@ -149,6 +150,10 @@ Alguns componentes representativos são:
 - `KnownOperationComplexityAnalyzer` para custos BCL/LINQ suportados.
 
 O analyzer não exige um call graph completo da compilation ou da solution.
+Constructs executáveis aninhados são analisados como raízes próprias. Um membro
+pai não atravessa automaticamente o body de uma local function, lambda ou
+anonymous method, salvo quando esse executável aninhado é alcançado por um
+caminho de chamada suportado.
 
 ## Operações BCL e LINQ conhecidas
 
@@ -188,7 +193,7 @@ complexidade do Caller
 
 O traversal é sob demanda. Um método-fonte só é analisado quando é alcançado a partir da raiz atual, a resolução de operação conhecida não se aplica, o dispatch é seguro e o budget configurado/interno permite a expansão.
 
-O dispatch suportado inclui métodos static, private, métodos ordinários não virtuais e dispatch sealed quando o alvo de runtime pode ser comprovado. Dispatch virtual/interface inseguro, dynamic dispatch, delegates, reflection, métodos externos disponíveis apenas em metadata, construtores, propriedades, operadores, local functions e lambdas como alvos independentes permanecem fora do escopo interprocedural suportado.
+O dispatch suportado inclui métodos static, private, métodos ordinários não virtuais, dispatch sealed quando o alvo de runtime pode ser comprovado e invocações diretas de local functions. Dispatch virtual/interface inseguro, dynamic dispatch, delegates, reflection, métodos externos disponíveis apenas em metadata, construtores, acesso a propriedades, acesso a eventos, operadores, conversões, lambdas e anonymous methods como callees permanecem fora do escopo interprocedural suportado.
 
 Ciclos são detectados de forma conservadora. Recursão direta pode ser tratada pelo pipeline de recorrências; recursão mútua é detectada, mas não resolvida.
 

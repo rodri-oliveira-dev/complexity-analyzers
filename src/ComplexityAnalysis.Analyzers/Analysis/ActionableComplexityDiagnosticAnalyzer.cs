@@ -71,11 +71,11 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
 
         AnalyzeRecursiveMember(member, context, diagnostics);
 
-        foreach (InvocationExpressionSyntax invocation in member.Declaration.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        foreach (InvocationExpressionSyntax invocation in ExecutableMemberSyntax.DescendantNodesInOwnBody<InvocationExpressionSyntax>(member))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            AnalyzeInvocation(invocation, context, diagnostics);
+            AnalyzeInvocation(invocation, member, context, diagnostics);
         }
 
         return diagnostics.ToImmutable();
@@ -107,10 +107,11 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
 
     private static void AnalyzeInvocation(
         InvocationExpressionSyntax invocation,
+        ExecutableMember member,
         MethodAnalysisContext context,
         ImmutableArray<Diagnostic>.Builder diagnostics)
     {
-        if (!TryGetContainingIterationComplexity(invocation, context, out ComplexityExpression iterationComplexity))
+        if (!TryGetContainingIterationComplexity(invocation, member, context, out ComplexityExpression iterationComplexity))
         {
             return;
         }
@@ -282,9 +283,15 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         InvocationExpressionSyntax invocation,
         MethodAnalysisContext context)
     {
-        foreach (InvocationExpressionSyntax descendant in invocation.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        foreach (InvocationExpressionSyntax descendant
+            in ExecutableMemberSyntax.DescendantNodesAndSelfExcludingNestedExecutableBodies<InvocationExpressionSyntax>(invocation))
         {
             context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (ReferenceEquals(descendant, invocation))
+            {
+                continue;
+            }
 
             if (KnownOperationInvocation.TryResolve(descendant, context, Resolver, out _, out KnownOperationMapping? mapping)
                 && mapping is not null
@@ -429,6 +436,7 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
 
     private static bool TryGetContainingIterationComplexity(
         InvocationExpressionSyntax invocation,
+        ExecutableMember member,
         MethodAnalysisContext context,
         out ComplexityExpression iterationComplexity)
     {
@@ -439,7 +447,8 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            if (!TryGetLoopBody(ancestor, out StatementSyntax? body)
+            if (!member.Body.Contains(ancestor.Span)
+                || !TryGetLoopBody(ancestor, out StatementSyntax? body)
                 || body is null
                 || !body.Span.Contains(invocation.Span))
             {

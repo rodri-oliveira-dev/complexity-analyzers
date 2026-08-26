@@ -88,9 +88,16 @@ internal sealed class SourceMethodResolver
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (syntaxReference.GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration)
+            SyntaxNode syntax = syntaxReference.GetSyntax(cancellationToken);
+            if (syntax is MethodDeclarationSyntax declaration)
             {
                 member = ExecutableMember.CreateOrdinaryMethod(declaration, methodSymbol);
+                return true;
+            }
+
+            if (syntax is LocalFunctionStatementSyntax localFunction)
+            {
+                member = ExecutableMember.CreateLocalFunction(localFunction, methodSymbol);
                 return true;
             }
         }
@@ -103,6 +110,12 @@ internal sealed class SourceMethodResolver
         IMethodSymbol targetMethodSymbol,
         IMethodSymbol sourceMethodDefinition)
     {
+        if (targetMethodSymbol.MethodKind == MethodKind.LocalFunction
+            && sourceMethodDefinition.MethodKind == MethodKind.LocalFunction)
+        {
+            return true;
+        }
+
         bool isUnsupportedDispatch = targetMethodSymbol.MethodKind == MethodKind.DelegateInvoke
             || sourceMethodDefinition.MethodKind != MethodKind.Ordinary
             || IsInterfaceMethod(targetMethodSymbol)

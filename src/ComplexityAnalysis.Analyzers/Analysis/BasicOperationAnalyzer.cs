@@ -51,6 +51,8 @@ internal sealed class BasicOperationAnalyzer
                 ? ComplexityFactory.Constant()
                 : ComplexityFactory.Unknown(),
             ParenthesizedExpressionSyntax parenthesized => AnalyzeExpression(parenthesized.Expression),
+            LambdaExpressionSyntax => ComplexityFactory.Constant(),
+            AnonymousMethodExpressionSyntax => ComplexityFactory.Constant(),
             BinaryExpressionSyntax binary => AnalyzeBinaryExpression(binary),
             AssignmentExpressionSyntax assignment => AnalyzeAssignment(assignment),
             PrefixUnaryExpressionSyntax prefixUnary => AnalyzePrefixUnary(prefixUnary),

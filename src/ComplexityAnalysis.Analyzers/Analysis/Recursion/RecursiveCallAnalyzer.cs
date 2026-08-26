@@ -169,6 +169,9 @@ internal sealed class RecursiveCallAnalyzer
             ReturnStatementSyntax returnStatement => AnalyzeReturnStatement(returnStatement, context, localFacts),
             ExpressionStatementSyntax expressionStatement => AnalyzeExpressionStatement(expressionStatement, context, localFacts),
             LocalDeclarationStatementSyntax localDeclaration => AnalyzeLocalDeclaration(localDeclaration, context, localFacts),
+            LocalFunctionStatementSyntax => PathSummary.Single(
+                RecursivePathState.Active(ImmutableArray<RecursiveCallShape>.Empty, localFacts),
+                ImmutableArray<BaseCaseEvidence>.Empty),
             EmptyStatementSyntax => PathSummary.Single(
                 RecursivePathState.Active(ImmutableArray<RecursiveCallShape>.Empty, localFacts),
                 ImmutableArray<BaseCaseEvidence>.Empty),
@@ -395,9 +398,8 @@ internal sealed class RecursiveCallAnalyzer
         ImmutableArray<RecursiveCallShape>.Builder calls =
             ImmutableArray.CreateBuilder<RecursiveCallShape>();
 
-        foreach (InvocationExpressionSyntax invocation in node
-            .DescendantNodesAndSelf()
-            .OfType<InvocationExpressionSyntax>())
+        foreach (InvocationExpressionSyntax invocation
+            in ExecutableMemberSyntax.DescendantNodesAndSelfExcludingNestedExecutableBodies<InvocationExpressionSyntax>(node))
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
@@ -423,8 +425,7 @@ internal sealed class RecursiveCallAnalyzer
         SyntaxNode node,
         MethodAnalysisContext context)
     {
-        return node.DescendantNodesAndSelf()
-            .OfType<InvocationExpressionSyntax>()
+        return ExecutableMemberSyntax.DescendantNodesAndSelfExcludingNestedExecutableBodies<InvocationExpressionSyntax>(node)
             .Any(invocation => IsDirectRecursiveInvocation(invocation, context, out _));
     }
 

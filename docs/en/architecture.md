@@ -16,7 +16,7 @@ Roslyn syntax + SemanticModel
     |
     v
 Executable-member analysis
-    (currently registered only for ordinary methods)
+    (supported C# executable constructs)
     |
     +-- analyzer configuration
     +-- input-size resolution
@@ -136,11 +136,12 @@ The main analysis layer lives under:
 src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-Analysis starts from an internal executable-member abstraction and evaluates supported syntax and semantic facts. In the current public analyzer scope, that abstraction is created only for ordinary C# methods, including block-bodied and expression-bodied ordinary methods. Responsibilities include member/body extraction, input-size resolution, basic-operation classification, loop-bound analysis, known-operation mapping, source-call propagation, and direct-recursion handling.
+Analysis starts from an internal executable-member abstraction and evaluates supported syntax and semantic facts. The analyzer normalizes ordinary methods, constructors, property/event accessors, operators, conversion operators, local functions, lambdas, anonymous methods, and supported expression-bodied forms into the same member pipeline when symbol identity, body ownership, and diagnostic location are available. Responsibilities include member/body extraction, input-size resolution, basic-operation classification, loop-bound analysis, known-operation mapping, source-call propagation, and direct-recursion handling.
 
 Representative components include:
 
 - `ExecutableMember` for the analyzed member identity, body, display name, and diagnostic location;
+- `ExecutableMemberSyntax` for executable-body boundaries that keep nested local functions, lambdas, and anonymous methods from inflating their lexical parent;
 - `MethodComplexityExtractor` for method/body composition;
 - `MethodAnalysisContext` for semantic and input-size context;
 - `InputSizeResolver` for canonical dimensions such as `n`, `m`, `k`, `p`, and later variables;
@@ -149,6 +150,9 @@ Representative components include:
 - `KnownOperationComplexityAnalyzer` for supported BCL/LINQ costs.
 
 The analyzer does not require a whole-compilation or whole-solution call graph.
+Nested executable constructs are analyzed as their own roots. A parent member does
+not automatically traverse a local function, lambda, or anonymous method body
+unless that nested executable is reached through a supported call path.
 
 ## Known BCL and LINQ operations
 
@@ -188,7 +192,7 @@ Caller complexity
 
 Traversal is demand-driven. A source method is analyzed only when reached from the current root, known-operation resolution does not apply, dispatch is safe, and the configured/internal analysis budget allows expansion.
 
-Supported source dispatch includes static methods, private methods, ordinary non-virtual methods, and sealed dispatch when the runtime target is proven. Unsafe virtual/interface dispatch, dynamic dispatch, delegates, reflection, external metadata-only methods, constructors, properties, operators, local functions, and lambdas as independent call targets remain outside the supported interprocedural scope.
+Supported source dispatch includes static methods, private methods, ordinary non-virtual methods, sealed dispatch when the runtime target is proven, and direct local-function invocations. Unsafe virtual/interface dispatch, dynamic dispatch, delegates, reflection, external metadata-only methods, constructors, property access, event access, operators, conversions, lambdas, and anonymous methods as callees remain outside the supported interprocedural scope.
 
 Cycles are detected conservatively. Direct recursion can be handled by the recurrence pipeline; mutual recursion is detected but not solved.
 

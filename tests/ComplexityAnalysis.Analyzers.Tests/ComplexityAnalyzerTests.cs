@@ -114,7 +114,7 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
-    public async Task Analyzer_does_not_register_local_functions_as_executable_member_roots_yet()
+    public async Task Analyzer_registers_local_functions_as_independent_executable_member_roots()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
             """
@@ -124,7 +124,14 @@ public sealed class ComplexityAnalyzerTests
 
                 public int M()
                 {
-                    int Local() => 42;
+                    int Local(int[] values)
+                    {
+                        foreach (var value in values)
+                        {
+                        }
+
+                        return 42;
+                    }
 
                     return 42;
                 }
@@ -132,13 +139,63 @@ public sealed class ComplexityAnalyzerTests
             """,
             enableComplexity: true);
 
-        Diagnostic diagnostic = Assert.Single(
-            diagnostics,
-            diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
-        AssertDiagnosticText(diagnostic, "Ordinary");
-        Assert.Equal(
-            "Estimated algorithmic complexity for 'Ordinary' is O(1)",
-            diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        ImmutableArray<Diagnostic> estimates =
+        [
+            .. diagnostics
+                .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+                .OrderBy(diagnostic => diagnostic.Location.SourceSpan.Start)
+        ];
+
+        Assert.Equal(3, estimates.Length);
+        AssertDiagnosticText(estimates[0], "Ordinary");
+        AssertDiagnosticText(estimates[1], "M");
+        AssertDiagnosticText(estimates[2], "Local");
+        Assert.Equal("Estimated algorithmic complexity for 'Ordinary' is O(1)", estimates[0].GetMessage(CultureInfo.InvariantCulture));
+        Assert.Equal("Estimated algorithmic complexity for 'M' is O(1)", estimates[1].GetMessage(CultureInfo.InvariantCulture));
+        Assert.Equal("Estimated algorithmic complexity for 'Local' is O(n)", estimates[2].GetMessage(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task Analyzer_uses_local_function_complexity_when_it_is_invoked_by_parent()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public void M(int[] values)
+                {
+                    Local(values);
+
+                    void Local(int[] items)
+                    {
+                        foreach (var item in items)
+                        {
+                        }
+                    }
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        ImmutableArray<Diagnostic> estimates =
+        [
+            .. diagnostics
+                .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+                .OrderBy(diagnostic => diagnostic.Location.SourceSpan.Start)
+        ];
+
+        Assert.Collection(
+            estimates,
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "M");
+                Assert.Equal("Estimated algorithmic complexity for 'M' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "Local");
+                Assert.Equal("Estimated algorithmic complexity for 'Local' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            });
     }
 
     [Theory]
@@ -240,6 +297,309 @@ public sealed class ComplexityAnalyzerTests
 
         Assert.Equal("Estimated algorithmic complexity for 'M' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
         AssertProperty(diagnostic, DiagnosticPropertyNames.Complexity, "O(n)");
+    }
+
+    [Fact]
+    public async Task Analyzer_reports_constructor_complexity_without_changing_method_locations()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public Sample(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                    }
+                }
+
+                public int M() => 42;
+            }
+            """,
+            enableComplexity: true);
+
+        Diagnostic constructor = diagnostics
+            .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+            .Single(diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture).Contains("Sample.ctor", StringComparison.Ordinal));
+        Diagnostic method = diagnostics
+            .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+            .Single(diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture).Contains("'M'", StringComparison.Ordinal));
+
+        AssertDiagnosticText(constructor, "Sample");
+        Assert.Equal("Estimated algorithmic complexity for 'Sample.ctor' is O(n)", constructor.GetMessage(CultureInfo.InvariantCulture));
+        AssertDiagnosticText(method, "M");
+        Assert.Equal("Estimated algorithmic complexity for 'M' is O(1)", method.GetMessage(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task Analyzer_reports_accessor_event_and_expression_bodied_property_roots()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            using System;
+
+            public sealed class Sample
+            {
+                public int Count
+                {
+                    get
+                    {
+                        return 42;
+                    }
+                }
+
+                public int[] Items
+                {
+                    set
+                    {
+                        foreach (var valueItem in value)
+                        {
+                        }
+                    }
+                }
+
+                public int[] InitOnly
+                {
+                    init
+                    {
+                        foreach (var valueItem in value)
+                        {
+                        }
+                    }
+                }
+
+                public event Action Changed
+                {
+                    add
+                    {
+                    }
+
+                    remove
+                    {
+                    }
+                }
+
+                public int Answer => 42;
+            }
+            """,
+            enableComplexity: true);
+
+        ImmutableArray<Diagnostic> estimates =
+        [
+            .. diagnostics
+                .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+                .OrderBy(diagnostic => diagnostic.Location.SourceSpan.Start)
+        ];
+
+        Assert.Collection(
+            estimates,
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "get");
+                Assert.Equal("Estimated algorithmic complexity for 'Count.get' is O(1)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "set");
+                Assert.Equal("Estimated algorithmic complexity for 'Items.set' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "init");
+                Assert.Equal("Estimated algorithmic complexity for 'InitOnly.set' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "add");
+                Assert.Equal("Estimated algorithmic complexity for 'Changed.add' is O(1)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "remove");
+                Assert.Equal("Estimated algorithmic complexity for 'Changed.remove' is O(1)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "Answer");
+                Assert.Equal("Estimated algorithmic complexity for 'Answer.get' is O(1)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            });
+    }
+
+    [Fact]
+    public async Task Analyzer_reports_operator_and_conversion_operator_roots()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public static Sample operator !(Sample value) => value;
+
+                public static Sample operator +(Sample left, int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                    }
+
+                    return left;
+                }
+
+                public static implicit operator Sample(int[] values)
+                {
+                    foreach (var value in values)
+                    {
+                    }
+
+                    return null;
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        ImmutableArray<Diagnostic> estimates =
+        [
+            .. diagnostics
+                .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+                .OrderBy(diagnostic => diagnostic.Location.SourceSpan.Start)
+        ];
+
+        Assert.Collection(
+            estimates,
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "operator");
+                Assert.Equal("Estimated algorithmic complexity for 'operator !' is O(1)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "operator");
+                Assert.Equal("Estimated algorithmic complexity for 'operator +' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "implicit");
+                Assert.Equal("Estimated algorithmic complexity for 'implicit operator Sample' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            });
+    }
+
+    [Fact]
+    public async Task Analyzer_reports_lambdas_and_anonymous_methods_without_parent_body_contamination()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            using System;
+
+            public sealed class Sample
+            {
+                public void M()
+                {
+                    Func<int, int> simple = x => x + 1;
+                    Action<int[]> parenthesized = (values) =>
+                    {
+                        foreach (var value in values)
+                        {
+                        }
+                    };
+                    Action<int[]> anonymous = delegate(int[] values)
+                    {
+                        foreach (var value in values)
+                        {
+                        }
+                    };
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        ImmutableArray<Diagnostic> estimates =
+        [
+            .. diagnostics
+                .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
+                .OrderBy(diagnostic => diagnostic.Location.SourceSpan.Start)
+        ];
+
+        Assert.Collection(
+            estimates,
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "M");
+                Assert.Equal("Estimated algorithmic complexity for 'M' is O(1)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "=>");
+                Assert.Equal("Estimated algorithmic complexity for 'lambda' is O(1)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "=>");
+                Assert.Equal("Estimated algorithmic complexity for 'lambda' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            },
+            diagnostic =>
+            {
+                AssertDiagnosticText(diagnostic, "delegate");
+                Assert.Equal("Estimated algorithmic complexity for 'anonymous method' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+            });
+    }
+
+    [Fact]
+    public async Task Analyzer_does_not_double_report_actionable_diagnostics_for_nested_lambda_bodies()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            using System;
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                public void M()
+                {
+                    Action<List<int>, List<int>> action = (items, blocked) =>
+                    {
+                        foreach (var item in items)
+                        {
+                            _ = blocked.Contains(item);
+                        }
+                    };
+                }
+            }
+            """);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == LinearLookupInsideIterationId);
+
+        AssertDiagnosticText(diagnostic, "blocked.Contains(item)");
+    }
+
+    [Fact]
+    public async Task Analyzer_does_not_treat_captured_variables_as_lambda_input_size_parameters()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            using System;
+
+            public sealed class Sample
+            {
+                public void M(int[] values)
+                {
+                    int count = values.Length;
+                    Action action = () =>
+                    {
+                        for (var i = 0; i < count; i++)
+                        {
+                        }
+                    };
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
+
+        AssertDiagnosticText(diagnostic, "M");
+        Assert.Equal("Estimated algorithmic complexity for 'M' is O(1)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
     }
 
     [Fact]
