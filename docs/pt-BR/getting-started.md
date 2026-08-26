@@ -6,11 +6,13 @@ Este guia explica como compilar, testar, empacotar e validar o `ComplexityAnalys
 
 ## Pré-requisitos
 
-- .NET SDK `10.0.100`, ou um SDK compatível selecionado pelo `global.json` da raiz.
+- .NET SDK `10.0.400`, ou um SDK compatível selecionado pelo `global.json` da raiz.
 - Git.
 - Um shell capaz de executar comandos `dotnet`.
 
 O projeto do analyzer targeteia `netstandard2.0` porque Roslyn Analyzers são carregados por hosts de compilador e IDE, e não pelo runtime da aplicação analisada. Os testes e as ferramentas do repositório usam o SDK selecionado pelo `global.json`.
+
+O SDK de build do repositório não é a versão mínima do host consumidor. Build e testes usam atualmente o SDK `10.0.400`; a compatibilidade do pacote é validada separadamente instalando o `.nupkg` gerado em projetos consumidores compilados pelos hosts SDK suportados.
 
 ## Clonar e compilar
 
@@ -46,6 +48,8 @@ analyzers/dotnet/cs/
 Ele não é empacotado como uma biblioteca de runtime normal em `lib/`. As dependências usadas para autoria do analyzer são assets privados e não devem se tornar dependências transitivas dos projetos consumidores.
 
 O projeto usa `README.md` como README do pacote e declara a URL do repositório, o tipo do repositório e a licença MIT nos metadados do pacote.
+
+O contrato do pacote também espera ausência de `.deps.json`, ausência de DLL duplicada do analyzer, ausência de asset runtime `lib/` para o assembly do analyzer e ausência de grupo de dependências transitivas de Roslyn no `.nuspec` gerado.
 
 ## Consumir o pacote local
 
@@ -162,6 +166,8 @@ O CI valida o consumo local do pacote nos hosts de SDK suportados:
 | .NET 10 LTS | `net10.0` |
 
 O assembly do analyzer targeteia `netstandard2.0`. A matriz de compatibilidade verifica se os hosts do compilador conseguem carregar e executar o pacote do analyzer, e não apenas se o projeto consumidor consegue targetear determinado framework.
+
+O analyzer é compilado contra `Microsoft.CodeAnalysis.CSharp` `4.8.0`, que resolve `Microsoft.CodeAnalysis.Common` `4.8.0`. Este é um baseline conservador de host Roslyn: upgrades de dependência exigem inspeção do pacote e execução bem-sucedida em consumidores de toda a matriz suportada antes do merge. `Microsoft.CodeAnalysis.Workspaces` está intencionalmente ausente porque o pacote não fornece code fixes nem features de IDE baseadas em workspace.
 
 ## Validação de performance
 

@@ -71,6 +71,23 @@ analyzers/dotnet/cs/
 
 Ele não é uma biblioteca de runtime. Aplicações consumidoras não chamam classes do analyzer, e as dependências usadas para autoria com Roslyn permanecem privadas em vez de serem expostas transitivamente.
 
+O SDK de build do repositório é uma preocupação separada. `global.json` seleciona o SDK `10.0.400` para restore, build, testes e pack do repositório, enquanto os hosts de compilador suportados são validados instalando o `.nupkg` produzido em projetos consumidores temporários.
+
+## Contratos de compatibilidade
+
+| Contrato | Valor atual |
+| --- | --- |
+| SDK de build do repositório | `.NET SDK 10.0.400` a partir de `global.json`. |
+| Versão de linguagem C# do repositório | `12.0`. |
+| Target framework do analyzer | `netstandard2.0`, preservado para compatibilidade com hosts de compilador/IDE. |
+| Baseline de API do compilador Roslyn | `Microsoft.CodeAnalysis.CSharp` `4.8.0`, resolvendo `Microsoft.CodeAnalysis.Common` `4.8.0`. |
+| Regras de autoria de analyzer | `Microsoft.CodeAnalysis.Analyzers` `3.11.0`. |
+| Matriz de hosts SDK suportados | Builds consumidores com `.NET 8`, `.NET 9` e `.NET 10` no CI. |
+| Path do analyzer no pacote | `analyzers/dotnet/cs/ComplexityAnalysis.Analyzers.dll`. |
+| Assets runtime do pacote | Sem asset `lib/` do analyzer e sem grupo de dependências transitivas de Roslyn. |
+
+Compilar contra packages Roslyn mais novos pode introduzir referências a APIs que hosts de compilador ou IDE mais antigos não conseguem carregar. Upgrades de Roslyn são, portanto, conservadores: propostas de atualização precisam manter assets Roslyn privados, inspecionar o pacote gerado, executar testes de contrato de package/consumer e validar todos os hosts SDK suportados antes do merge.
+
 ## Estrutura do repositório
 
 As principais áreas do produto são:
@@ -239,7 +256,7 @@ O CI trata checks estruturais determinísticos como gates bloqueantes: traversal
 
 A validação do contrato do pacote garante que `ComplexityAnalysis.Analyzers.dll` seja empacotado em `analyzers/dotnet/cs/`, e não em `lib/`, e que as dependências de autoria não se tornem dependências de runtime do consumidor.
 
-O CI também valida o consumo do pacote com hosts SDK .NET 8, .NET 9 e .NET 10.
+O CI também valida o consumo do pacote com hosts SDK .NET 8, .NET 9 e .NET 10. Cada job de compatibilidade restaura e compila um consumidor temporário usando o `.nupkg` real, habilita `BIG9000` como probe de carregamento do pacote, habilita `BIG1006` em um método quadrático conhecido, rejeita falhas de carregamento do analyzer e verifica que o pacote contribui assets de analyzer em vez de assets de compile/runtime.
 
 ## Por que não há dependência de Workspaces
 

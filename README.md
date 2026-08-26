@@ -105,7 +105,7 @@ Missing base cases, non-reducing arguments, unsupported recurrence shapes, unkno
 
 Prerequisites:
 
-- .NET SDK `10.0.100` or a compatible SDK selected by `global.json`.
+- .NET SDK `10.0.400` or a compatible SDK selected by `global.json`.
 - A shell capable of running `dotnet` commands.
 
 From the repository root:
