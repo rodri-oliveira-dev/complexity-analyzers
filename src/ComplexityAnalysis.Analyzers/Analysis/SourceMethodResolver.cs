@@ -55,12 +55,12 @@ internal sealed class SourceMethodResolver
             && TryGetSourceMethodDeclaration(
                 sourceMethodDefinition,
                 cancellationToken,
-                out MethodDeclarationSyntax? sourceMethodDeclaration)
-            && sourceMethodDeclaration is not null
+                out ExecutableMember? sourceMember)
+            && sourceMember is not null
             ? CallTargetResolution.SourceMethod(
                 targetMethodSymbol,
                 sourceMethodDefinition,
-                sourceMethodDeclaration)
+                sourceMember)
             : CallTargetResolution.Unsupported();
     }
 
@@ -73,14 +73,14 @@ internal sealed class SourceMethodResolver
     private static bool TryGetSourceMethodDeclaration(
         IMethodSymbol methodSymbol,
         CancellationToken cancellationToken,
-        out MethodDeclarationSyntax? methodDeclaration)
+        out ExecutableMember? member)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         ImmutableArray<SyntaxReference> syntaxReferences = methodSymbol.DeclaringSyntaxReferences;
         if (syntaxReferences.IsDefaultOrEmpty)
         {
-            methodDeclaration = null;
+            member = null;
             return false;
         }
 
@@ -90,12 +90,12 @@ internal sealed class SourceMethodResolver
 
             if (syntaxReference.GetSyntax(cancellationToken) is MethodDeclarationSyntax declaration)
             {
-                methodDeclaration = declaration;
+                member = ExecutableMember.CreateOrdinaryMethod(declaration, methodSymbol);
                 return true;
             }
         }
 
-        methodDeclaration = null;
+        member = null;
         return false;
     }
 

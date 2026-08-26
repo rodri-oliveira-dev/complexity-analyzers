@@ -25,14 +25,47 @@ internal sealed class RecursiveCallAnalyzer
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken)
-            ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        if (!ExecutableMember.TryCreateOrdinaryMethod(
+            methodDeclaration,
+            semanticModel,
+            cancellationToken,
+            out ExecutableMember? member)
+            || member is null)
+        {
+            throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        }
+
         MethodAnalysisContext context = MethodAnalysisContext.Create(
             semanticModel,
-            methodSymbol,
+            member.Symbol,
             cancellationToken);
 
-        return Analyze(methodDeclaration, context);
+        return Analyze(member, context);
+    }
+
+    internal RecursiveCallAnalysisResult Analyze(
+        ExecutableMember member,
+        MethodAnalysisContext context)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = context ?? throw new ArgumentNullException(nameof(context));
+
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        PathSummary summary = member.Body.Block is not null
+            ? AnalyzeBlock(member.Body.Block, context, LocalArgumentFacts.Empty)
+            : member.Body.Expression is not null
+                ? AnalyzeExpressionBody(member.Body.Expression, context)
+                : PathSummary.Unsupported("Only ordinary methods with a block or expression body are supported.");
+
+        return summary.IsSupported
+            ? RecursiveCallAnalysisResult.Supported(
+                DeduplicateBaseCases(summary.BaseCaseEvidence),
+                summary.Paths
+                    .Where(path => path.RecursiveCalls.Length > 0)
+                    .Select(path => new RecursiveExecutionPath(path.RecursiveCalls))
+                    .ToImmutableArray())
+            : RecursiveCallAnalysisResult.Unsupported(summary.UnsupportedReason ?? "The recursive call shape is unsupported.");
     }
 
     internal RecursiveCallAnalysisResult Analyze(
@@ -44,20 +77,8 @@ internal sealed class RecursiveCallAnalyzer
 
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        PathSummary summary = methodDeclaration.Body is not null
-            ? AnalyzeBlock(methodDeclaration.Body, context, LocalArgumentFacts.Empty)
-            : methodDeclaration.ExpressionBody is not null
-                ? AnalyzeExpressionBody(methodDeclaration.ExpressionBody.Expression, context)
-                : PathSummary.Unsupported("Only ordinary methods with a block or expression body are supported.");
-
-        return summary.IsSupported
-            ? RecursiveCallAnalysisResult.Supported(
-                DeduplicateBaseCases(summary.BaseCaseEvidence),
-                summary.Paths
-                    .Where(path => path.RecursiveCalls.Length > 0)
-                    .Select(path => new RecursiveExecutionPath(path.RecursiveCalls))
-                    .ToImmutableArray())
-            : RecursiveCallAnalysisResult.Unsupported(summary.UnsupportedReason ?? "The recursive call shape is unsupported.");
+        ExecutableMember member = ExecutableMember.CreateOrdinaryMethod(methodDeclaration, context.MethodSymbol);
+        return Analyze(member, context);
     }
 
     private static PathSummary AnalyzeExpressionBody(

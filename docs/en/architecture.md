@@ -15,7 +15,8 @@ C# source
 Roslyn syntax + SemanticModel
     |
     v
-Method analysis
+Executable-member analysis
+    (currently registered only for ordinary methods)
     |
     +-- analyzer configuration
     +-- input-size resolution
@@ -135,10 +136,11 @@ The main analysis layer lives under:
 src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-Analysis starts from a method and evaluates supported syntax and semantic facts. Responsibilities include method extraction, input-size resolution, basic-operation classification, loop-bound analysis, known-operation mapping, source-call propagation, and direct-recursion handling.
+Analysis starts from an internal executable-member abstraction and evaluates supported syntax and semantic facts. In the current public analyzer scope, that abstraction is created only for ordinary C# methods, including block-bodied and expression-bodied ordinary methods. Responsibilities include member/body extraction, input-size resolution, basic-operation classification, loop-bound analysis, known-operation mapping, source-call propagation, and direct-recursion handling.
 
 Representative components include:
 
+- `ExecutableMember` for the analyzed member identity, body, display name, and diagnostic location;
 - `MethodComplexityExtractor` for method/body composition;
 - `MethodAnalysisContext` for semantic and input-size context;
 - `InputSizeResolver` for canonical dimensions such as `n`, `m`, `k`, `p`, and later variables;

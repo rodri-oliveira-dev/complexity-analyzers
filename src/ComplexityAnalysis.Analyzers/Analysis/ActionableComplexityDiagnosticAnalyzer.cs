@@ -32,24 +32,46 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken) as IMethodSymbol
-            ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        return ExecutableMember.TryCreateOrdinaryMethod(
+            methodDeclaration,
+            semanticModel,
+            cancellationToken,
+            out ExecutableMember? member)
+            && member is not null
+            ? AnalyzeMember(member, semanticModel, interproceduralContext, options, cancellationToken)
+            : throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+    }
+
+    internal ImmutableArray<Diagnostic> AnalyzeMember(
+        ExecutableMember member,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
+        ComplexityAnalyzerOptions options,
+        CancellationToken cancellationToken)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
+        _ = options ?? throw new ArgumentNullException(nameof(options));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
         InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
-            methodSymbol,
+            member.Symbol,
             options,
             cancellationToken);
         MethodAnalysisContext context = MethodAnalysisContext.Create(
             semanticModel,
-            methodSymbol,
+            member.Symbol,
             options.WithAnalysisBudget(rootState.Budget),
             interproceduralContext,
             rootState,
             cancellationToken);
         ImmutableArray<Diagnostic>.Builder diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
 
-        AnalyzeRecursiveMethod(methodDeclaration, context, diagnostics);
+        AnalyzeRecursiveMember(member, context, diagnostics);
 
-        foreach (InvocationExpressionSyntax invocation in methodDeclaration.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        foreach (InvocationExpressionSyntax invocation in member.Declaration.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -59,13 +81,13 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         return diagnostics.ToImmutable();
     }
 
-    private static void AnalyzeRecursiveMethod(
-        MethodDeclarationSyntax methodDeclaration,
+    private static void AnalyzeRecursiveMember(
+        ExecutableMember member,
         MethodAnalysisContext context,
         ImmutableArray<Diagnostic>.Builder diagnostics)
     {
         if (MethodComplexityExtractor.TrySolveDirectRecurrence(
-            methodDeclaration,
+            member,
             context,
             out ComplexityExpression? complexity)
             && complexity is ExponentialComplexity)
@@ -74,7 +96,7 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
 
             diagnostics.Add(Diagnostic.Create(
                 DiagnosticDescriptors.ExponentialRecursiveGrowth,
-                methodDeclaration.Identifier.GetLocation(),
+                member.DiagnosticLocation,
                 ImmutableDictionary<string, string?>.Empty
                     .Add(DiagnosticPropertyNames.Complexity, formattedComplexity)
                     .Add(DiagnosticPropertyNames.RecurrenceClass, "exponential"),

@@ -113,6 +113,34 @@ public sealed class ComplexityAnalyzerTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
     }
 
+    [Fact]
+    public async Task Analyzer_does_not_register_local_functions_as_executable_member_roots_yet()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public int Ordinary() => 42;
+
+                public int M()
+                {
+                    int Local() => 42;
+
+                    return 42;
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Diagnostic diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
+        AssertDiagnosticText(diagnostic, "Ordinary");
+        Assert.Equal(
+            "Estimated algorithmic complexity for 'Ordinary' is O(1)",
+            diagnostic.GetMessage(CultureInfo.InvariantCulture));
+    }
+
     [Theory]
     [InlineData(
         """

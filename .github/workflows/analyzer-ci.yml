@@ -112,6 +112,10 @@ jobs:
     timeout-minutes: 30
     needs: validate
     if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
 
     steps:
       - name: Checkout
@@ -213,12 +217,14 @@ jobs:
           }
 
       - name: End Sonar analysis
+        id: sonar_end
         shell: bash
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
 
       - name: Report Sonar quality gate conditions
+        id: sonar_quality_gate
         if: ${{ always() && github.event_name == 'pull_request' }}
         shell: bash
         env:
@@ -226,12 +232,53 @@ jobs:
           SONAR_PROJECT_KEY: rodri-oliveira-dev_complexity-analyzers
           SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
         run: |
-          set -euo pipefail
-          response=$(curl --fail-with-body --silent --show-error \
+          set -uo pipefail
+          marker="<!-- complexity-analyzers:sonar-quality-gate -->"
+          dashboard_url="https://sonarcloud.io/dashboard?id=${SONAR_PROJECT_KEY}&pullRequest=${SONAR_PULL_REQUEST}"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          comment_file="sonar-quality-gate-comment.md"
+
+          if [ -z "${SONAR_TOKEN:-}" ]; then
+            echo "status=UNKNOWN" >> "${GITHUB_OUTPUT}"
+            echo "lookup_failed=true" >> "${GITHUB_OUTPUT}"
+            {
+              echo "${marker}"
+              echo "### SonarQube Cloud failure"
+              echo
+              echo "The SonarQube Cloud job failed before Quality Gate conditions could be fetched."
+              echo
+              echo "Cause: \`SONAR_TOKEN\` was not available to the workflow."
+              echo
+              echo "- [Open workflow run](${run_url})"
+              echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+            } > "${comment_file}"
+            exit 0
+          fi
+
+          if ! response=$(curl --fail-with-body --silent --show-error \
             -u "${SONAR_TOKEN}:" \
             --get "https://sonarcloud.io/api/qualitygates/project_status" \
             --data-urlencode "projectKey=${SONAR_PROJECT_KEY}" \
-            --data-urlencode "pullRequest=${SONAR_PULL_REQUEST}")
+            --data-urlencode "pullRequest=${SONAR_PULL_REQUEST}"); then
+            echo "status=UNKNOWN" >> "${GITHUB_OUTPUT}"
+            echo "lookup_failed=true" >> "${GITHUB_OUTPUT}"
+            {
+              echo "${marker}"
+              echo "### SonarQube Cloud failure"
+              echo
+              echo "The SonarQube Cloud job failed, and the workflow could not fetch Quality Gate conditions from SonarCloud."
+              echo
+              echo "Cause: SonarCloud Quality Gate API lookup failed."
+              echo
+              echo "- [Open workflow run](${run_url})"
+              echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+            } > "${comment_file}"
+            exit 0
+          fi
+
+          status=$(echo "${response}" | jq -r '.projectStatus.status // "UNKNOWN"')
+          echo "status=${status}" >> "${GITHUB_OUTPUT}"
+          echo "lookup_failed=false" >> "${GITHUB_OUTPUT}"
 
           echo "SonarQube Cloud quality gate conditions:"
           echo "${response}" | jq '{
@@ -243,6 +290,76 @@ jobs:
               actualValue
             }]
           }'
+
+          failed_conditions=$(echo "${response}" | jq -r '
+            [.projectStatus.conditions[]? | select(.status != "OK") |
+              "- `" + .metricKey + "`: status `" + .status + "`, actual `" + (.actualValue // "n/a") + "`, threshold `" + (.errorThreshold // "n/a") + "`"
+            ] | join("\n")
+          ')
+
+          {
+            echo "${marker}"
+            echo "### SonarQube Cloud failure"
+            echo
+            echo "The SonarQube Cloud Quality Gate failed for this PR."
+            echo
+            echo "Quality Gate status: **${status}**"
+            echo
+            if [ -n "${failed_conditions}" ]; then
+              echo "Failed conditions:"
+              echo "${failed_conditions}"
+            else
+              echo "No failing Quality Gate condition was returned by SonarCloud."
+            fi
+            echo
+            echo "- [Open workflow run](${run_url})"
+            echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+          } > "${comment_file}"
+
+      - name: Comment Sonar failure on PR
+        if: ${{ always() && failure() && github.event_name == 'pull_request' && ((steps.sonar_end.outcome == 'failure' && steps.sonar_quality_gate.outputs.status == 'ERROR') || steps.sonar_quality_gate.outputs.lookup_failed == 'true') }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- complexity-analyzers:sonar-quality-gate -->";
+            const fallbackBody = [
+              marker,
+              "### SonarQube Cloud failure",
+              "",
+              "The SonarQube Cloud job failed before the workflow could prepare Quality Gate details.",
+              "",
+              `- [Open workflow run](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})`
+            ].join("\n");
+            const body = fs.existsSync("sonar-quality-gate-comment.md")
+              ? fs.readFileSync("sonar-quality-gate-comment.md", "utf8")
+              : fallbackBody;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100
+            });
+            const existing = comments.find(comment =>
+              comment.user?.type === "Bot" && comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
 
   pack:
     name: Pack analyzer

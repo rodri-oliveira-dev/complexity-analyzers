@@ -13,13 +13,13 @@ internal sealed class CallTargetResolution
         CallTargetResolutionKind kind,
         IMethodSymbol? targetMethodSymbol,
         IMethodSymbol? sourceMethodDefinition,
-        MethodDeclarationSyntax? sourceMethodDeclaration,
+        ExecutableMember? sourceMember,
         KnownOperationMapping? knownOperationMapping)
     {
         Kind = kind;
         TargetMethodSymbol = targetMethodSymbol;
         SourceMethodDefinition = sourceMethodDefinition;
-        SourceMethodDeclaration = sourceMethodDeclaration;
+        SourceMember = sourceMember;
         KnownOperationMapping = knownOperationMapping;
     }
 
@@ -39,6 +39,9 @@ internal sealed class CallTargetResolution
     }
 
     internal MethodDeclarationSyntax? SourceMethodDeclaration
+        => SourceMember?.Declaration as MethodDeclarationSyntax;
+
+    internal ExecutableMember? SourceMember
     {
         get;
     }
@@ -66,17 +69,17 @@ internal sealed class CallTargetResolution
     internal static CallTargetResolution SourceMethod(
         IMethodSymbol targetMethodSymbol,
         IMethodSymbol sourceMethodDefinition,
-        MethodDeclarationSyntax sourceMethodDeclaration)
+        ExecutableMember sourceMember)
     {
         _ = targetMethodSymbol ?? throw new ArgumentNullException(nameof(targetMethodSymbol));
         _ = sourceMethodDefinition ?? throw new ArgumentNullException(nameof(sourceMethodDefinition));
-        _ = sourceMethodDeclaration ?? throw new ArgumentNullException(nameof(sourceMethodDeclaration));
+        _ = sourceMember ?? throw new ArgumentNullException(nameof(sourceMember));
 
         return new CallTargetResolution(
             CallTargetResolutionKind.SourceMethod,
             targetMethodSymbol,
             sourceMethodDefinition,
-            sourceMethodDeclaration,
+            sourceMember,
             null);
     }
 

@@ -90,10 +90,69 @@ internal sealed class MethodAnalysisContext
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken) as IMethodSymbol
-            ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        return ExecutableMember.TryCreateOrdinaryMethod(
+            methodDeclaration,
+            semanticModel,
+            cancellationToken,
+            out ExecutableMember? member)
+            && member is not null
+            ? Create(member, semanticModel, cancellationToken)
+            : throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+    }
 
-        return Create(semanticModel, methodSymbol, cancellationToken);
+    internal static MethodAnalysisContext Create(
+        ExecutableMember member,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Create(semanticModel, member.Symbol, cancellationToken);
+    }
+
+    internal static MethodAnalysisContext Create(
+        MethodDeclarationSyntax methodDeclaration,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext? interproceduralContext,
+        InterproceduralRootAnalysisState? interproceduralRootState,
+        CancellationToken cancellationToken)
+    {
+        _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return ExecutableMember.TryCreateOrdinaryMethod(
+            methodDeclaration,
+            semanticModel,
+            cancellationToken,
+            out ExecutableMember? member)
+            && member is not null
+            ? Create(member, semanticModel, interproceduralContext, interproceduralRootState, cancellationToken)
+            : throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+    }
+
+    internal static MethodAnalysisContext Create(
+        ExecutableMember member,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext? interproceduralContext,
+        InterproceduralRootAnalysisState? interproceduralRootState,
+        CancellationToken cancellationToken)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Create(
+            semanticModel,
+            member.Symbol,
+            interproceduralContext,
+            interproceduralRootState,
+            cancellationToken);
     }
 
     internal static MethodAnalysisContext Create(

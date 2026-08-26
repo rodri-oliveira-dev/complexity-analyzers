@@ -15,7 +15,8 @@ código-fonte C#
 sintaxe Roslyn + SemanticModel
     |
     v
-análise do método
+análise de executable member
+    (atualmente registrada apenas para métodos ordinários)
     |
     +-- configuração do analyzer
     +-- resolução de tamanho de entrada
@@ -135,10 +136,11 @@ A principal camada de análise fica em:
 src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-A análise parte de um método e avalia informações sintáticas e semânticas suportadas. As responsabilidades incluem extração de métodos, resolução de tamanho de entrada, classificação de operações básicas, análise de limites de loop, mapeamento de operações conhecidas, propagação de chamadas a métodos-fonte e tratamento de recursão direta.
+A análise parte de uma abstração interna de executable member e avalia informações sintáticas e semânticas suportadas. No escopo público atual do analyzer, essa abstração é criada apenas para métodos C# ordinários, incluindo métodos ordinários com bloco e expression body. As responsabilidades incluem extração de membro/body, resolução de tamanho de entrada, classificação de operações básicas, análise de limites de loop, mapeamento de operações conhecidas, propagação de chamadas a métodos-fonte e tratamento de recursão direta.
 
 Alguns componentes representativos são:
 
+- `ExecutableMember` para identidade, body, nome de exibição e localização de diagnóstico do membro analisado;
 - `MethodComplexityExtractor` para composição do método e de seu corpo;
 - `MethodAnalysisContext` para contexto semântico e dimensões de entrada;
 - `InputSizeResolver` para dimensões canônicas como `n`, `m`, `k`, `p` e variáveis posteriores;
