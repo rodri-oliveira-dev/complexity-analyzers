@@ -56,6 +56,7 @@ jobs:
             ]);
             const syncStart = "<!-- sonar-sync:start -->";
             const syncEnd = "<!-- sonar-sync:end -->";
+            const workflowAuthor = "github-actions[bot]";
 
             core.setSecret(sonarToken);
 
@@ -127,8 +128,33 @@ jobs:
               return `${existingBody.slice(0, startIndex)}${nextManagedBody}${existingBody.slice(suffixStart)}`;
             }
 
-            function extractSonarIssueKey(body) {
-              const match = body?.match(/<!--\s*sonar-issue-key:([^\s>]+)\s*-->/);
+            function extractManagedSonarIssueKey(githubIssue) {
+              // issues.listForRepo also returns pull requests; never treat a PR as a
+              // workflow-managed Sonar issue even if its body contains matching markers.
+              if (githubIssue.pull_request) {
+                return null;
+              }
+
+              // The default GITHUB_TOKEN creates issues as github-actions[bot]. Requiring
+              // that provenance prevents user-authored issues from spoofing a public
+              // Sonar issue key and becoming the canonical sync target.
+              if (githubIssue.user?.login !== workflowAuthor) {
+                return null;
+              }
+
+              const body = githubIssue.body ?? "";
+              const startIndex = body.indexOf(syncStart);
+              if (startIndex === -1) {
+                return null;
+              }
+
+              const endIndex = body.indexOf(syncEnd, startIndex + syncStart.length);
+              if (endIndex === -1 || endIndex < startIndex) {
+                return null;
+              }
+
+              const managedSection = body.slice(startIndex, endIndex + syncEnd.length);
+              const match = managedSection.match(/<!--\s*sonar-issue-key:([^\s>]+)\s*-->/);
               return match?.[1] ?? null;
             }
 
@@ -203,8 +229,9 @@ jobs:
 
             await ensureLabel();
 
-            // Read every issue, not only labeled ones. This prevents duplicates even if
-            // someone removes the label from an issue created by this workflow.
+            // Read every repository issue so a workflow-managed item remains discoverable
+            // even if someone removes its label. Provenance and managed delimiters are
+            // validated before accepting any item as the canonical Sonar sync target.
             const repositoryIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner,
               repo,
@@ -214,14 +241,14 @@ jobs:
 
             const existingBySonarKey = new Map();
             for (const githubIssue of repositoryIssues) {
-              const sonarKey = extractSonarIssueKey(githubIssue.body);
+              const sonarKey = extractManagedSonarIssueKey(githubIssue);
               if (!sonarKey) {
                 continue;
               }
 
               if (existingBySonarKey.has(sonarKey)) {
                 core.warning(
-                  `Multiple GitHub issues already reference Sonar issue ${sonarKey}. Keeping #${existingBySonarKey.get(sonarKey).number} as the canonical match.`,
+                  `Multiple workflow-managed GitHub issues reference Sonar issue ${sonarKey}. Keeping #${existingBySonarKey.get(sonarKey).number} as the canonical match.`,
                 );
                 continue;
               }
