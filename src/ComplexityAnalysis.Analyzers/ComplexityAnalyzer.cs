@@ -94,6 +94,10 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             DiagnosticDescriptors.EstimatedAlgorithmicComplexity,
             methodDeclaration.Identifier.GetLocation(),
+            CreateProperty(
+                DiagnosticPropertyNames.Complexity,
+                complexity.ToBigONotation()),
+            methodDeclaration.Identifier.ValueText,
             complexity.ToBigONotation()));
     }
 
@@ -116,6 +120,9 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             DiagnosticDescriptors.MethodComplexityExceedsConfiguredThreshold,
             methodDeclaration.Identifier.GetLocation(),
+            ImmutableDictionary<string, string?>.Empty
+                .Add(DiagnosticPropertyNames.Complexity, actualComplexity.ToBigONotation())
+                .Add(DiagnosticPropertyNames.Threshold, thresholdComplexity.ToBigONotation()),
             methodDeclaration.Identifier.ValueText,
             actualComplexity.ToBigONotation(),
             thresholdComplexity.ToBigONotation()));
@@ -132,6 +139,16 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
 
         context.ReportDiagnostic(Diagnostic.Create(
             DiagnosticDescriptors.AnalyzerExecutionProbe,
-            location));
+            location,
+            CreateProperty(
+                DiagnosticPropertyNames.DiagnosticRole,
+                "execution-probe")));
+    }
+
+    private static ImmutableDictionary<string, string?> CreateProperty(
+        string key,
+        string value)
+    {
+        return ImmutableDictionary<string, string?>.Empty.Add(key, value);
     }
 }

@@ -7,7 +7,7 @@ internal static class DiagnosticDescriptors
     internal static readonly DiagnosticDescriptor EstimatedAlgorithmicComplexity = new(
         id: "BIG0001",
         title: "Estimated algorithmic complexity",
-        messageFormat: "Estimated time complexity: {0}",
+        messageFormat: "Estimated algorithmic complexity for '{0}' is {1}",
         category: "Complexity",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: false,
@@ -16,7 +16,7 @@ internal static class DiagnosticDescriptors
     internal static readonly DiagnosticDescriptor LinearLookupInsideIteration = new(
         id: "BIG1001",
         title: "Linear lookup inside iteration",
-        messageFormat: "Linear lookup '{0}' is executed inside an iteration estimated as {1}. Estimated combined complexity: {2}. Consider an indexed lookup when appropriate.",
+        messageFormat: "{0} performs a linear lookup with known cost {1} inside an iteration estimated as {2}. Estimated contribution: {3}.",
         category: "Complexity",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
@@ -25,7 +25,7 @@ internal static class DiagnosticDescriptors
     internal static readonly DiagnosticDescriptor MaterializationInsideIteration = new(
         id: "BIG1002",
         title: "Materialization inside iteration",
-        messageFormat: "Materialization '{0}' is executed inside an iteration estimated as {1}, repeatedly enumerating the source and allocating results. Estimated combined complexity: {2}.",
+        messageFormat: "{0} materializes the sequence with known cost {1} inside an iteration estimated as {2}. Estimated contribution: {3}.",
         category: "Complexity",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
@@ -34,7 +34,7 @@ internal static class DiagnosticDescriptors
     internal static readonly DiagnosticDescriptor OrderingInsideIteration = new(
         id: "BIG1003",
         title: "Ordering inside iteration",
-        messageFormat: "Ordering '{0}' is consumed inside an iteration estimated as {1}. Estimated combined complexity: {2}.",
+        messageFormat: "{0} performs ordering with known consumed cost {1} inside an iteration estimated as {2}. Estimated contribution: {3}.",
         category: "Complexity",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
@@ -43,7 +43,7 @@ internal static class DiagnosticDescriptors
     internal static readonly DiagnosticDescriptor InputDependentCallInsideIteration = new(
         id: "BIG1004",
         title: "Input-dependent method call inside iteration",
-        messageFormat: "Method '{0}' contributes {1} work inside a {2} iteration. Estimated combined complexity: {3}.",
+        messageFormat: "Method '{0}' has input-dependent complexity {1} and is invoked inside an iteration estimated as {2}. Estimated contribution: {3}.",
         category: "Complexity",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
@@ -52,7 +52,7 @@ internal static class DiagnosticDescriptors
     internal static readonly DiagnosticDescriptor ExponentialRecursiveGrowth = new(
         id: "BIG1005",
         title: "Exponential recursive growth",
-        messageFormat: "Recursive method '{0}' has estimated exponential time complexity {1}",
+        messageFormat: "Recursive method '{0}' exhibits exponential growth with estimated complexity {1}",
         category: "Complexity",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
@@ -61,7 +61,7 @@ internal static class DiagnosticDescriptors
     internal static readonly DiagnosticDescriptor MethodComplexityExceedsConfiguredThreshold = new(
         id: "BIG1006",
         title: "Method complexity exceeds configured threshold",
-        messageFormat: "Method '{0}' has estimated complexity {1}, which exceeds the configured maximum {2}",
+        messageFormat: "Method '{0}' has estimated complexity {1}, exceeding configured maximum {2}",
         category: "Complexity",
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,

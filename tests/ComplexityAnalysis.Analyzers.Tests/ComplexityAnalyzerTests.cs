@@ -2,6 +2,8 @@ using System;
 using System.Collections.Immutable;
 using System.Globalization;
 
+using ComplexityAnalysis.Analyzers.Diagnostics;
+
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -119,7 +121,7 @@ public sealed class ComplexityAnalyzerTests
             public int M() => 42;
         }
         """,
-        "Estimated time complexity: O(1)")]
+        "Estimated algorithmic complexity for 'M' is O(1)")]
     [InlineData(
         """
         public sealed class Sample
@@ -133,7 +135,7 @@ public sealed class ComplexityAnalyzerTests
             }
         }
         """,
-        "Estimated time complexity: O(n)")]
+        "Estimated algorithmic complexity for 'M' is O(n)")]
     [InlineData(
         """
         public sealed class Sample
@@ -150,11 +152,13 @@ public sealed class ComplexityAnalyzerTests
             }
         }
         """,
-        "Estimated time complexity: O(n\u00b2)")]
+        "Estimated algorithmic complexity for 'M' is O(n\u00b2)")]
     public async Task Analyzer_reports_estimated_complexity_when_explicitly_enabled(
         string source,
         string expectedMessage)
     {
+        _ = expectedMessage ?? throw new ArgumentNullException(nameof(expectedMessage));
+
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
             source,
             enableComplexity: true);
@@ -164,6 +168,10 @@ public sealed class ComplexityAnalyzerTests
             diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
         Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
         Assert.Equal(expectedMessage, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertProperty(
+            diagnostic,
+            DiagnosticPropertyNames.Complexity,
+            expectedMessage[(expectedMessage.IndexOf(" is ", StringComparison.Ordinal) + " is ".Length)..]);
         Assert.True(diagnostic.Location.IsInSource);
 
         SyntaxTree sourceTree = diagnostic.Location.SourceTree
@@ -202,7 +210,8 @@ public sealed class ComplexityAnalyzerTests
             .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
             .Single(diagnostic => GetDiagnosticText(diagnostic) == "M");
 
-        Assert.Equal("Estimated time complexity: O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        Assert.Equal("Estimated algorithmic complexity for 'M' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertProperty(diagnostic, DiagnosticPropertyNames.Complexity, "O(n)");
     }
 
     [Fact]
@@ -237,7 +246,8 @@ public sealed class ComplexityAnalyzerTests
             .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
             .Single(diagnostic => GetDiagnosticText(diagnostic) == "M");
 
-        Assert.Equal("Estimated time complexity: O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        Assert.Equal("Estimated algorithmic complexity for 'M' is O(n)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertProperty(diagnostic, DiagnosticPropertyNames.Complexity, "O(n)");
     }
 
     [Fact]
@@ -270,7 +280,8 @@ public sealed class ComplexityAnalyzerTests
             .Where(diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId)
             .Single(diagnostic => GetDiagnosticText(diagnostic) == "M");
 
-        Assert.Equal("Estimated time complexity: O(n \u00b7 m)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        Assert.Equal("Estimated algorithmic complexity for 'M' is O(n \u00b7 m)", diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertProperty(diagnostic, DiagnosticPropertyNames.Complexity, "O(n \u00b7 m)");
     }
 
     [Theory]
@@ -290,7 +301,7 @@ public sealed class ComplexityAnalyzerTests
         }
         """,
         "M",
-        "Estimated time complexity: O(n)")]
+        "Estimated algorithmic complexity for 'M' is O(n)")]
     [InlineData(
         """
         public sealed class Sample
@@ -312,7 +323,7 @@ public sealed class ComplexityAnalyzerTests
         }
         """,
         "BinarySearch",
-        "Estimated time complexity: O(log n)")]
+        "Estimated algorithmic complexity for 'BinarySearch' is O(log n)")]
     [InlineData(
         """
         public sealed class Sample
@@ -335,7 +346,7 @@ public sealed class ComplexityAnalyzerTests
         }
         """,
         "MergeSort",
-        "Estimated time complexity: O(n log n)")]
+        "Estimated algorithmic complexity for 'MergeSort' is O(n log n)")]
     [InlineData(
         """
         public sealed class Sample
@@ -359,7 +370,7 @@ public sealed class ComplexityAnalyzerTests
         }
         """,
         "FractionalMaster",
-        "Estimated time complexity: O(n^1.585)")]
+        "Estimated algorithmic complexity for 'FractionalMaster' is O(n^1.585)")]
     [InlineData(
         """
         public sealed class Sample
@@ -382,12 +393,14 @@ public sealed class ComplexityAnalyzerTests
         }
         """,
         "UnequalSplit",
-        "Estimated time complexity: O(n log n)")]
+        "Estimated algorithmic complexity for 'UnequalSplit' is O(n log n)")]
     public async Task Analyzer_reports_recursive_estimated_complexity_when_enabled(
         string source,
         string methodName,
         string expectedMessage)
     {
+        _ = expectedMessage ?? throw new ArgumentNullException(nameof(expectedMessage));
+
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
             source,
             enableComplexity: true);
@@ -397,6 +410,10 @@ public sealed class ComplexityAnalyzerTests
             .Single(diagnostic => GetDiagnosticText(diagnostic) == methodName);
 
         Assert.Equal(expectedMessage, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertProperty(
+            diagnostic,
+            DiagnosticPropertyNames.Complexity,
+            expectedMessage[(expectedMessage.IndexOf(" is ", StringComparison.Ordinal) + " is ".Length)..]);
     }
 
     [Fact]
@@ -481,8 +498,9 @@ public sealed class ComplexityAnalyzerTests
             diagnostic => diagnostic.Id == LinearLookupInsideIterationId);
 
         Assert.Equal(
-            "Linear lookup 'List<T>.Contains' is executed inside an iteration estimated as O(n). Estimated combined complexity: O(n \u00b7 m). Consider an indexed lookup when appropriate.",
+            "List<T>.Contains performs a linear lookup with known cost O(m) inside an iteration estimated as O(n). Estimated contribution: O(n \u00b7 m).",
             diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertNestedOperationProperties(diagnostic, "List<T>.Contains", "O(m)", "O(n)", "O(n \u00b7 m)");
         AssertDiagnosticText(diagnostic, "blockedCustomers.Contains(customer)");
     }
 
@@ -574,7 +592,8 @@ public sealed class ComplexityAnalyzerTests
             diagnostics,
             diagnostic => diagnostic.Id == LinearLookupInsideIterationId);
 
-        Assert.Contains("Estimated combined complexity: O(n \u00b7 m).", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        Assert.Contains("Estimated contribution: O(n \u00b7 m).", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        AssertNestedOperationProperties(diagnostic, "List<T>.Contains", "O(m)", "O(n)", "O(n \u00b7 m)");
     }
 
     [Fact]
@@ -602,8 +621,9 @@ public sealed class ComplexityAnalyzerTests
             diagnostic => diagnostic.Id == MaterializationInsideIterationId);
 
         Assert.Equal(
-            "Materialization 'Enumerable.ToList' is executed inside an iteration estimated as O(n), repeatedly enumerating the source and allocating results. Estimated combined complexity: O(n \u00b7 m).",
+            "Enumerable.ToList materializes the sequence with known cost O(m) inside an iteration estimated as O(n). Estimated contribution: O(n \u00b7 m).",
             diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertNestedOperationProperties(diagnostic, "Enumerable.ToList", "O(m)", "O(n)", "O(n \u00b7 m)");
         AssertDiagnosticText(diagnostic, "items.ToList()");
     }
 
@@ -676,8 +696,9 @@ public sealed class ComplexityAnalyzerTests
             diagnostic => diagnostic.Id == OrderingInsideIterationId);
 
         Assert.Equal(
-            "Ordering 'Enumerable.OrderBy' is consumed inside an iteration estimated as O(n). Estimated combined complexity: O(n \u00b7 m log m).",
+            "Enumerable.OrderBy performs ordering with known consumed cost O(m log m) inside an iteration estimated as O(n). Estimated contribution: O(n \u00b7 m log m).",
             diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertNestedOperationProperties(diagnostic, "Enumerable.OrderBy", "O(m log m)", "O(n)", "O(n \u00b7 m log m)");
         AssertDiagnosticText(diagnostic, "items.OrderBy(item => item)");
     }
 
@@ -760,8 +781,9 @@ public sealed class ComplexityAnalyzerTests
             diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
 
         Assert.Equal(
-            "Method 'Sample.Check' contributes O(n) work inside a O(n) iteration. Estimated combined complexity: O(n\u00b2).",
+            "Method 'Sample.Check' has input-dependent complexity O(n) and is invoked inside an iteration estimated as O(n). Estimated contribution: O(n\u00b2).",
             diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertNestedOperationProperties(diagnostic, "Sample.Check", "O(n)", "O(n)", "O(n\u00b2)");
         AssertDiagnosticText(diagnostic, "Check(customers)");
     }
 
@@ -795,8 +817,9 @@ public sealed class ComplexityAnalyzerTests
             diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
 
         Assert.Equal(
-            "Method 'Sample.CheckAgainstBlacklist' contributes O(m) work inside a O(n) iteration. Estimated combined complexity: O(n \u00b7 m).",
+            "Method 'Sample.CheckAgainstBlacklist' has input-dependent complexity O(m) and is invoked inside an iteration estimated as O(n). Estimated contribution: O(n \u00b7 m).",
             diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertNestedOperationProperties(diagnostic, "Sample.CheckAgainstBlacklist", "O(m)", "O(n)", "O(n \u00b7 m)");
         AssertDiagnosticText(diagnostic, "CheckAgainstBlacklist(customer, blocked)");
     }
 
@@ -832,8 +855,9 @@ public sealed class ComplexityAnalyzerTests
             diagnostic => diagnostic.Id == InputDependentCallInsideIterationId);
 
         Assert.Equal(
-            "Method 'Sample.CountDown' contributes O(m) work inside a O(n) iteration. Estimated combined complexity: O(n \u00b7 m).",
+            "Method 'Sample.CountDown' has input-dependent complexity O(m) and is invoked inside an iteration estimated as O(n). Estimated contribution: O(n \u00b7 m).",
             diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertNestedOperationProperties(diagnostic, "Sample.CountDown", "O(m)", "O(n)", "O(n \u00b7 m)");
         AssertDiagnosticText(diagnostic, "CountDown(limit)");
     }
 
@@ -1039,8 +1063,10 @@ public sealed class ComplexityAnalyzerTests
             diagnostic => diagnostic.Id == ExponentialRecursiveGrowthId);
 
         Assert.Equal(
-            "Recursive method 'Sample.Fibonacci' has estimated exponential time complexity O(1.618^n)",
+            "Recursive method 'Sample.Fibonacci' exhibits exponential growth with estimated complexity O(1.618^n)",
             diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertProperty(diagnostic, DiagnosticPropertyNames.Complexity, "O(1.618^n)");
+        AssertProperty(diagnostic, DiagnosticPropertyNames.RecurrenceClass, "exponential");
         AssertDiagnosticText(diagnostic, "Fibonacci");
     }
 
@@ -1069,8 +1095,10 @@ public sealed class ComplexityAnalyzerTests
             diagnostic => diagnostic.Id == ExponentialRecursiveGrowthId);
 
         Assert.Equal(
-            "Recursive method 'Sample.Branch' has estimated exponential time complexity O(2^n)",
+            "Recursive method 'Sample.Branch' exhibits exponential growth with estimated complexity O(2^n)",
             diagnostic.GetMessage(CultureInfo.InvariantCulture));
+        AssertProperty(diagnostic, DiagnosticPropertyNames.Complexity, "O(2^n)");
+        AssertProperty(diagnostic, DiagnosticPropertyNames.RecurrenceClass, "exponential");
         AssertDiagnosticText(diagnostic, "Branch");
     }
 
@@ -1217,6 +1245,7 @@ public sealed class ComplexityAnalyzerTests
 
         Diagnostic diagnostic = Assert.Single(diagnostics, diagnostic => diagnostic.Id == AnalyzerExecutionProbeId);
         Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        AssertProperty(diagnostic, DiagnosticPropertyNames.DiagnosticRole, "execution-probe");
     }
 
     [Fact]
@@ -1356,6 +1385,28 @@ public sealed class ComplexityAnalyzerTests
     private static void AssertDiagnosticText(Diagnostic diagnostic, string expectedText)
     {
         Assert.Equal(expectedText, GetDiagnosticText(diagnostic));
+    }
+
+    private static void AssertNestedOperationProperties(
+        Diagnostic diagnostic,
+        string operation,
+        string operationComplexity,
+        string iterationComplexity,
+        string combinedComplexity)
+    {
+        AssertProperty(diagnostic, DiagnosticPropertyNames.Operation, operation);
+        AssertProperty(diagnostic, DiagnosticPropertyNames.OperationComplexity, operationComplexity);
+        AssertProperty(diagnostic, DiagnosticPropertyNames.IterationComplexity, iterationComplexity);
+        AssertProperty(diagnostic, DiagnosticPropertyNames.CombinedComplexity, combinedComplexity);
+    }
+
+    private static void AssertProperty(
+        Diagnostic diagnostic,
+        string key,
+        string expectedValue)
+    {
+        Assert.True(diagnostic.Properties.TryGetValue(key, out string? actualValue));
+        Assert.Equal(expectedValue, actualValue);
     }
 
     private static string GetDiagnosticText(Diagnostic diagnostic)
