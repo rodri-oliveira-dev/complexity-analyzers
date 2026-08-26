@@ -23,27 +23,35 @@ internal sealed class RecurrenceExtractor
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        IMethodSymbol methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration, cancellationToken)
-            ?? throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        if (!ExecutableMember.TryCreateOrdinaryMethod(
+            methodDeclaration,
+            semanticModel,
+            cancellationToken,
+            out ExecutableMember? member)
+            || member is null)
+        {
+            throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        }
+
         MethodAnalysisContext context = MethodAnalysisContext.Create(
             semanticModel,
-            methodSymbol,
+            member.Symbol,
             cancellationToken);
 
-        return Extract(methodDeclaration, context);
+        return Extract(member, context);
     }
 
     internal RecurrenceExtractionResult Extract(
-        MethodDeclarationSyntax methodDeclaration,
+        ExecutableMember member,
         MethodAnalysisContext context)
     {
-        _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
+        _ = member ?? throw new ArgumentNullException(nameof(member));
         _ = context ?? throw new ArgumentNullException(nameof(context));
 
         context.CancellationToken.ThrowIfCancellationRequested();
 
         RecursiveCallAnalysisResult callAnalysis = new RecursiveCallAnalyzer().Analyze(
-            methodDeclaration,
+            member,
             context);
         if (!callAnalysis.IsSupported)
         {
@@ -76,7 +84,7 @@ internal sealed class RecurrenceExtractor
             return RecurrenceExtractionResult.Unsupported(reason ?? "The recursive execution paths are unsupported.");
         }
 
-        ComplexityExpression localWork = AnalyzeLocalWork(methodDeclaration, context);
+        ComplexityExpression localWork = AnalyzeLocalWork(member, context);
         return localWork is UnknownComplexity
             ? RecurrenceExtractionResult.Unknown("The non-recursive local work is unknown.")
             : RecurrenceExtractionResult.Extracted(
@@ -84,6 +92,31 @@ internal sealed class RecurrenceExtractor
                     dimension.Variable,
                     recursiveTerms,
                     localWork));
+    }
+
+    internal RecurrenceExtractionResult Extract(
+        MethodDeclarationSyntax methodDeclaration,
+        MethodAnalysisContext context)
+    {
+        _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
+        _ = context ?? throw new ArgumentNullException(nameof(context));
+
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        ExecutableMember member = ExecutableMember.CreateOrdinaryMethod(methodDeclaration, context.MethodSymbol);
+        return Extract(member, context);
+    }
+
+    private static ComplexityExpression AnalyzeLocalWork(
+        ExecutableMember member,
+        MethodAnalysisContext context)
+    {
+        MethodAnalysisContext localWorkContext = context.WithDirectRecursiveInvocationsAsConstant();
+        return member.Body.Block is not null
+            ? new MethodComplexityExtractor().AnalyzeBlock(member.Body.Block, localWorkContext)
+            : member.Body.Expression is null
+                ? ComplexityFactory.Unknown()
+                : new BasicOperationAnalyzer(localWorkContext).AnalyzeExpression(member.Body.Expression);
     }
 
     private static bool TryIdentifyRecursiveDimension(
@@ -325,19 +358,6 @@ internal sealed class RecurrenceExtractor
             : left.Kind == RecurrenceReductionKind.SubtractConstant
             ? right.Value.CompareTo(left.Value)
             : left.Value.CompareTo(right.Value);
-    }
-
-    private static ComplexityExpression AnalyzeLocalWork(
-        MethodDeclarationSyntax methodDeclaration,
-        MethodAnalysisContext context)
-    {
-        MethodAnalysisContext localWorkContext = context.WithDirectRecursiveInvocationsAsConstant();
-        return methodDeclaration.Body is not null
-            ? new MethodComplexityExtractor().AnalyzeBlock(methodDeclaration.Body, localWorkContext)
-            : methodDeclaration.ExpressionBody is null
-                ? ComplexityFactory.Unknown()
-                : new BasicOperationAnalyzer(localWorkContext).AnalyzeExpression(
-                    methodDeclaration.ExpressionBody.Expression);
     }
 
     private sealed class RecursiveDimension : IEquatable<RecursiveDimension>

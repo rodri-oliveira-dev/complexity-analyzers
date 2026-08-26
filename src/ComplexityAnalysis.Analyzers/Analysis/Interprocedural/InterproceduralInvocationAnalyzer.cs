@@ -80,14 +80,14 @@ internal sealed class InterproceduralInvocationAnalyzer
 
         if (resolution.TargetMethodSymbol is null
             || resolution.SourceMethodDefinition is null
-            || resolution.SourceMethodDeclaration is null)
+            || resolution.SourceMember is null)
         {
             return ComplexityFactory.Unknown();
         }
 
         IMethodSymbol sourceMethodDefinition = resolution.SourceMethodDefinition;
         ComplexityAnalyzerOptions calleeOptions = interproceduralContext.GetAnalysisOptions(
-            resolution.SourceMethodDeclaration.SyntaxTree,
+            resolution.SourceMember.SyntaxTree,
             rootState.Budget,
             callerContext.CancellationToken);
         if (rootState.ContainsActiveMethod(sourceMethodDefinition))
@@ -134,7 +134,7 @@ internal sealed class InterproceduralInvocationAnalyzer
         {
             calleeResult = GetOrAnalyzeCallee(
                 sourceMethodDefinition,
-                resolution.SourceMethodDeclaration,
+                resolution.SourceMember,
                 interproceduralContext,
                 calleeOptions,
                 calleeState);
@@ -153,7 +153,7 @@ internal sealed class InterproceduralInvocationAnalyzer
 
     private InterproceduralAnalysisResult GetOrAnalyzeCallee(
         IMethodSymbol sourceMethodDefinition,
-        MethodDeclarationSyntax sourceMethodDeclaration,
+        ExecutableMember sourceMember,
         InterproceduralAnalysisContext interproceduralContext,
         ComplexityAnalyzerOptions calleeOptions,
         InterproceduralRootAnalysisState calleeState)
@@ -168,8 +168,7 @@ internal sealed class InterproceduralInvocationAnalyzer
         {
             return completedResult
                 ?? AnalyzeCalleeWithoutCaching(
-                    sourceMethodDefinition,
-                    sourceMethodDeclaration,
+                    sourceMember,
                     interproceduralContext,
                     calleeOptions,
                     calleeState);
@@ -179,8 +178,7 @@ internal sealed class InterproceduralInvocationAnalyzer
         try
         {
             InterproceduralAnalysisResult analyzedResult = AnalyzeCalleeWithoutCaching(
-                sourceMethodDefinition,
-                sourceMethodDeclaration,
+                sourceMember,
                 interproceduralContext,
                 calleeOptions,
                 calleeState);
@@ -210,8 +208,7 @@ internal sealed class InterproceduralInvocationAnalyzer
     }
 
     private InterproceduralAnalysisResult AnalyzeCalleeWithoutCaching(
-        IMethodSymbol sourceMethodDefinition,
-        MethodDeclarationSyntax sourceMethodDeclaration,
+        ExecutableMember sourceMember,
         InterproceduralAnalysisContext interproceduralContext,
         ComplexityAnalyzerOptions calleeOptions,
         InterproceduralRootAnalysisState calleeState)
@@ -219,12 +216,11 @@ internal sealed class InterproceduralInvocationAnalyzer
         callerContext.CancellationToken.ThrowIfCancellationRequested();
 
         SemanticModel calleeSemanticModel = interproceduralContext.GetSemanticModel(
-            sourceMethodDeclaration.SyntaxTree,
+            sourceMember.SyntaxTree,
             callerContext.CancellationToken);
         return new MethodComplexityExtractor()
-            .AnalyzeSourceMethod(
-                sourceMethodDeclaration,
-                sourceMethodDefinition,
+            .AnalyzeSourceMember(
+                sourceMember,
                 calleeSemanticModel,
                 interproceduralContext,
                 calleeState,

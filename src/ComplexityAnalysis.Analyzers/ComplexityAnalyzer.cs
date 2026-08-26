@@ -63,12 +63,22 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         context.CancellationToken.ThrowIfCancellationRequested();
 
         MethodDeclarationSyntax methodDeclaration = (MethodDeclarationSyntax)context.Node;
+        if (!ExecutableMember.TryCreateOrdinaryMethod(
+            methodDeclaration,
+            context.SemanticModel,
+            context.CancellationToken,
+            out ExecutableMember? member)
+            || member is null)
+        {
+            return;
+        }
+
         ComplexityAnalyzerOptions options = interproceduralContext.GetOptions(
-            methodDeclaration.SyntaxTree,
+            member.SyntaxTree,
             context.CancellationToken);
 
-        foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMethod(
-            methodDeclaration,
+        foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMember(
+            member,
             context.SemanticModel,
             interproceduralContext,
             options,
@@ -77,8 +87,8 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(diagnostic);
         }
 
-        ComplexityExpression complexity = MethodComplexityExtractor.AnalyzeMethod(
-            methodDeclaration,
+        ComplexityExpression complexity = MethodComplexityExtractor.AnalyzeMember(
+            member,
             context.SemanticModel,
             interproceduralContext,
             options,
@@ -89,21 +99,21 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        ReportThresholdDiagnosticIfNeeded(context, methodDeclaration, options, complexity);
+        ReportThresholdDiagnosticIfNeeded(context, member, options, complexity);
 
         context.ReportDiagnostic(Diagnostic.Create(
             DiagnosticDescriptors.EstimatedAlgorithmicComplexity,
-            methodDeclaration.Identifier.GetLocation(),
+            member.DiagnosticLocation,
             CreateProperty(
                 DiagnosticPropertyNames.Complexity,
                 complexity.ToBigONotation()),
-            methodDeclaration.Identifier.ValueText,
+            member.DisplayName,
             complexity.ToBigONotation()));
     }
 
     private static void ReportThresholdDiagnosticIfNeeded(
         SyntaxNodeAnalysisContext context,
-        MethodDeclarationSyntax methodDeclaration,
+        ExecutableMember member,
         ComplexityAnalyzerOptions options,
         ComplexityExpression actualComplexity)
     {
@@ -119,11 +129,11 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
 
         context.ReportDiagnostic(Diagnostic.Create(
             DiagnosticDescriptors.MethodComplexityExceedsConfiguredThreshold,
-            methodDeclaration.Identifier.GetLocation(),
+            member.DiagnosticLocation,
             ImmutableDictionary<string, string?>.Empty
                 .Add(DiagnosticPropertyNames.Complexity, actualComplexity.ToBigONotation())
                 .Add(DiagnosticPropertyNames.Threshold, thresholdComplexity.ToBigONotation()),
-            methodDeclaration.Identifier.ValueText,
+            member.DisplayName,
             actualComplexity.ToBigONotation(),
             thresholdComplexity.ToBigONotation()));
     }
