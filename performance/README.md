@@ -85,7 +85,8 @@ These checks are suitable for CI blocking because they are deterministic:
 - generated-code exclusion and concurrent execution remain explicit;
 - package layout and consumer compatibility tests remain green;
 - production analyzer source remains free of forbidden hot-path I/O, network,
-  process, and telemetry API patterns.
+  process, and telemetry symbols, checked through Roslyn semantic binding rather
+  than substring matching.
 
 The primary structural suites are:
 

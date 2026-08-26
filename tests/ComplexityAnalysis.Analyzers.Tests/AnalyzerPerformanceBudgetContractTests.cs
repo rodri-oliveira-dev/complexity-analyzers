@@ -272,36 +272,68 @@ public sealed class AnalyzerPerformanceBudgetContractTests
     }
 
     [Fact]
-    public void Production_analyzer_source_remains_free_of_forbidden_hot_path_api_patterns()
+    public void Forbidden_hot_path_symbol_scan_detects_using_imports_constructors_and_instance_methods()
     {
-        string sourceRoot = Path.Combine(FindRepositoryRoot(), "src", "ComplexityAnalysis.Analyzers");
-        string[] productionFiles = Directory.GetFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToArray();
-        string[] forbiddenPatterns =
+        SyntaxTree syntaxTree = Parse(
+            """
+            using System.Diagnostics;
+            using System.IO;
+
+            public sealed class Sample
+            {
+                public void M()
+                {
+                    using var stream = new FileStream("input.txt", FileMode.Open);
+                    var process = new Process();
+                    process.Start();
+                }
+            }
+            """);
+        CSharpCompilation compilation = CSharpCompilation.Create(
+            assemblyName: "ForbiddenHotPathSymbolRegression",
+            syntaxTrees: [syntaxTree],
+            references: BasicReferences,
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        ImmutableArray<Diagnostic> errors =
         [
-            "System.IO.",
-            "System.Net.",
-            "HttpClient",
-            "WebRequest",
-            "Process.Start",
-            "File.",
-            "Directory.",
-            "Telemetry",
-            "EventSource",
-            "Trace."
+            .. compilation.GetDiagnostics(CancellationToken.None)
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
         ];
 
-        Assert.NotEmpty(productionFiles);
-        foreach (string file in productionFiles)
-        {
-            string source = File.ReadAllText(file);
-            foreach (string pattern in forbiddenPatterns)
-            {
-                Assert.DoesNotContain(pattern, source, StringComparison.Ordinal);
-            }
-        }
+        Assert.Empty(errors);
+
+        ImmutableArray<string> forbiddenUsages = FindForbiddenHotPathSymbolUsages(
+            compilation,
+            [syntaxTree]);
+
+        Assert.Contains(forbiddenUsages, usage => usage.Contains("System.IO.FileStream", StringComparison.Ordinal));
+        Assert.Contains(forbiddenUsages, usage => usage.Contains("System.Diagnostics.Process.Start", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Production_analyzer_source_remains_free_of_forbidden_hot_path_symbols()
+    {
+        string sourceRoot = Path.Combine(FindRepositoryRoot(), "src", "ComplexityAnalysis.Analyzers");
+        ImmutableArray<SyntaxTree> syntaxTrees = LoadProductionSyntaxTrees(sourceRoot);
+        ImmutableArray<SyntaxTree> compilationSyntaxTrees = syntaxTrees.Add(ParseImplicitUsings());
+        CSharpCompilation compilation = CSharpCompilation.Create(
+            assemblyName: "ComplexityAnalysis.Analyzers.ForbiddenSymbolScan",
+            syntaxTrees: compilationSyntaxTrees,
+            references: BasicReferences,
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        ImmutableArray<Diagnostic> errors =
+        [
+            .. compilation.GetDiagnostics(CancellationToken.None)
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+        ];
+
+        Assert.Empty(errors);
+
+        ImmutableArray<string> forbiddenUsages = FindForbiddenHotPathSymbolUsages(
+            compilation,
+            syntaxTrees);
+
+        Assert.Empty(forbiddenUsages);
     }
 
     private static ComplexityExpression AnalyzeMethod(
@@ -447,6 +479,143 @@ public sealed class AnalyzerPerformanceBudgetContractTests
         }
 
         throw new InvalidOperationException("Could not locate the repository root.");
+    }
+
+    private static ImmutableArray<SyntaxTree> LoadProductionSyntaxTrees(string sourceRoot)
+    {
+        string[] productionFiles = Directory.GetFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(productionFiles);
+
+        return
+        [
+            .. productionFiles.Select(path => CSharpSyntaxTree.ParseText(
+                File.ReadAllText(path),
+                path: path))
+        ];
+    }
+
+    private static SyntaxTree ParseImplicitUsings()
+    {
+        return CSharpSyntaxTree.ParseText(
+            """
+            global using System;
+            global using System.Collections.Generic;
+            global using System.IO;
+            global using System.Linq;
+            global using System.Net.Http;
+            global using System.Threading;
+            global using System.Threading.Tasks;
+            """,
+            path: "ImplicitUsings.g.cs");
+    }
+
+    private static ImmutableArray<string> FindForbiddenHotPathSymbolUsages(
+        Compilation compilation,
+        ImmutableArray<SyntaxTree> syntaxTrees)
+    {
+        ImmutableArray<string>.Builder forbiddenUsages = ImmutableArray.CreateBuilder<string>();
+        foreach (SyntaxTree syntaxTree in syntaxTrees)
+        {
+            SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
+            foreach (SyntaxNode node in syntaxTree.GetRoot().DescendantNodes())
+            {
+                if (TryGetReferencedSymbol(node, semanticModel, out ISymbol? symbol)
+                    && symbol is not null
+                    && IsForbiddenHotPathSymbol(symbol))
+                {
+                    Location location = node.GetLocation();
+                    FileLinePositionSpan lineSpan = location.GetLineSpan();
+                    forbiddenUsages.Add(
+                        string.Create(
+                            CultureInfo.InvariantCulture,
+                            $"{lineSpan.Path}:{lineSpan.StartLinePosition.Line + 1}:{lineSpan.StartLinePosition.Character + 1} references {symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}"));
+                }
+            }
+        }
+
+        return forbiddenUsages.ToImmutable();
+    }
+
+    private static bool TryGetReferencedSymbol(
+        SyntaxNode node,
+        SemanticModel semanticModel,
+        out ISymbol? symbol)
+    {
+        symbol = node switch
+        {
+            ObjectCreationExpressionSyntax creation => semanticModel.GetSymbolInfo(creation, CancellationToken.None).Symbol,
+            InvocationExpressionSyntax invocation => semanticModel.GetSymbolInfo(invocation, CancellationToken.None).Symbol,
+            MemberAccessExpressionSyntax memberAccess => semanticModel.GetSymbolInfo(memberAccess, CancellationToken.None).Symbol,
+            IdentifierNameSyntax identifier => semanticModel.GetSymbolInfo(identifier, CancellationToken.None).Symbol,
+            QualifiedNameSyntax qualifiedName => semanticModel.GetSymbolInfo(qualifiedName, CancellationToken.None).Symbol,
+            TypeSyntax type => semanticModel.GetTypeInfo(type, CancellationToken.None).Type,
+            _ => null,
+        };
+
+        return symbol is not null;
+    }
+
+    private static bool IsForbiddenHotPathSymbol(ISymbol symbol)
+    {
+        ITypeSymbol? containingOrReferencedType = symbol switch
+        {
+            IMethodSymbol method => method.ContainingType,
+            IPropertySymbol property => property.ContainingType,
+            IFieldSymbol field => field.ContainingType,
+            IEventSymbol @event => @event.ContainingType,
+            ITypeSymbol type => type,
+            _ => symbol.ContainingType,
+        };
+
+        return containingOrReferencedType is not null
+            && IsForbiddenHotPathType(containingOrReferencedType);
+    }
+
+    private static bool IsForbiddenHotPathType(ITypeSymbol type)
+    {
+        INamedTypeSymbol? namedType = type switch
+        {
+            IArrayTypeSymbol arrayType => arrayType.ElementType as INamedTypeSymbol,
+            INamedTypeSymbol named => named,
+            _ => null,
+        };
+
+        if (namedType is null)
+        {
+            return false;
+        }
+
+        string namespaceName = GetNamespaceName(namedType.ContainingNamespace);
+        string metadataName = namedType.OriginalDefinition.MetadataName;
+
+        return StringComparer.Ordinal.Equals(namespaceName, "System.IO")
+            || StringComparer.Ordinal.Equals(namespaceName, "System.Net")
+            || StringComparer.Ordinal.Equals(namespaceName, "System.Net.Http")
+            || StringComparer.Ordinal.Equals(namespaceName, "System.Diagnostics")
+                && IsForbiddenSystemDiagnosticsType(metadataName)
+            || StringComparer.Ordinal.Equals(namespaceName, "System.Diagnostics.Tracing")
+                && StringComparer.Ordinal.Equals(metadataName, "EventSource")
+            || metadataName.Contains("Telemetry", StringComparison.Ordinal);
+    }
+
+    private static bool IsForbiddenSystemDiagnosticsType(string metadataName)
+    {
+        return StringComparer.Ordinal.Equals(metadataName, "Process")
+            || StringComparer.Ordinal.Equals(metadataName, "ProcessStartInfo")
+            || StringComparer.Ordinal.Equals(metadataName, "Trace")
+            || StringComparer.Ordinal.Equals(metadataName, "TraceSource")
+            || StringComparer.Ordinal.Equals(metadataName, "EventLog");
+    }
+
+    private static string GetNamespaceName(INamespaceSymbol namespaceSymbol)
+    {
+        return namespaceSymbol.IsGlobalNamespace
+            ? string.Empty
+            : namespaceSymbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
     }
 
     private static ImmutableArray<MetadataReference> BasicReferences

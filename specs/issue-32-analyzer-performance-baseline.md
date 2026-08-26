@@ -146,7 +146,8 @@ These checks are suitable for CI blocking:
 - already-cancelled tokens stop non-trivial interprocedural and recursive
   analysis before cache growth;
 - analyzer source remains free of forbidden hot-path I/O/network/process/
-  telemetry API patterns;
+  telemetry symbols, checked through Roslyn semantic binding rather than
+  substring matching;
 - generated-code exclusion, package contract, compatibility, and #31
   characterization suites remain green.
 
