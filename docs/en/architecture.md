@@ -71,6 +71,23 @@ analyzers/dotnet/cs/
 
 It is not a runtime library. Consumer applications do not call analyzer classes, and Roslyn authoring dependencies are kept private rather than exposed transitively.
 
+The repository build SDK is a separate concern. `global.json` selects SDK `10.0.400` for repository restore, build, tests, and pack, while supported compiler hosts are validated by installing the produced `.nupkg` into temporary consumer projects.
+
+## Compatibility contracts
+
+| Contract | Current value |
+| --- | --- |
+| Repository build SDK | `.NET SDK 10.0.400` from `global.json`. |
+| Repository C# language version | `12.0`. |
+| Analyzer target framework | `netstandard2.0`, preserved for compiler/IDE host compatibility. |
+| Roslyn compiler API baseline | `Microsoft.CodeAnalysis.CSharp` `4.8.0`, resolving `Microsoft.CodeAnalysis.Common` `4.8.0`. |
+| Analyzer authoring rules | `Microsoft.CodeAnalysis.Analyzers` `3.11.0`. |
+| Supported SDK host matrix | `.NET 8`, `.NET 9`, and `.NET 10` consumer builds in CI. |
+| Package analyzer path | `analyzers/dotnet/cs/ComplexityAnalysis.Analyzers.dll`. |
+| Runtime package assets | No analyzer `lib/` asset and no transitive Roslyn dependency group. |
+
+Compiling against newer Roslyn packages can introduce API references that older compiler or IDE hosts cannot load. Roslyn upgrades are therefore conservative: update proposals must keep Roslyn assets private, inspect the generated package, run the package/consumer contract tests, and validate every supported SDK host before merge.
+
 ## Repository structure
 
 The main product areas are:
@@ -239,7 +256,7 @@ CI treats deterministic structural checks as hard gates: bounded traversal, cach
 
 Package contract validation ensures that `ComplexityAnalysis.Analyzers.dll` is packed under `analyzers/dotnet/cs/`, not `lib/`, and that authoring dependencies do not become consumer runtime dependencies.
 
-CI also validates package consumption with .NET 8, .NET 9, and .NET 10 SDK hosts.
+CI also validates package consumption with .NET 8, .NET 9, and .NET 10 SDK hosts. Each compatibility job restores and builds a temporary consumer using the real `.nupkg`, enables `BIG9000` as a package-load probe, enables `BIG1006` on a known quadratic method, rejects analyzer load failures, and checks that the package contributes analyzer assets rather than compile/runtime assets.
 
 ## Why no Workspaces dependency
 

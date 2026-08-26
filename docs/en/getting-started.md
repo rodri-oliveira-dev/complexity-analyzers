@@ -6,11 +6,13 @@ This guide explains how to build, test, pack, and validate `ComplexityAnalysis.A
 
 ## Prerequisites
 
-- .NET SDK `10.0.100`, or a compatible SDK selected by the root `global.json`.
+- .NET SDK `10.0.400`, or a compatible SDK selected by the root `global.json`.
 - Git.
 - A shell capable of running `dotnet` commands.
 
 The analyzer project targets `netstandard2.0` because Roslyn analyzers are loaded by compiler and IDE hosts rather than by the runtime target of the application being analyzed. The repository tests and tooling use the SDK selected by `global.json`.
+
+The repository build SDK is not the minimum consumer host version. Build and test tooling currently use SDK `10.0.400`; package compatibility is validated separately by installing the generated `.nupkg` into consumer projects built by supported SDK hosts.
 
 ## Clone and build
 
@@ -46,6 +48,8 @@ analyzers/dotnet/cs/
 It is intentionally not packed as a normal runtime library under `lib/`. Roslyn authoring dependencies are private assets and are not intended to become transitive dependencies of consuming projects.
 
 The project uses `README.md` as the package readme and declares the repository URL, repository type, and MIT package license metadata.
+
+The package contract also expects no `.deps.json`, no duplicate analyzer DLL, no runtime `lib/` asset for the analyzer assembly, and no transitive Roslyn dependency group in the generated `.nuspec`.
 
 ## Consume the local package
 
@@ -162,6 +166,8 @@ CI validates local package consumption on the supported SDK hosts:
 | .NET 10 LTS | `net10.0` |
 
 The analyzer assembly itself targets `netstandard2.0`. The compatibility matrix verifies that compiler hosts can load and execute the analyzer package, not merely that the consumer project can target a given framework.
+
+The analyzer is compiled against `Microsoft.CodeAnalysis.CSharp` `4.8.0`, which resolves `Microsoft.CodeAnalysis.Common` `4.8.0`. This is a conservative Roslyn host baseline: dependency upgrades require package inspection and successful consumer execution across the supported host matrix before merge. `Microsoft.CodeAnalysis.Workspaces` is intentionally absent because the package does not provide code fixes or workspace-based IDE features.
 
 ## Performance validation
 

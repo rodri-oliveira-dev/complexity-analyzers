@@ -99,7 +99,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: package
-    permissions: {}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -112,6 +113,9 @@ jobs:
             target_framework: net10.0
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Setup .NET SDK host
         uses: actions/setup-dotnet@v6
         with:
@@ -127,86 +131,13 @@ jobs:
         shell: pwsh
         env:
           TARGET_FRAMEWORK: ${{ matrix.target_framework }}
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          $consumer = Join-Path $env:RUNNER_TEMP "complexity-analyzers-consumer"
-          $packageSource = Join-Path $env:RUNNER_TEMP "complexity-analyzers-packages"
-          $artifacts = Join-Path $consumer "artifacts"
-
-          New-Item -ItemType Directory -Force -Path $consumer | Out-Null
-          New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
-
-          Push-Location $consumer
-          try {
-            dotnet new console --framework $env:TARGET_FRAMEWORK --no-restore
-            dotnet new nugetconfig
-            $nugetConfig = Join-Path $consumer "nuget.config"
-            if (-not (Test-Path -LiteralPath $nugetConfig)) {
-              $nugetConfig = Join-Path $consumer "NuGet.config"
-            }
-
-            dotnet nuget add source $packageSource --name local-complexity-analyzers --configfile $nugetConfig
-            dotnet add package ComplexityAnalysis.Analyzers --version $env:PACKAGE_VERSION --source $packageSource --no-restore
-
-            @(
-              "root = true"
-              ""
-              "[*.cs]"
-              "complexity_analyzers.maximum_complexity = n"
-              "dotnet_diagnostic.BIG1006.severity = warning"
-            ) | Set-Content -LiteralPath ".editorconfig"
-
-            @(
-              "using System;"
-              ""
-              "public static class Program"
-              "{"
-              "    public static void Main()"
-              "    {"
-              "        Console.WriteLine(new Sample().Quadratic(new[] { 1, 2, 3 }));"
-              "    }"
-              "}"
-              ""
-              "public sealed class Sample"
-              "{"
-              "    public int Quadratic(int[] values)"
-              "    {"
-              "        var total = 0;"
-              "        foreach (var outer in values)"
-              "        {"
-              "            foreach (var inner in values)"
-              "            {"
-              "                total += outer + inner;"
-              "            }"
-              "        }"
-              ""
-              "        return total;"
-              "    }"
-              "}"
-            ) | Set-Content -LiteralPath "Program.cs"
-
-            dotnet restore --configfile $nugetConfig
-            $output = & dotnet build --configuration Release --no-restore 2>&1
-            $exitCode = $LASTEXITCODE
-            $output | Tee-Object -FilePath (Join-Path $artifacts "consumer-build.log")
-
-            if ($exitCode -ne 0) {
-              exit $exitCode
-            }
-
-            $joined = $output -join "`n"
-            if ($joined -match "CS8032|CS9057|AD0001|AD0002") {
-              throw "Analyzer load failure or analyzer exception was reported."
-            }
-
-            if ($joined -notmatch "BIG1006") {
-              throw "Expected BIG1006 diagnostic was not reported by the consumer build."
-            }
-          }
-          finally {
-            Pop-Location
-          }
+        run: >
+          ./eng/Validate-AnalyzerPackageConsumer.ps1
+          -PackageSource "${{ runner.temp }}/complexity-analyzers-packages"
+          -PackageVersion "${{ env.PACKAGE_VERSION }}"
+          -TargetFramework "$env:TARGET_FRAMEWORK"
+          -ConsumerDirectory "${{ runner.temp }}/complexity-analyzers-consumer"
+          -ArtifactsDirectory "${{ runner.temp }}/complexity-analyzers-consumer/artifacts"
 
       - name: Upload consumer smoke log
         uses: actions/upload-artifact@v7

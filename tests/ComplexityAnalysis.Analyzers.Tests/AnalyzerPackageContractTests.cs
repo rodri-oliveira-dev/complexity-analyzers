@@ -1,10 +1,5 @@
-using System;
-using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.IO.Compression;
-using System.Linq;
-using System.Threading;
 using System.Xml.Linq;
 
 using Xunit;
@@ -27,11 +22,18 @@ public sealed class AnalyzerPackageContractTests
         PackageArtifacts artifacts = Artifacts.Value;
         using ZipArchive package = ZipFile.OpenRead(artifacts.PackagePath);
         string[] entries = GetEntryNames(package);
+        string[] dllEntries =
+        [
+            .. entries.Where(entry => entry.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        ];
 
         Assert.Contains(AnalyzerDllPath, entries);
+        Assert.Equal([AnalyzerDllPath], dllEntries);
         Assert.DoesNotContain("lib/netstandard2.0/ComplexityAnalysis.Analyzers.dll", entries);
         Assert.DoesNotContain(entries, entry => entry.StartsWith("lib/", StringComparison.Ordinal));
+        Assert.DoesNotContain(entries, entry => entry.StartsWith("runtimes/", StringComparison.Ordinal));
         Assert.DoesNotContain(entries, entry => entry.EndsWith(".deps.json", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(entries, entry => entry.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -110,7 +112,7 @@ public sealed class AnalyzerPackageContractTests
 
     private static PackageArtifacts CreatePackageArtifacts()
     {
-        string root = FindAnalyzerRoot();
+        string root = RepositoryTestSupport.FindRepositoryRoot();
         string outputDirectory = Path.Combine(root, "artifacts", "package-contract-tests");
         _ = Directory.CreateDirectory(outputDirectory);
 
@@ -119,64 +121,20 @@ public sealed class AnalyzerPackageContractTests
         DeleteIfExists(packagePath);
         DeleteIfExists(symbolPackagePath);
 
-        RunDotNet(
-            root,
-            "pack",
-            "src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
-            "--configuration",
-            "Release",
-            "--no-build",
-            "-p:PackageVersion=" + PackageVersion,
-            "--output",
-            outputDirectory);
+        RepositoryTestSupport.RunDotNet(
+                root,
+                "pack",
+                "src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj",
+                "--configuration",
+                "Release",
+                "--no-build",
+                "-p:PackageVersion=" + PackageVersion,
+                "--output",
+                outputDirectory)
+            .AssertSuccess("dotnet pack");
 
         Assert.True(File.Exists(packagePath), string.Create(CultureInfo.InvariantCulture, $"Expected package '{packagePath}' to exist."));
         return new PackageArtifacts(packagePath, symbolPackagePath);
-    }
-
-    private static void RunDotNet(string workingDirectory, params string[] arguments)
-    {
-        ProcessStartInfo startInfo = new()
-        {
-            FileName = "dotnet",
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-
-        foreach (string argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start dotnet.");
-        string standardOutput = process.StandardOutput.ReadToEnd();
-        string standardError = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        Assert.True(
-            process.ExitCode == 0,
-            string.Create(
-                CultureInfo.InvariantCulture,
-                $"dotnet {string.Join(" ", arguments)} failed with exit code {process.ExitCode}.{Environment.NewLine}{standardOutput}{Environment.NewLine}{standardError}"));
-    }
-
-    private static string FindAnalyzerRoot()
-    {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "ComplexityAnalysis.Analyzers.slnx")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("Could not locate analyzer workspace root.");
     }
 
     private static void DeleteIfExists(string path)
