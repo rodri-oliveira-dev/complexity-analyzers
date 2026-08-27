@@ -7,14 +7,15 @@
     <Nullable>enable</Nullable>
 
     <PackageId>ComplexityAnalysis.Analyzers</PackageId>
-    <Title>ComplexityAnalysis.Analyzers</Title>
-    <Description>Roslyn analyzer package for algorithmic complexity diagnostics in C#.</Description>
+    <Title>Complexity Analysis Analyzers for C#</Title>
+    <Description>Roslyn analyzers for C# that detect algorithmic and structural code complexity at compile time, including Big-O estimation, cyclomatic complexity, nesting depth, method-size metrics, costly LINQ/BCL patterns, interprocedural analysis, and recurrence solving.</Description>
     <Authors>Rodrigo de Oliveira</Authors>
-    <PackageTags>roslyn;analyzer;complexity;big-o;csharp</PackageTags>
+    <PackageTags>roslyn;roslyn-analyzer;analyzer;csharp;dotnet;static-analysis;code-analysis;code-quality;complexity;algorithmic-complexity;big-o;cyclomatic-complexity;code-metrics;nesting-depth;performance;linq</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -32,6 +33,7 @@
 
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../resources/icon.png" Pack="true" PackagePath="/" />
     <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs/" />
   </ItemGroup>
 </Project>
