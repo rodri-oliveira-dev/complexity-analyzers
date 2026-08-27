@@ -11,6 +11,9 @@ BIG1005 | Complexity | Info | Exponential recursive growth.
 BIG1006 | Complexity | Info | Method complexity exceeds configured threshold.
 BIG2001 | Complexity | Info | Cyclomatic complexity exceeds configured threshold.
 BIG2002 | Complexity | Info | Maximum nesting depth exceeds configured threshold.
+BIG2003 | Complexity | Info | Method NLOC exceeds configured threshold.
+BIG2004 | Complexity | Info | Statement count exceeds configured threshold.
+BIG2005 | Complexity | Info | Token count exceeds configured threshold.
 BIG9000 | Infrastructure | Info | Analyzer execution probe.
 
 ### Changed Rules
@@ -31,3 +34,6 @@ BIG1005 | Direct-recursion reporting can now use the shared executable-member ab
 BIG1006 | Threshold diagnostics can now report for supported executable members when their known complexity exceeds the configured maximum.
 BIG2001 | Added configurable Cyclomatic Complexity / Modified McCabe threshold reporting with `cyclomaticComplexity`, `threshold` and `cyclomaticComplexityMode` diagnostic properties.
 BIG2002 | Added configurable Maximum Control-Flow Nesting Depth threshold reporting with `maximumNestingDepth` and `threshold` diagnostic properties.
+BIG2003 | Added configurable NLOC threshold reporting with `methodNloc` and `threshold` diagnostic properties.
+BIG2004 | Added configurable statement-count threshold reporting with `statementCount` and `threshold` diagnostic properties.
+BIG2005 | Added configurable token-count threshold reporting with `tokenCount` and `threshold` diagnostic properties.

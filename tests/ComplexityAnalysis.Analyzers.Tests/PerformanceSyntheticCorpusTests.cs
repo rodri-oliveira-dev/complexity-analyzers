@@ -62,7 +62,10 @@ public sealed class PerformanceSyntheticCorpusTests
                 Options(
                     (ComplexityAnalyzerOptionsReader.MaxCallDepthKey, "16"),
                     (ComplexityAnalyzerOptionsReader.MaxMethodsPerRootKey, "128"),
-                    (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "2147483647")),
+                    (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "2147483647"),
+                    (ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "2147483647"),
+                    (ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "2147483647"),
+                    (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "2147483647")),
                 []));
 
         Stopwatch stopwatch = Stopwatch.StartNew();

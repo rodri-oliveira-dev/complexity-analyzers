@@ -25,6 +25,9 @@ inconclusivos ou não resolvidos permanecem `Unknown` em vez de serem estimados.
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2001` | Cyclomatic complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2002` | Maximum nesting depth exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2003` | Method NLOC exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2004` | Statement count exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2005` | Token count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Executable Members Suportados
@@ -84,10 +87,13 @@ como um trace interno completo.
 | Propriedade | Significado |
 | --- | --- |
 | `complexity` | Estimativa conhecida emitida por `BIG0001`, `BIG1005` ou `BIG1006`. |
-| `threshold` | Threshold configurado emitido por `BIG1006`, `BIG2001` ou `BIG2002`. |
+| `threshold` | Threshold configurado emitido por `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004` ou `BIG2005`. |
 | `cyclomaticComplexity` | Cyclomatic Complexity real emitida por `BIG2001`. |
 | `cyclomaticComplexityMode` | Modo de contabilização de `switch` emitido por `BIG2001`: `standard` ou `modified_mccabe`. |
 | `maximumNestingDepth` | Maximum Control-Flow Nesting Depth real emitida por `BIG2002`. |
+| `methodNloc` | NLOC real emitido por `BIG2003`. |
+| `statementCount` | Statement count estrutural real emitido por `BIG2004`. |
+| `tokenCount` | Token count real do corpo executável emitido por `BIG2005`. |
 | `operation` | Nome estável da operação ou método responsável por um diagnóstico acionável. |
 | `operationComplexity` | Custo conhecido da operação ou callee no local do diagnóstico. |
 | `iterationComplexity` | Complexidade conhecida da iteração envolvente. |
@@ -777,6 +783,138 @@ Este diagnóstico não é métrica de quantidade de caminhos, estimativa Big-O,
 contagem de linhas, contagem de statements, contagem de tokens nem Cognitive
 Complexity. Ele não conta nesting sintático simples e não infere execução por
 bodies executáveis aninhados apenas porque foram declarados dentro do membro pai.
+
+## BIG2003 - Method NLOC Acima do Threshold Configurado
+
+| Propriedade | Valor |
+| --- | --- |
+| Categoria | `Complexity` |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Localização estável do executable member |
+| Mensagem | `Member '{member}' has NLOC {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `methodNloc`, `threshold` |
+
+### O Que Detecta
+
+`BIG2003` reporta um executable member suportado cujo NLOC é estritamente maior
+que `complexity_analyzers.maximum_method_nloc`.
+
+### Por Que Importa
+
+NLOC é um sinal de tamanho, não uma pontuação de complexidade algorítmica ou de
+fluxo de controle. Ele ajuda a aplicar uma política de manutenibilidade sobre
+quanto código-fonte relevante pertence a um único executable member.
+
+### Regras de Contagem
+
+NLOC conta linhas de origem dentro do corpo executável pertencente ao membro que
+contêm pelo menos um token relevante de código. Linhas em branco, linhas somente
+com comentários, linhas somente com chaves e linhas somente com delimitadores não
+contam. Comentários no fim da linha não adicionam linhas.
+
+Linhas de declaração/header fora do corpo executável não participam. Um membro
+com bloco é contado a partir do bloco; um expression-bodied member é contado
+apenas a partir da expressão. Local functions, lambdas e anonymous methods
+aninhados são analisados independentemente e não inflam o NLOC do pai.
+
+### Exemplo Que Dispara
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_method_nloc = 2
+dotnet_diagnostic.BIG2003.severity = warning
+```
+
+```csharp
+void M()
+{
+    var value = 0;
+    if (value == 0)
+    {
+        value++;
+    }
+}
+```
+
+As linhas relevantes do corpo são a declaração, o `if` e o incremento; portanto,
+o NLOC real é `3`.
+
+### Limitações
+
+Este diagnóstico não mede LOC físico, totais por arquivo/projeto, statement
+count, token count, Big-O, Cyclomatic Complexity, Maximum Nesting Depth,
+Cognitive Complexity ou Halstead Metrics.
+
+## BIG2004 - Statement Count Acima do Threshold Configurado
+
+| Propriedade | Valor |
+| --- | --- |
+| Categoria | `Complexity` |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Localização estável do executable member |
+| Mensagem | `Member '{member}' has statement count {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `statementCount`, `threshold` |
+
+### O Que Detecta
+
+`BIG2004` reporta um executable member suportado cujo statement count estrutural
+C# é estritamente maior que
+`complexity_analyzers.maximum_statement_count`.
+
+### Regras de Contagem
+
+O analyzer conta nós Roslyn `StatementSyntax` no corpo pertencente ao membro,
+excluindo containers `BlockSyntax` para evitar contar a representação de blocos
+como trabalho executável. Statements filhos dentro de constructs de fluxo de
+controle continuam contando: um `if` com um expression statement no corpo
+contribui dois statements.
+
+Expression-bodied members contam como um statement sintético de expressão. Local
+functions, lambdas e anonymous methods aninhados são analisados
+independentemente; a declaração de local function conta como um statement do pai,
+mas o corpo dela não infla o pai.
+
+### Limitações
+
+Statement count é independente de NLOC, token count, Big-O, Cyclomatic
+Complexity, Maximum Nesting Depth, Cognitive Complexity e Halstead Metrics.
+
+## BIG2005 - Token Count Acima do Threshold Configurado
+
+| Propriedade | Valor |
+| --- | --- |
+| Categoria | `Complexity` |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Localização estável do executable member |
+| Mensagem | `Member '{member}' has token count {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `tokenCount`, `threshold` |
+
+### O Que Detecta
+
+`BIG2005` reporta um executable member suportado cujo token count do corpo
+executável é estritamente maior que
+`complexity_analyzers.maximum_token_count`.
+
+### Regras de Contagem
+
+Token count conta tokens sintáticos C# não ausentes pertencentes ao corpo
+executável, incluindo keywords, identificadores, literais, operadores, chaves,
+pontuação e delimitadores. Trivia é excluída; portanto, comentários e whitespace
+não afetam o valor.
+
+Em expression-bodied members, apenas tokens da expressão participam. Local
+functions, lambdas e anonymous methods aninhados são analisados
+independentemente; bodies executáveis aninhados não inflam o token count do pai.
+
+### Limitações
+
+Token count é uma métrica sintática de tamanho. Ela é independente de NLOC,
+statement count, Big-O, Cyclomatic Complexity, Maximum Nesting Depth, Cognitive
+Complexity e Halstead Metrics.
 
 ## BIG9000 - Probe de Execução do Analyzer
 

@@ -48,6 +48,9 @@ DiagnosticAnalyzer
     +-- BIG1006 threshold configurado excedido
     +-- BIG2001 threshold ciclomático excedido
     +-- BIG2002 threshold de maximum nesting excedido
+    +-- BIG2003 threshold de NLOC excedido
+    +-- BIG2004 threshold de statement count excedido
+    +-- BIG2005 threshold de token count excedido
     `-- BIG9000 probe de execução
 ```
 
@@ -241,7 +244,10 @@ As opções públicas de comportamento são:
 - `complexity_analyzers.maximum_complexity`;
 - `complexity_analyzers.maximum_cyclomatic_complexity`;
 - `complexity_analyzers.cyclomatic_complexity_mode`;
-- `complexity_analyzers.maximum_nesting_depth`.
+- `complexity_analyzers.maximum_nesting_depth`;
+- `complexity_analyzers.maximum_method_nloc`;
+- `complexity_analyzers.maximum_statement_count`;
+- `complexity_analyzers.maximum_token_count`.
 
 Valores específicos por syntax tree sobrescrevem valores globais para aquela árvore. Valores inválidos retornam aos defaults documentados em vez de gerar falhas do analyzer.
 
@@ -260,6 +266,9 @@ Veja [Configuração](configuration.md) para detalhes.
 - `BIG1006` para estimativas conhecidas e comparáveis acima de um threshold configurado;
 - `BIG2001` para executable members suportados acima de um threshold configurado de Cyclomatic Complexity;
 - `BIG2002` para executable members suportados acima de um threshold configurado de Maximum Control-Flow Nesting Depth;
+- `BIG2003` para executable members suportados acima de um threshold configurado de NLOC;
+- `BIG2004` para executable members suportados acima de um threshold configurado de statement count;
+- `BIG2005` para executable members suportados acima de um threshold configurado de token count;
 - `BIG9000` como probe de execução opt-in.
 
 A análise de código gerado é desabilitada e a execução concorrente do analyzer é habilitada.

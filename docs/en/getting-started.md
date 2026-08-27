@@ -110,7 +110,7 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## Try the diagnostics
 
-`BIG1001` through `BIG1005` are enabled by default with `Info` severity. `BIG1006`, `BIG2001`, and `BIG2002` are also enabled as descriptors, but they only report after concrete thresholds are configured. Build visibility for informational diagnostics depends on the consuming project and SDK settings.
+`BIG1001` through `BIG1005` are enabled by default with `Info` severity. `BIG1006` and `BIG2001` through `BIG2005` are also enabled as descriptors, but they only report after concrete thresholds are configured. Build visibility for informational diagnostics depends on the consuming project and SDK settings.
 
 Promote an actionable diagnostic locally:
 
@@ -162,6 +162,19 @@ Promote the Maximum Control-Flow Nesting Depth threshold diagnostic:
 
 complexity_analyzers.maximum_nesting_depth = 3
 dotnet_diagnostic.BIG2002.severity = warning
+```
+
+Promote method-size threshold diagnostics:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_method_nloc = 40
+complexity_analyzers.maximum_statement_count = 25
+complexity_analyzers.maximum_token_count = 300
+dotnet_diagnostic.BIG2003.severity = warning
+dotnet_diagnostic.BIG2004.severity = warning
+dotnet_diagnostic.BIG2005.severity = warning
 ```
 
 `BIG0001` is disabled by default. Enable it when you want method-level complexity estimates:

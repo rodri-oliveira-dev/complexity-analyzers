@@ -7,6 +7,9 @@ internal static class DiagnosticPropertyNames
     internal const string CyclomaticComplexity = "cyclomaticComplexity";
     internal const string CyclomaticComplexityMode = "cyclomaticComplexityMode";
     internal const string MaximumNestingDepth = "maximumNestingDepth";
+    internal const string MethodNloc = "methodNloc";
+    internal const string StatementCount = "statementCount";
+    internal const string TokenCount = "tokenCount";
     internal const string Operation = "operation";
     internal const string OperationComplexity = "operationComplexity";
     internal const string IterationComplexity = "iterationComplexity";

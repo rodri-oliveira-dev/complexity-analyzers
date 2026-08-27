@@ -22,7 +22,10 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         ComplexityThreshold.None,
         maximumCyclomaticComplexity: null,
         CyclomaticComplexityAnalysisMode.Standard,
-        maximumNestingDepth: null);
+        maximumNestingDepth: null,
+        maximumMethodNloc: null,
+        maximumStatementCount: null,
+        maximumTokenCount: null);
 
     internal ComplexityAnalyzerOptions(
         bool interproceduralAnalysisEnabled,
@@ -32,7 +35,10 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         ComplexityThreshold maximumComplexity,
         int? maximumCyclomaticComplexity = null,
         CyclomaticComplexityAnalysisMode cyclomaticComplexityMode = CyclomaticComplexityAnalysisMode.Standard,
-        int? maximumNestingDepth = null)
+        int? maximumNestingDepth = null,
+        int? maximumMethodNloc = null,
+        int? maximumStatementCount = null,
+        int? maximumTokenCount = null)
     {
         if (maxCallDepth is < 0 or > MaximumMaxCallDepth)
         {
@@ -54,6 +60,21 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             throw new ArgumentOutOfRangeException(nameof(maximumNestingDepth), "Maximum nesting depth must be non-negative when configured.");
         }
 
+        if (maximumMethodNloc < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumMethodNloc), "Maximum method NLOC must be non-negative when configured.");
+        }
+
+        if (maximumStatementCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumStatementCount), "Maximum statement count must be non-negative when configured.");
+        }
+
+        if (maximumTokenCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumTokenCount), "Maximum token count must be non-negative when configured.");
+        }
+
         InterproceduralAnalysisEnabled = interproceduralAnalysisEnabled;
         RecursionAnalysisEnabled = recursionAnalysisEnabled;
         MaxCallDepth = maxCallDepth;
@@ -62,6 +83,9 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         MaximumCyclomaticComplexity = maximumCyclomaticComplexity;
         CyclomaticComplexityMode = cyclomaticComplexityMode;
         MaximumNestingDepth = maximumNestingDepth;
+        MaximumMethodNloc = maximumMethodNloc;
+        MaximumStatementCount = maximumStatementCount;
+        MaximumTokenCount = maximumTokenCount;
     }
 
     internal bool InterproceduralAnalysisEnabled
@@ -104,6 +128,21 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         get;
     }
 
+    internal int? MaximumMethodNloc
+    {
+        get;
+    }
+
+    internal int? MaximumStatementCount
+    {
+        get;
+    }
+
+    internal int? MaximumTokenCount
+    {
+        get;
+    }
+
     internal ComplexityAnalyzerOptions WithAnalysisBudget(AnalysisBudget budget)
     {
         _ = budget ?? throw new ArgumentNullException(nameof(budget));
@@ -119,7 +158,10 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
                 MaximumComplexity,
                 MaximumCyclomaticComplexity,
                 CyclomaticComplexityMode,
-                MaximumNestingDepth);
+                MaximumNestingDepth,
+                MaximumMethodNloc,
+                MaximumStatementCount,
+                MaximumTokenCount);
     }
 
     public bool Equals(ComplexityAnalyzerOptions? other)
@@ -132,7 +174,10 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             && MaximumComplexity.Equals(other.MaximumComplexity)
             && MaximumCyclomaticComplexity == other.MaximumCyclomaticComplexity
             && CyclomaticComplexityMode == other.CyclomaticComplexityMode
-            && MaximumNestingDepth == other.MaximumNestingDepth;
+            && MaximumNestingDepth == other.MaximumNestingDepth
+            && MaximumMethodNloc == other.MaximumMethodNloc
+            && MaximumStatementCount == other.MaximumStatementCount
+            && MaximumTokenCount == other.MaximumTokenCount;
     }
 
     public override bool Equals(object? obj)
@@ -152,6 +197,9 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             hash = (hash * 397) ^ MaximumCyclomaticComplexity.GetHashCode();
             hash = (hash * 397) ^ CyclomaticComplexityMode.GetHashCode();
             hash = (hash * 397) ^ MaximumNestingDepth.GetHashCode();
+            hash = (hash * 397) ^ MaximumMethodNloc.GetHashCode();
+            hash = (hash * 397) ^ MaximumStatementCount.GetHashCode();
+            hash = (hash * 397) ^ MaximumTokenCount.GetHashCode();
             return hash;
         }
     }

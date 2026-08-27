@@ -23,10 +23,13 @@ Valores inválidos são tratados com segurança: não quebram o build nem geram 
 | `complexity_analyzers.maximum_cyclomatic_complexity` | Integer | sem valor | Inteiro decimal positivo | Habilita `BIG2001` quando a Cyclomatic Complexity de um executable member suportado excede esse threshold. |
 | `complexity_analyzers.cyclomatic_complexity_mode` | String | `standard` | `standard`, `modified_mccabe` | Seleciona a contabilização de `switch` para Cyclomatic Complexity. |
 | `complexity_analyzers.maximum_nesting_depth` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2002` quando a Maximum Control-Flow Nesting Depth de um executable member suportado excede esse threshold. |
+| `complexity_analyzers.maximum_method_nloc` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2003` quando o NLOC de um executable member suportado excede esse threshold. |
+| `complexity_analyzers.maximum_statement_count` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2004` quando o statement count de um executable member suportado excede esse threshold. |
+| `complexity_analyzers.maximum_token_count` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2005` quando o token count de um executable member suportado excede esse threshold. |
 
 Valores booleanos ignoram diferenças entre maiúsculas e minúsculas depois da remoção de espaços nas extremidades. Valores inteiros devem ser números decimais não negativos, sem sinal, ponto decimal, separadores ou espaços internos. Valores de threshold são case-sensitive.
 
-Valores fora dos limites públicos de budget retornam ao padrão: `max_call_depth = 5` e `max_methods_per_root = 32`. Thresholds ciclomáticos e de nesting inválidos retornam para sem valor configurado. Modos ciclomáticos inválidos retornam para `standard`.
+Valores fora dos limites públicos de budget retornam ao padrão: `max_call_depth = 5` e `max_methods_per_root = 32`. Thresholds ciclomáticos, de nesting, NLOC, statement count e token count inválidos retornam para sem valor configurado. Modos ciclomáticos inválidos retornam para `standard`.
 
 ## Exemplo
 
@@ -41,10 +44,16 @@ complexity_analyzers.maximum_complexity = n_log_n
 complexity_analyzers.maximum_cyclomatic_complexity = 10
 complexity_analyzers.cyclomatic_complexity_mode = standard
 complexity_analyzers.maximum_nesting_depth = 3
+complexity_analyzers.maximum_method_nloc = 40
+complexity_analyzers.maximum_statement_count = 25
+complexity_analyzers.maximum_token_count = 300
 
 dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG2001.severity = warning
 dotnet_diagnostic.BIG2002.severity = warning
+dotnet_diagnostic.BIG2003.severity = warning
+dotnet_diagnostic.BIG2004.severity = warning
+dotnet_diagnostic.BIG2005.severity = warning
 ```
 
 ## Comportamento do threshold
@@ -126,6 +135,45 @@ Exemplos:
 | `3` | `3` | Não reporta. |
 | `4` | `3` | Reporta `BIG2002`. |
 
+## Comportamento das métricas de tamanho
+
+Os thresholds de tamanho são opt-in e independentes:
+
+- `complexity_analyzers.maximum_method_nloc` habilita `BIG2003`;
+- `complexity_analyzers.maximum_statement_count` habilita `BIG2004`;
+- `complexity_analyzers.maximum_token_count` habilita `BIG2005`.
+
+Quando um threshold não está configurado ou é inválido, seu diagnóstico não
+reporta. Valores válidos são inteiros decimais não negativos. Igualdade não
+reporta; apenas valor real estritamente maior gera diagnóstico.
+
+NLOC conta linhas de origem dentro do corpo executável que contêm pelo menos um
+token de código pertencente ao membro, excluindo linhas em branco, linhas
+somente com comentários, linhas somente com chaves e linhas somente com
+delimitadores. Linhas de declaração/header fora do corpo executável não
+participam. Em expression-bodied members, apenas a expressão participa.
+
+Statement count conta statements C# estruturais no corpo executável. Blocos são
+containers, não statements contados. Expression-bodied members contam como um
+statement sintético de expressão. Local functions, lambdas e anonymous methods
+aninhados são medidos independentemente; a declaração de local function conta
+como um statement do pai, mas seu corpo não infla o pai.
+
+Token count conta tokens sintáticos C# não ausentes pertencentes ao corpo
+executável, incluindo pontuação e delimitadores, mas excluindo trivia, espaços em
+branco e comentários. Em expression-bodied members, apenas tokens da expressão
+participam.
+
+Exemplos:
+
+| Métrica | Valor real | Threshold | Resultado |
+| --- | --- | --- | --- |
+| NLOC | `9` | `10` | Não reporta. |
+| NLOC | `10` | `10` | Não reporta. |
+| NLOC | `11` | `10` | Reporta `BIG2003`. |
+| Statement count | `26` | `25` | Reporta `BIG2004`. |
+| Token count | `301` | `300` | Reporta `BIG2005`. |
+
 ## Feature flags
 
 `complexity_analyzers.interprocedural_analysis = false` impede expansão para callees fonte suportados. A análise intraprocedural e a análise de operações BCL/LINQ suportadas permanecem ativas.
@@ -177,6 +225,9 @@ O compilador e o SDK determinam o comportamento exato do build para cada severid
 | `BIG1006` | `Info` | `true` |
 | `BIG2001` | `Info` | `true` |
 | `BIG2002` | `Info` | `true` |
+| `BIG2003` | `Info` | `true` |
+| `BIG2004` | `Info` | `true` |
+| `BIG2005` | `Info` | `true` |
 | `BIG9000` | `Info` | `false` |
 
 `BIG1006` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_complexity` seja configurado com um threshold concreto.
@@ -184,6 +235,8 @@ O compilador e o SDK determinam o comportamento exato do build para cada severid
 `BIG2001` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_cyclomatic_complexity` seja configurado com um threshold concreto.
 
 `BIG2002` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_nesting_depth` seja configurado com um threshold concreto.
+
+`BIG2003`, `BIG2004` e `BIG2005` são habilitados por padrão como descriptors, mas cada um permanece funcionalmente inativo até que seu threshold de tamanho correspondente seja configurado.
 
 ## Configurações comuns
 
@@ -212,6 +265,12 @@ complexity_analyzers.cyclomatic_complexity_mode = modified_mccabe
 dotnet_diagnostic.BIG2001.severity = warning
 complexity_analyzers.maximum_nesting_depth = 3
 dotnet_diagnostic.BIG2002.severity = warning
+complexity_analyzers.maximum_method_nloc = 40
+dotnet_diagnostic.BIG2003.severity = warning
+complexity_analyzers.maximum_statement_count = 25
+dotnet_diagnostic.BIG2004.severity = warning
+complexity_analyzers.maximum_token_count = 300
+dotnet_diagnostic.BIG2005.severity = warning
 ```
 
 Comprove temporariamente que o pacote carregou:
@@ -232,6 +291,6 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## O que não é configurável
 
-O analyzer não expõe opções para mappings customizados de operações, regras customizadas de decision points ciclomáticos além do modo de `switch` documentado, comportamento dos mappings BCL/LINQ, seleção de famílias de recorrência, tolerâncias de teoremas, análise de solution inteira, code fixes, complexidade de memória, complexidade paralela ou complexidade probabilística.
+O analyzer não expõe opções para mappings customizados de operações, regras customizadas de decision points ciclomáticos além do modo de `switch` documentado, convenções customizadas para métricas de tamanho, comportamento dos mappings BCL/LINQ, seleção de famílias de recorrência, tolerâncias de teoremas, análise de solution inteira, code fixes, complexidade de memória, complexidade paralela ou complexidade probabilística.
 
 Operações não suportadas ou não resolvidas permanecem `Unknown`; não existe opção para convertê-las em uma classe de complexidade conhecida.

@@ -24,6 +24,9 @@ unresolved behavior remains `Unknown` rather than being guessed.
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2001` | Cyclomatic complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2002` | Maximum nesting depth exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2003` | Method NLOC exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2004` | Statement count exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2005` | Token count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Supported Executable Members
@@ -82,10 +85,13 @@ internal trace.
 | Property | Meaning |
 | --- | --- |
 | `complexity` | Known method estimate emitted by `BIG0001`, `BIG1005`, or `BIG1006`. |
-| `threshold` | Configured threshold emitted by `BIG1006`, `BIG2001`, or `BIG2002`. |
+| `threshold` | Configured threshold emitted by `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004`, or `BIG2005`. |
 | `cyclomaticComplexity` | Actual Cyclomatic Complexity emitted by `BIG2001`. |
 | `cyclomaticComplexityMode` | Switch accounting mode emitted by `BIG2001`, either `standard` or `modified_mccabe`. |
 | `maximumNestingDepth` | Actual Maximum Control-Flow Nesting Depth emitted by `BIG2002`. |
+| `methodNloc` | Actual NLOC emitted by `BIG2003`. |
+| `statementCount` | Actual structural statement count emitted by `BIG2004`. |
+| `tokenCount` | Actual executable-body token count emitted by `BIG2005`. |
 | `operation` | Stable operation or method display name responsible for an actionable diagnostic. |
 | `operationComplexity` | Known cost of the operation or callee at the diagnostic location. |
 | `iterationComplexity` | Known enclosing iteration complexity. |
@@ -769,6 +775,136 @@ This diagnostic is not a path-count metric, Big-O estimate, line count,
 statement count, token count, or Cognitive Complexity score. It does not count
 plain syntax nesting and does not infer execution through nested executable
 bodies merely because they are declared inside a parent member.
+
+## BIG2003 - Method NLOC Exceeds Configured Threshold
+
+| Property | Value |
+| --- | --- |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Stable executable-member location |
+| Message | `Member '{member}' has NLOC {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `methodNloc`, `threshold` |
+
+### What It Detects
+
+`BIG2003` reports a supported executable member whose NLOC is strictly greater
+than `complexity_analyzers.maximum_method_nloc`.
+
+### Why It Matters
+
+NLOC is a size signal, not an algorithmic or control-flow complexity score. It
+helps enforce a maintainability policy for how much relevant source code belongs
+in one executable member.
+
+### Counting Rules
+
+NLOC counts source lines inside the owned executable body that contain at least
+one relevant code token. Blank lines, comment-only lines, brace-only lines, and
+delimiter-only lines do not count. Trailing comments do not add lines.
+
+Declaration/header lines outside the executable body do not participate. A
+block-bodied member is counted from its block body; an expression-bodied member
+is counted from its expression body only. Nested local functions, lambdas, and
+anonymous methods are analyzed independently and do not inflate the parent's
+NLOC.
+
+### Example That Triggers
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_method_nloc = 2
+dotnet_diagnostic.BIG2003.severity = warning
+```
+
+```csharp
+void M()
+{
+    var value = 0;
+    if (value == 0)
+    {
+        value++;
+    }
+}
+```
+
+The relevant body lines are the declaration statement, the `if`, and the
+increment, so the actual NLOC is `3`.
+
+### Limitations
+
+This diagnostic does not measure physical LOC, file totals, project totals,
+statement count, token count, Big-O, Cyclomatic Complexity, Maximum Nesting
+Depth, Cognitive Complexity, or Halstead metrics.
+
+## BIG2004 - Statement Count Exceeds Configured Threshold
+
+| Property | Value |
+| --- | --- |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Stable executable-member location |
+| Message | `Member '{member}' has statement count {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `statementCount`, `threshold` |
+
+### What It Detects
+
+`BIG2004` reports a supported executable member whose structural C# statement
+count is strictly greater than
+`complexity_analyzers.maximum_statement_count`.
+
+### Counting Rules
+
+The analyzer counts Roslyn `StatementSyntax` nodes in the member's owned body,
+excluding `BlockSyntax` containers to avoid counting nested block representation
+as executable work. Child statements inside control-flow constructs still count:
+an `if` with one expression statement in its body contributes two statements.
+
+Expression-bodied members count as one synthetic expression statement. Nested
+local functions, lambdas, and anonymous methods are analyzed independently; a
+local-function declaration counts as one parent statement, but its body does not
+inflate the parent.
+
+### Limitations
+
+Statement count is independent from NLOC, token count, Big-O, Cyclomatic
+Complexity, Maximum Nesting Depth, Cognitive Complexity, and Halstead metrics.
+
+## BIG2005 - Token Count Exceeds Configured Threshold
+
+| Property | Value |
+| --- | --- |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Stable executable-member location |
+| Message | `Member '{member}' has token count {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `tokenCount`, `threshold` |
+
+### What It Detects
+
+`BIG2005` reports a supported executable member whose executable-body token
+count is strictly greater than `complexity_analyzers.maximum_token_count`.
+
+### Counting Rules
+
+Token count counts non-missing C# syntax tokens owned by the executable body,
+including keywords, identifiers, literals, operators, braces, punctuation, and
+delimiters. Trivia is excluded, so comments and whitespace do not affect the
+value.
+
+For expression-bodied members, only tokens in the expression body participate.
+Nested local functions, lambdas, and anonymous methods are analyzed
+independently; nested executable bodies do not inflate the parent count.
+
+### Limitations
+
+Token count is a syntactic size metric. It is independent from NLOC, statement
+count, Big-O, Cyclomatic Complexity, Maximum Nesting Depth, Cognitive
+Complexity, and Halstead metrics.
 
 ## BIG9000 - Analyzer Execution Probe
 

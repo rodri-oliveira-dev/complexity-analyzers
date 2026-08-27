@@ -32,6 +32,9 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.MethodComplexityExceedsConfiguredThreshold,
             DiagnosticDescriptors.CyclomaticComplexityExceedsConfiguredThreshold,
             DiagnosticDescriptors.MaximumNestingDepthExceedsConfiguredThreshold,
+            DiagnosticDescriptors.MethodNlocExceedsConfiguredThreshold,
+            DiagnosticDescriptors.StatementCountExceedsConfiguredThreshold,
+            DiagnosticDescriptors.TokenCountExceedsConfiguredThreshold,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)
@@ -93,6 +96,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
 
         ReportCyclomaticThresholdDiagnosticIfNeeded(context, member, options);
         ReportMaximumNestingDepthThresholdDiagnosticIfNeeded(context, member, options);
+        ReportMethodSizeThresholdDiagnosticsIfNeeded(context, member, options);
 
         foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMember(
             member,
@@ -206,6 +210,98 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             member.DisplayName,
             actualText,
             thresholdText));
+    }
+
+    private static void ReportMethodSizeThresholdDiagnosticsIfNeeded(
+        SyntaxNodeAnalysisContext context,
+        ExecutableMember member,
+        ComplexityAnalyzerOptions options)
+    {
+        if (!options.MaximumMethodNloc.HasValue
+            && !options.MaximumStatementCount.HasValue
+            && !options.MaximumTokenCount.HasValue)
+        {
+            return;
+        }
+
+        if (!new MethodSizeMetricsAnalyzer().TryAnalyze(
+            member,
+            CreateMethodSizeMetricTargets(options),
+            context.CancellationToken,
+            out MethodSizeMetricsResult result))
+        {
+            return;
+        }
+
+        ReportIntegerThresholdDiagnosticIfNeeded(
+            context,
+            member,
+            DiagnosticDescriptors.MethodNlocExceedsConfiguredThreshold,
+            DiagnosticPropertyNames.MethodNloc,
+            result.Nloc,
+            options.MaximumMethodNloc);
+        ReportIntegerThresholdDiagnosticIfNeeded(
+            context,
+            member,
+            DiagnosticDescriptors.StatementCountExceedsConfiguredThreshold,
+            DiagnosticPropertyNames.StatementCount,
+            result.StatementCount,
+            options.MaximumStatementCount);
+        ReportIntegerThresholdDiagnosticIfNeeded(
+            context,
+            member,
+            DiagnosticDescriptors.TokenCountExceedsConfiguredThreshold,
+            DiagnosticPropertyNames.TokenCount,
+            result.TokenCount,
+            options.MaximumTokenCount);
+    }
+
+    private static void ReportIntegerThresholdDiagnosticIfNeeded(
+        SyntaxNodeAnalysisContext context,
+        ExecutableMember member,
+        DiagnosticDescriptor descriptor,
+        string propertyName,
+        int actual,
+        int? threshold)
+    {
+        if (!threshold.HasValue || actual <= threshold.Value)
+        {
+            return;
+        }
+
+        string actualText = actual.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string thresholdText = threshold.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            descriptor,
+            member.DiagnosticLocation,
+            ImmutableDictionary<string, string?>.Empty
+                .Add(propertyName, actualText)
+                .Add(DiagnosticPropertyNames.Threshold, thresholdText),
+            member.DisplayName,
+            actualText,
+            thresholdText));
+    }
+
+    private static MethodSizeMetricTargets CreateMethodSizeMetricTargets(ComplexityAnalyzerOptions options)
+    {
+        MethodSizeMetricTargets targets = MethodSizeMetricTargets.None;
+        if (options.MaximumMethodNloc.HasValue)
+        {
+            targets |= MethodSizeMetricTargets.Nloc;
+        }
+
+        if (options.MaximumStatementCount.HasValue)
+        {
+            targets |= MethodSizeMetricTargets.StatementCount;
+        }
+
+        if (options.MaximumTokenCount.HasValue)
+        {
+            targets |= MethodSizeMetricTargets.TokenCount;
+        }
+
+        return targets;
     }
 
     private static void ReportThresholdDiagnosticIfNeeded(
