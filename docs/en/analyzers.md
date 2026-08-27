@@ -634,14 +634,16 @@ With `maximum_cyclomatic_complexity = 2`, equality does not report.
 
 The standard convention counts `1 + decision points`. Decision points include
 `if`, loops, `catch`, catch filters, conditional expressions, short-circuit
-`&&`/`||`, non-default switch cases or non-discard switch expression arms,
-`when` guards, and `or` patterns. `else`, `try`, `finally`, plain blocks,
+`&&`/`||`, non-default switch cases, non-discard switch expression arms,
+guarded discard switch expression arms, `when` guards, and `or` patterns.
+`else`, `try`, `finally`, plain blocks,
 initializers, `??`, `?.`, pattern `and`, and pattern `not` do not add points by
 themselves.
 
 In `modified_mccabe` mode, each switch statement or switch expression
 contributes one decision for the switch family instead of one per non-default
-case or non-discard arm. Guards and `or` patterns still add points.
+case, non-discard arm, or guarded discard arm. Guards and `or` patterns still
+add points.
 
 ### Guidance
 

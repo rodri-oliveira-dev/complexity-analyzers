@@ -642,14 +642,16 @@ Com `maximum_cyclomatic_complexity = 2`, igualdade não reporta.
 
 A convenção standard conta `1 + decision points`. Decision points incluem `if`,
 loops, `catch`, filtros de catch, expressões condicionais, short-circuit
-`&&`/`||`, cases de switch não default ou arms de switch expression não discard,
-guards `when` e patterns `or`. `else`, `try`, `finally`, blocos simples,
+`&&`/`||`, cases de switch não default, arms de switch expression não discard,
+arms discard com guarda em switch expression, guards `when` e patterns `or`.
+`else`, `try`, `finally`, blocos simples,
 initializers, `??`, `?.`, pattern `and` e pattern `not` não adicionam pontos por
 si só.
 
 No modo `modified_mccabe`, cada switch statement ou switch expression contribui
-uma decisão para a família de `switch`, em vez de uma por case não default ou arm
-não discard. Guards e patterns `or` continuam adicionando pontos.
+uma decisão para a família de `switch`, em vez de uma por case não default, arm
+não discard ou arm discard com guarda. Guards e patterns `or` continuam
+adicionando pontos.
 
 ### Orientação
 

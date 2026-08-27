@@ -80,10 +80,10 @@ recursion analysis, or `maximum_complexity`.
 
 The standard convention uses baseline `1 + decision points` and counts
 documented decision constructs such as `if`, loops, `catch`, `?:`, short-circuit
-`&&`/`||`, switch cases/arms, `when` guards, and `or` patterns. In
-`modified_mccabe` mode, each switch statement or switch expression contributes
-one decision for the switch family instead of one per non-default case/arm;
-guards and `or` patterns are still counted separately.
+`&&`/`||`, switch cases/arms, guarded discard switch expression arms, `when`
+guards, and `or` patterns. In `modified_mccabe` mode, each switch statement or
+switch expression contributes one decision for the switch family instead of one
+per non-default case/arm; guards and `or` patterns are still counted separately.
 
 Examples:
 

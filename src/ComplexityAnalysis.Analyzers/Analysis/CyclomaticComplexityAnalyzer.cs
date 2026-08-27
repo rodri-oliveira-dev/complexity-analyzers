@@ -111,7 +111,8 @@ internal sealed class CyclomaticComplexityAnalyzer
 
     private static bool IsDefaultSwitchExpressionArm(SwitchExpressionArmSyntax arm)
     {
-        return arm.Pattern is DiscardPatternSyntax;
+        return arm.Pattern is DiscardPatternSyntax
+            && arm.WhenClause is null;
     }
 
     private static int AddDecisionPoints(

@@ -152,6 +152,36 @@ public sealed class CyclomaticComplexityDiagnosticTests
     }
 
     [Fact]
+    public async Task Guarded_discard_switch_expression_arm_can_exceed_modified_mccabe_threshold()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(
+                """
+                public sealed class Sample
+                {
+                    int M(int value)
+                    {
+                        return value switch
+                        {
+                            _ when Check(value) => 1,
+                            _ => 0,
+                        };
+                    }
+
+                    bool Check(int value) => value > 0;
+                }
+                """),
+            globalOptions: Options(
+                (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "2"),
+                (ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, "modified_mccabe")));
+
+        _ = AssertCyclomaticThreshold(
+            diagnostics,
+            "M",
+            "Member 'M' has cyclomatic complexity 3, exceeding configured maximum 2 (modified_mccabe mode)");
+    }
+
+    [Fact]
     public async Task Tree_specific_thresholds_are_preserved_for_different_files()
     {
         SyntaxTree firstTree = Parse(BranchingSource("First"), "First.cs");

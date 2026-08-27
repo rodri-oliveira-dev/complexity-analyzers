@@ -30,7 +30,8 @@ The adopted standard convention counts these C# decision points:
 - boolean short-circuit expressions: `+1` per `&&` or `||` binary expression;
 - switch statements in standard mode: `+1` per non-default `case` label,
   including pattern case labels;
-- switch expressions in standard mode: `+1` per non-discard arm;
+- switch expressions in standard mode: `+1` per non-discard arm and per
+  discard arm with a `when` guard;
 - switch/case/switch-arm guards: `+1` per `when` guard;
 - pattern alternatives: `+1` per `or` pattern.
 
@@ -43,7 +44,8 @@ Modified McCabe mode changes only the switch-family convention:
 
 - a switch statement contributes `+1` when it has at least one non-default
   `case` label;
-- a switch expression contributes `+1` when it has at least one non-discard arm;
+- a switch expression contributes `+1` when it has at least one non-discard arm
+  or one discard arm with a `when` guard;
 - `when` guards and `or` patterns are still counted separately because they add
   control-flow alternatives beyond the switch dispatch convention.
 

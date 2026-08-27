@@ -80,11 +80,12 @@ ter Cyclomatic Complexity `12`. `BIG2001` não afeta `BIG0001`, `BIG1006`, anál
 interprocedural, análise de recursão nem `maximum_complexity`.
 
 A convenção standard usa baseline `1 + decision points` e conta constructs
-documentados como `if`, loops, `catch`, `?:`, short-circuit `&&`/`||`, cases/arms
-de `switch`, guards `when` e patterns `or`. No modo `modified_mccabe`, cada
-switch statement ou switch expression contribui uma decisão para a família de
-`switch` em vez de uma por case/arm não default; guards e patterns `or` continuam
-sendo contados separadamente.
+documentados como `if`, loops, `catch`, `?:`, short-circuit `&&`/`||`,
+cases/arms de `switch`, arms discard com guarda em switch expression, guards
+`when` e patterns `or`. No modo `modified_mccabe`, cada switch statement ou
+switch expression contribui uma decisão para a família de `switch` em vez de uma
+por case/arm não default; guards e patterns `or` continuam sendo contados
+separadamente.
 
 Exemplos:
 

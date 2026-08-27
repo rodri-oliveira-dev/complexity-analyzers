@@ -319,6 +319,26 @@ public sealed class CyclomaticComplexityAnalyzerTests
             3
         },
         {
+            "guarded discard switch expression arm",
+            """
+            public sealed class Sample
+            {
+                int M(int value)
+                {
+                    return value switch
+                    {
+                        _ when Check(value) => 1,
+                        _ => 0,
+                    };
+                }
+
+                bool Check(int value) => value > 0;
+            }
+            """,
+            3,
+            3
+        },
+        {
             "default-only switch",
             """
             public sealed class Sample
