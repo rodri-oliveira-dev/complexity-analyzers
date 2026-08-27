@@ -62,6 +62,106 @@ public sealed class TimingWorkload
         return total;
     }
 
+    public int MediumFlatControlFlow(int value)
+    {
+        var total = 0;
+        if (value > 0)
+        {
+            total++;
+        }
+
+        if (value > 10)
+        {
+            total++;
+        }
+
+        if (value > 20)
+        {
+            total++;
+        }
+
+        if (value > 30)
+        {
+            total++;
+        }
+
+        return total;
+    }
+
+    public int MediumDeepControlFlow(int[] values)
+    {
+        var total = 0;
+        if (values.Length > 0)
+        {
+            foreach (var value in values)
+            {
+                if (value > 0)
+                {
+                    while (total < value)
+                    {
+                        total++;
+                    }
+                }
+            }
+        }
+
+        return total;
+    }
+
+    public int MediumMixedControlFlow(int[] values, int selector)
+    {
+        try
+        {
+            switch (selector)
+            {
+                case 0:
+                    foreach (var value in values)
+                    {
+                        if (value > 0)
+                        {
+                            return value;
+                        }
+                    }
+
+                    break;
+                default:
+                    return selector > 0 ? selector : -selector;
+            }
+        }
+        catch (System.InvalidOperationException)
+        {
+            if (values.Length > 0)
+            {
+                return values[0];
+            }
+        }
+
+        return 0;
+    }
+
+    public int MediumNestedExecutableMembers(int[] values)
+    {
+        if (values.Length == 0)
+        {
+            return 0;
+        }
+
+        static int Local(int value)
+        {
+            if (value > 0)
+            {
+                while (value > 10)
+                {
+                    value--;
+                }
+            }
+
+            return value;
+        }
+
+        return Local(values[0]);
+    }
+
     public int MediumDeferredLinqConsumption(IEnumerable<int> values)
     {
         return values

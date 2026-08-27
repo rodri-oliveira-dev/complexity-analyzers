@@ -23,6 +23,7 @@ unresolved behavior remains `Unknown` rather than being guessed.
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | `true` |
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2001` | Cyclomatic complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2002` | Maximum nesting depth exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Supported Executable Members
@@ -81,9 +82,10 @@ internal trace.
 | Property | Meaning |
 | --- | --- |
 | `complexity` | Known method estimate emitted by `BIG0001`, `BIG1005`, or `BIG1006`. |
-| `threshold` | Configured threshold emitted by `BIG1006` or `BIG2001`. |
+| `threshold` | Configured threshold emitted by `BIG1006`, `BIG2001`, or `BIG2002`. |
 | `cyclomaticComplexity` | Actual Cyclomatic Complexity emitted by `BIG2001`. |
 | `cyclomaticComplexityMode` | Switch accounting mode emitted by `BIG2001`, either `standard` or `modified_mccabe`. |
+| `maximumNestingDepth` | Actual Maximum Control-Flow Nesting Depth emitted by `BIG2002`. |
 | `operation` | Stable operation or method display name responsible for an actionable diagnostic. |
 | `operationComplexity` | Known cost of the operation or callee at the diagnostic location. |
 | `iterationComplexity` | Known enclosing iteration complexity. |
@@ -656,6 +658,117 @@ policy.
 This diagnostic is not a Big-O estimate and does not claim the member is slow.
 Nested local functions, lambdas, and anonymous methods are analyzed as their own
 executable members rather than inflating their lexical parent.
+
+## BIG2002 - Maximum Nesting Depth Exceeds Configured Threshold
+
+| Property | Value |
+| --- | --- |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Stable executable-member location |
+| Message | `Member '{member}' has maximum control-flow nesting depth {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `maximumNestingDepth`, `threshold` |
+
+### What It Detects
+
+`BIG2002` reports a supported executable member whose Maximum Control-Flow
+Nesting Depth is strictly greater than
+`complexity_analyzers.maximum_nesting_depth`.
+
+### Why It Matters
+
+Maximum nesting depth measures how deeply control-flow structures are nested,
+not how many independent paths exist. It is independent from Big-O and
+Cyclomatic Complexity. Many flat decisions can have low nesting depth; a few
+deeply nested decisions can have high nesting depth.
+
+### Example That Triggers
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_nesting_depth = 2
+dotnet_diagnostic.BIG2002.severity = warning
+```
+
+```csharp
+void M(int[] values, bool flag)
+{
+    if (flag)
+    {
+        foreach (var value in values)
+        {
+            if (value > 0)
+            {
+            }
+        }
+    }
+}
+```
+
+The deepest chain is `if` -> `foreach` -> `if`, so the actual depth is `3`.
+
+### Example That Does Not Trigger
+
+```csharp
+void M(bool a, bool b, bool c)
+{
+    if (a)
+    {
+    }
+
+    if (b)
+    {
+    }
+
+    if (c)
+    {
+    }
+}
+```
+
+The three `if` statements are siblings, so the maximum depth is `1`, not `3`.
+
+### Nesting Rules
+
+| Construct | Adds a nesting level? |
+| --- | --- |
+| `if` | Yes |
+| `else if` in the same chain | No additional chain nesting; the `else if` is evaluated at the chain depth |
+| `else` | No |
+| `for`, `foreach`, `while`, `do` | Yes |
+| `switch` statement | Yes |
+| switch section/case/default label | No |
+| switch expression | Yes |
+| switch expression arm | No |
+| `try` | Yes |
+| `catch` and `finally` | No additional level; they are sibling branches of the `try` |
+| conditional `?:` expression | Yes |
+| `&&`, `||`, patterns, and `when` guards | No |
+| `lock`, `using`, `fixed`, `checked`, `unchecked` | No |
+| plain lexical block | No |
+| object, collection, array, property, and anonymous-object initializers | No |
+| nested local function, lambda, or anonymous method body in a parent | No |
+
+### Threshold Behavior
+
+The threshold is opt-in. Missing or invalid configuration produces no `BIG2002`.
+Valid values are non-negative base-10 integers. Equality does not report; only a
+strictly greater actual value reports.
+
+### Guidance
+
+Consider flattening or extracting deeply nested branches when the project
+threshold reflects a maintainability policy and the refactoring preserves the
+intended control flow.
+
+### Limitations
+
+This diagnostic is not a path-count metric, Big-O estimate, line count,
+statement count, token count, or Cognitive Complexity score. It does not count
+plain syntax nesting and does not infer execution through nested executable
+bodies merely because they are declared inside a parent member.
 
 ## BIG9000 - Analyzer Execution Probe
 

@@ -47,6 +47,7 @@ DiagnosticAnalyzer
     +-- BIG1005 exponential recursive growth
     +-- BIG1006 configured threshold exceeded
     +-- BIG2001 cyclomatic threshold exceeded
+    +-- BIG2002 maximum nesting threshold exceeded
     `-- BIG9000 execution probe
 ```
 
@@ -130,9 +131,9 @@ The model supports:
 
 When the analyzer cannot prove a safe result, the model preserves `Unknown` rather than coercing the operation to a guessed complexity class.
 
-Cyclomatic Complexity is a separate integer structural metric. It is computed
-from executable-member control flow and is not combined with the Big-O
-complexity model.
+Cyclomatic Complexity and Maximum Control-Flow Nesting Depth are separate
+integer structural metrics. They are computed from executable-member control
+flow and are not combined with the Big-O complexity model or with each other.
 
 ## Roslyn analysis
 
@@ -142,7 +143,7 @@ The main analysis layer lives under:
 src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-Analysis starts from an internal executable-member abstraction and evaluates supported syntax and semantic facts. The analyzer normalizes ordinary methods, constructors, property/event accessors, operators, conversion operators, local functions, lambdas, anonymous methods, and supported expression-bodied forms into the same member pipeline when symbol identity, body ownership, and diagnostic location are available. Responsibilities include member/body extraction, input-size resolution, basic-operation classification, loop-bound analysis, known-operation mapping, source-call propagation, direct-recursion handling, and structural control-flow metrics such as Cyclomatic Complexity.
+Analysis starts from an internal executable-member abstraction and evaluates supported syntax and semantic facts. The analyzer normalizes ordinary methods, constructors, property/event accessors, operators, conversion operators, local functions, lambdas, anonymous methods, and supported expression-bodied forms into the same member pipeline when symbol identity, body ownership, and diagnostic location are available. Responsibilities include member/body extraction, input-size resolution, basic-operation classification, loop-bound analysis, known-operation mapping, source-call propagation, direct-recursion handling, and structural control-flow metrics such as Cyclomatic Complexity and Maximum Control-Flow Nesting Depth.
 
 Representative components include:
 
@@ -155,6 +156,7 @@ Representative components include:
 - `LoopBoundAnalyzer` for supported loop bounds;
 - `KnownOperationComplexityAnalyzer` for supported BCL/LINQ costs.
 - `CyclomaticComplexityAnalyzer` for structural path-complexity scoring that stays independent from Big-O.
+- `MaximumNestingDepthAnalyzer` for maximum control-flow nesting depth scoring that stays independent from Big-O and Cyclomatic Complexity.
 
 The analyzer does not require a whole-compilation or whole-solution call graph.
 Nested executable constructs are analyzed as their own roots. A parent member does
@@ -236,7 +238,8 @@ Public behavior options are:
 - `complexity_analyzers.max_methods_per_root`;
 - `complexity_analyzers.maximum_complexity`;
 - `complexity_analyzers.maximum_cyclomatic_complexity`;
-- `complexity_analyzers.cyclomatic_complexity_mode`.
+- `complexity_analyzers.cyclomatic_complexity_mode`;
+- `complexity_analyzers.maximum_nesting_depth`.
 
 Tree-specific analyzer config values override global values for that syntax tree. Invalid values fall back to documented defaults rather than producing analyzer failures.
 
@@ -254,6 +257,7 @@ See [Configuration](configuration.md) for details.
 - `BIG1005` for supported direct recursion with solved exponential growth;
 - `BIG1006` for known comparable estimates above a configured threshold;
 - `BIG2001` for supported executable members above a configured Cyclomatic Complexity threshold;
+- `BIG2002` for supported executable members above a configured Maximum Control-Flow Nesting Depth threshold;
 - `BIG9000` as an opt-in execution probe.
 
 Generated-code analysis is disabled and concurrent analyzer execution is enabled.

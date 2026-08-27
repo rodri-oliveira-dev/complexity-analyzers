@@ -22,10 +22,11 @@ Valores inválidos são tratados com segurança: não quebram o build nem geram 
 | `complexity_analyzers.maximum_complexity` | String | `none` | `none`, `constant`, `log_n`, `n`, `n_log_n`, `n2`, `n3`, `exponential`, `factorial` | Habilita `BIG1006` quando uma estimativa conhecida e comparável excede esse threshold. |
 | `complexity_analyzers.maximum_cyclomatic_complexity` | Integer | sem valor | Inteiro decimal positivo | Habilita `BIG2001` quando a Cyclomatic Complexity de um executable member suportado excede esse threshold. |
 | `complexity_analyzers.cyclomatic_complexity_mode` | String | `standard` | `standard`, `modified_mccabe` | Seleciona a contabilização de `switch` para Cyclomatic Complexity. |
+| `complexity_analyzers.maximum_nesting_depth` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2002` quando a Maximum Control-Flow Nesting Depth de um executable member suportado excede esse threshold. |
 
 Valores booleanos ignoram diferenças entre maiúsculas e minúsculas depois da remoção de espaços nas extremidades. Valores inteiros devem ser números decimais não negativos, sem sinal, ponto decimal, separadores ou espaços internos. Valores de threshold são case-sensitive.
 
-Valores fora dos limites públicos de budget retornam ao padrão: `max_call_depth = 5` e `max_methods_per_root = 32`. Thresholds ciclomáticos inválidos retornam para sem valor configurado. Modos ciclomáticos inválidos retornam para `standard`.
+Valores fora dos limites públicos de budget retornam ao padrão: `max_call_depth = 5` e `max_methods_per_root = 32`. Thresholds ciclomáticos e de nesting inválidos retornam para sem valor configurado. Modos ciclomáticos inválidos retornam para `standard`.
 
 ## Exemplo
 
@@ -39,9 +40,11 @@ complexity_analyzers.max_methods_per_root = 32
 complexity_analyzers.maximum_complexity = n_log_n
 complexity_analyzers.maximum_cyclomatic_complexity = 10
 complexity_analyzers.cyclomatic_complexity_mode = standard
+complexity_analyzers.maximum_nesting_depth = 3
 
 dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG2001.severity = warning
+dotnet_diagnostic.BIG2002.severity = warning
 ```
 
 ## Comportamento do threshold
@@ -95,6 +98,34 @@ Exemplos:
 | `10` | `10` | Não reporta. |
 | `11` | `10` | Reporta `BIG2001`. |
 
+## Comportamento de Maximum Nesting Depth
+
+`complexity_analyzers.maximum_nesting_depth` é opt-in. Quando não está
+configurado ou é inválido, `BIG2002` não reporta. Valores válidos são inteiros
+decimais não negativos. Igualdade não reporta; apenas valor real estritamente
+maior gera diagnóstico.
+
+Maximum Control-Flow Nesting Depth mede a estrutura de fluxo de controle mais
+profundamente aninhada dentro de um executable member. Código straight-line tem
+depth `0`, um único `if` ou loop tem depth `1`, e constructs realmente aninhados
+aumentam a profundidade. Branches irmãos não acumulam.
+
+A convenção de nesting conta `if`, loops, statements `switch`, switch
+expressions, `try` e expressões condicionais `?:` como um nível. `else`, `else
+if`, cases, arms de switch, catches, `finally`, cadeias booleanas, patterns,
+guards, blocos simples, initializers, `lock`, `using`, `fixed`, `checked` e
+`unchecked` não adicionam nível por si só. Local functions, lambdas e anonymous
+methods aninhados são analisados como executable members independentes em vez de
+inflarem o pai lexical.
+
+Exemplos:
+
+| Valor real | Threshold | Resultado |
+| --- | --- | --- |
+| `2` | `3` | Não reporta. |
+| `3` | `3` | Não reporta. |
+| `4` | `3` | Reporta `BIG2002`. |
+
 ## Feature flags
 
 `complexity_analyzers.interprocedural_analysis = false` impede expansão para callees fonte suportados. A análise intraprocedural e a análise de operações BCL/LINQ suportadas permanecem ativas.
@@ -145,11 +176,14 @@ O compilador e o SDK determinam o comportamento exato do build para cada severid
 | `BIG1005` | `Info` | `true` |
 | `BIG1006` | `Info` | `true` |
 | `BIG2001` | `Info` | `true` |
+| `BIG2002` | `Info` | `true` |
 | `BIG9000` | `Info` | `false` |
 
 `BIG1006` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_complexity` seja configurado com um threshold concreto.
 
 `BIG2001` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_cyclomatic_complexity` seja configurado com um threshold concreto.
+
+`BIG2002` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_nesting_depth` seja configurado com um threshold concreto.
 
 ## Configurações comuns
 
@@ -176,6 +210,8 @@ dotnet_diagnostic.BIG1006.severity = warning
 complexity_analyzers.maximum_cyclomatic_complexity = 10
 complexity_analyzers.cyclomatic_complexity_mode = modified_mccabe
 dotnet_diagnostic.BIG2001.severity = warning
+complexity_analyzers.maximum_nesting_depth = 3
+dotnet_diagnostic.BIG2002.severity = warning
 ```
 
 Comprove temporariamente que o pacote carregou:

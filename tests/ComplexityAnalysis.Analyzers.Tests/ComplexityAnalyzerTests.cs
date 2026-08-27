@@ -22,6 +22,7 @@ public sealed class ComplexityAnalyzerTests
     private const string ExponentialRecursiveGrowthId = "BIG1005";
     private const string MethodComplexityExceedsConfiguredThresholdId = "BIG1006";
     private const string CyclomaticComplexityExceedsConfiguredThresholdId = "BIG2001";
+    private const string MaximumNestingDepthExceedsConfiguredThresholdId = "BIG2002";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -48,6 +49,7 @@ public sealed class ComplexityAnalyzerTests
                 ExponentialRecursiveGrowthId,
                 MethodComplexityExceedsConfiguredThresholdId,
                 CyclomaticComplexityExceedsConfiguredThresholdId,
+                MaximumNestingDepthExceedsConfiguredThresholdId,
                 AnalyzerExecutionProbeId
             ],
             analyzer.SupportedDiagnostics.Select(descriptor => descriptor.Id));
@@ -75,6 +77,7 @@ public sealed class ComplexityAnalyzerTests
     [InlineData(ExponentialRecursiveGrowthId, "Exponential recursive growth")]
     [InlineData(MethodComplexityExceedsConfiguredThresholdId, "Method complexity exceeds configured threshold")]
     [InlineData(CyclomaticComplexityExceedsConfiguredThresholdId, "Cyclomatic complexity exceeds configured threshold")]
+    [InlineData(MaximumNestingDepthExceedsConfiguredThresholdId, "Maximum nesting depth exceeds configured threshold")]
     public void Actionable_diagnostics_have_expected_public_descriptor_metadata(
         string diagnosticId,
         string expectedTitle)

@@ -24,6 +24,7 @@ inconclusivos ou não resolvidos permanecem `Unknown` em vez de serem estimados.
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | `true` |
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2001` | Cyclomatic complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2002` | Maximum nesting depth exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Executable Members Suportados
@@ -83,9 +84,10 @@ como um trace interno completo.
 | Propriedade | Significado |
 | --- | --- |
 | `complexity` | Estimativa conhecida emitida por `BIG0001`, `BIG1005` ou `BIG1006`. |
-| `threshold` | Threshold configurado emitido por `BIG1006` ou `BIG2001`. |
+| `threshold` | Threshold configurado emitido por `BIG1006`, `BIG2001` ou `BIG2002`. |
 | `cyclomaticComplexity` | Cyclomatic Complexity real emitida por `BIG2001`. |
 | `cyclomaticComplexityMode` | Modo de contabilização de `switch` emitido por `BIG2001`: `standard` ou `modified_mccabe`. |
+| `maximumNestingDepth` | Maximum Control-Flow Nesting Depth real emitida por `BIG2002`. |
 | `operation` | Nome estável da operação ou método responsável por um diagnóstico acionável. |
 | `operationComplexity` | Custo conhecido da operação ou callee no local do diagnóstico. |
 | `iterationComplexity` | Complexidade conhecida da iteração envolvente. |
@@ -664,6 +666,117 @@ manutenibilidade do time.
 Este diagnóstico não é uma estimativa Big-O e não afirma que o membro seja lento.
 Local functions, lambdas e anonymous methods aninhados são analisados como
 executable members próprios em vez de inflarem o pai lexical.
+
+## BIG2002 - Maximum Nesting Depth Acima do Threshold Configurado
+
+| Propriedade | Valor |
+| --- | --- |
+| Categoria | `Complexity` |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Localização estável do executable member |
+| Mensagem | `Member '{member}' has maximum control-flow nesting depth {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `maximumNestingDepth`, `threshold` |
+
+### O Que Detecta
+
+`BIG2002` reporta um executable member suportado cuja Maximum Control-Flow
+Nesting Depth é estritamente maior que
+`complexity_analyzers.maximum_nesting_depth`.
+
+### Por Que Importa
+
+Maximum nesting depth mede quão profundamente estruturas de fluxo de controle
+estão aninhadas, não quantos caminhos independentes existem. A métrica é
+independente de Big-O e Cyclomatic Complexity. Muitas decisões planas podem ter
+nesting baixo; poucas decisões profundamente aninhadas podem ter nesting alto.
+
+### Exemplo Que Dispara
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_nesting_depth = 2
+dotnet_diagnostic.BIG2002.severity = warning
+```
+
+```csharp
+void M(int[] values, bool flag)
+{
+    if (flag)
+    {
+        foreach (var value in values)
+        {
+            if (value > 0)
+            {
+            }
+        }
+    }
+}
+```
+
+A cadeia mais profunda é `if` -> `foreach` -> `if`, então o depth real é `3`.
+
+### Exemplo Que Não Dispara
+
+```csharp
+void M(bool a, bool b, bool c)
+{
+    if (a)
+    {
+    }
+
+    if (b)
+    {
+    }
+
+    if (c)
+    {
+    }
+}
+```
+
+Os três `if` são branches irmãos, então o depth máximo é `1`, não `3`.
+
+### Regras de Nesting
+
+| Construct | Adiciona nível de nesting? |
+| --- | --- |
+| `if` | Sim |
+| `else if` na mesma cadeia | Não adiciona nesting artificial da cadeia; o `else if` é avaliado no depth da cadeia |
+| `else` | Não |
+| `for`, `foreach`, `while`, `do` | Sim |
+| statement `switch` | Sim |
+| seção/case/default de switch | Não |
+| switch expression | Sim |
+| arm de switch expression | Não |
+| `try` | Sim |
+| `catch` e `finally` | Não adicionam nível próprio; são branches irmãos do `try` |
+| expressão condicional `?:` | Sim |
+| `&&`, `||`, patterns e guards `when` | Não |
+| `lock`, `using`, `fixed`, `checked`, `unchecked` | Não |
+| bloco léxico simples | Não |
+| initializers de object, collection, array, property e anonymous object | Não |
+| body de local function, lambda ou anonymous method aninhado no pai | Não |
+
+### Comportamento de Threshold
+
+O threshold é opt-in. Configuração ausente ou inválida não produz `BIG2002`.
+Valores válidos são inteiros decimais não negativos. Igualdade não reporta;
+apenas valor real estritamente maior reporta.
+
+### Orientação
+
+Considere achatar ou extrair branches profundamente aninhados quando o threshold
+do projeto representar uma política de manutenibilidade e a refatoração preservar
+o fluxo de controle pretendido.
+
+### Limitações
+
+Este diagnóstico não é métrica de quantidade de caminhos, estimativa Big-O,
+contagem de linhas, contagem de statements, contagem de tokens nem Cognitive
+Complexity. Ele não conta nesting sintático simples e não infere execução por
+bodies executáveis aninhados apenas porque foram declarados dentro do membro pai.
 
 ## BIG9000 - Probe de Execução do Analyzer
 

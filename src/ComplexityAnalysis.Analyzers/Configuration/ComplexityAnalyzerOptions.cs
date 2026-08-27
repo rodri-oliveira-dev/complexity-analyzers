@@ -21,7 +21,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         DefaultMaxMethodsPerRoot,
         ComplexityThreshold.None,
         maximumCyclomaticComplexity: null,
-        CyclomaticComplexityAnalysisMode.Standard);
+        CyclomaticComplexityAnalysisMode.Standard,
+        maximumNestingDepth: null);
 
     internal ComplexityAnalyzerOptions(
         bool interproceduralAnalysisEnabled,
@@ -30,7 +31,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         int maxMethodsPerRoot,
         ComplexityThreshold maximumComplexity,
         int? maximumCyclomaticComplexity = null,
-        CyclomaticComplexityAnalysisMode cyclomaticComplexityMode = CyclomaticComplexityAnalysisMode.Standard)
+        CyclomaticComplexityAnalysisMode cyclomaticComplexityMode = CyclomaticComplexityAnalysisMode.Standard,
+        int? maximumNestingDepth = null)
     {
         if (maxCallDepth is < 0 or > MaximumMaxCallDepth)
         {
@@ -47,6 +49,11 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             throw new ArgumentOutOfRangeException(nameof(maximumCyclomaticComplexity), "Maximum cyclomatic complexity must be positive when configured.");
         }
 
+        if (maximumNestingDepth < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumNestingDepth), "Maximum nesting depth must be non-negative when configured.");
+        }
+
         InterproceduralAnalysisEnabled = interproceduralAnalysisEnabled;
         RecursionAnalysisEnabled = recursionAnalysisEnabled;
         MaxCallDepth = maxCallDepth;
@@ -54,6 +61,7 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         MaximumComplexity = maximumComplexity ?? throw new ArgumentNullException(nameof(maximumComplexity));
         MaximumCyclomaticComplexity = maximumCyclomaticComplexity;
         CyclomaticComplexityMode = cyclomaticComplexityMode;
+        MaximumNestingDepth = maximumNestingDepth;
     }
 
     internal bool InterproceduralAnalysisEnabled
@@ -91,6 +99,11 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         get;
     }
 
+    internal int? MaximumNestingDepth
+    {
+        get;
+    }
+
     internal ComplexityAnalyzerOptions WithAnalysisBudget(AnalysisBudget budget)
     {
         _ = budget ?? throw new ArgumentNullException(nameof(budget));
@@ -105,7 +118,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
                 budget.MaximumMethodsPerRootAnalysis,
                 MaximumComplexity,
                 MaximumCyclomaticComplexity,
-                CyclomaticComplexityMode);
+                CyclomaticComplexityMode,
+                MaximumNestingDepth);
     }
 
     public bool Equals(ComplexityAnalyzerOptions? other)
@@ -117,7 +131,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             && MaxMethodsPerRoot == other.MaxMethodsPerRoot
             && MaximumComplexity.Equals(other.MaximumComplexity)
             && MaximumCyclomaticComplexity == other.MaximumCyclomaticComplexity
-            && CyclomaticComplexityMode == other.CyclomaticComplexityMode;
+            && CyclomaticComplexityMode == other.CyclomaticComplexityMode
+            && MaximumNestingDepth == other.MaximumNestingDepth;
     }
 
     public override bool Equals(object? obj)
@@ -136,6 +151,7 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             hash = (hash * 397) ^ MaximumComplexity.GetHashCode();
             hash = (hash * 397) ^ MaximumCyclomaticComplexity.GetHashCode();
             hash = (hash * 397) ^ CyclomaticComplexityMode.GetHashCode();
+            hash = (hash * 397) ^ MaximumNestingDepth.GetHashCode();
             return hash;
         }
     }

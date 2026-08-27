@@ -47,6 +47,7 @@ DiagnosticAnalyzer
     +-- BIG1005 crescimento recursivo exponencial
     +-- BIG1006 threshold configurado excedido
     +-- BIG2001 threshold ciclomático excedido
+    +-- BIG2002 threshold de maximum nesting excedido
     `-- BIG9000 probe de execução
 ```
 
@@ -130,9 +131,10 @@ O modelo suporta:
 
 Quando o analyzer não consegue comprovar um resultado seguro, o modelo preserva `Unknown` em vez de forçar uma classe de complexidade estimada.
 
-Cyclomatic Complexity é uma métrica estrutural inteira separada. Ela é calculada
-a partir do fluxo de controle do executable member e não é combinada com o modelo
-de complexidade Big-O.
+Cyclomatic Complexity e Maximum Control-Flow Nesting Depth são métricas
+estruturais inteiras separadas. Elas são calculadas a partir do fluxo de controle
+do executable member e não são combinadas com o modelo de complexidade Big-O nem
+entre si.
 
 ## Análise com Roslyn
 
@@ -142,7 +144,7 @@ A principal camada de análise fica em:
 src/ComplexityAnalysis.Analyzers/Analysis/
 ```
 
-A análise parte de uma abstração interna de executable member e avalia informações sintáticas e semânticas suportadas. O analyzer normaliza métodos ordinários, construtores, accessors de propriedades/eventos, operadores, operadores de conversão, local functions, lambdas, anonymous methods e formas expression-bodied suportadas para o mesmo pipeline quando identidade de símbolo, ownership de body e localização de diagnóstico estão disponíveis. As responsabilidades incluem extração de membro/body, resolução de tamanho de entrada, classificação de operações básicas, análise de limites de loop, mapeamento de operações conhecidas, propagação de chamadas a métodos-fonte, tratamento de recursão direta e métricas estruturais de fluxo de controle como Cyclomatic Complexity.
+A análise parte de uma abstração interna de executable member e avalia informações sintáticas e semânticas suportadas. O analyzer normaliza métodos ordinários, construtores, accessors de propriedades/eventos, operadores, operadores de conversão, local functions, lambdas, anonymous methods e formas expression-bodied suportadas para o mesmo pipeline quando identidade de símbolo, ownership de body e localização de diagnóstico estão disponíveis. As responsabilidades incluem extração de membro/body, resolução de tamanho de entrada, classificação de operações básicas, análise de limites de loop, mapeamento de operações conhecidas, propagação de chamadas a métodos-fonte, tratamento de recursão direta e métricas estruturais de fluxo de controle como Cyclomatic Complexity e Maximum Control-Flow Nesting Depth.
 
 Alguns componentes representativos são:
 
@@ -155,6 +157,7 @@ Alguns componentes representativos são:
 - `LoopBoundAnalyzer` para limites de loop suportados;
 - `KnownOperationComplexityAnalyzer` para custos BCL/LINQ suportados.
 - `CyclomaticComplexityAnalyzer` para pontuação estrutural de complexidade de caminhos, independente do Big-O.
+- `MaximumNestingDepthAnalyzer` para pontuação de profundidade máxima de nesting de fluxo de controle, independente de Big-O e Cyclomatic Complexity.
 
 O analyzer não exige um call graph completo da compilation ou da solution.
 Constructs executáveis aninhados são analisados como raízes próprias. Um membro
@@ -237,7 +240,8 @@ As opções públicas de comportamento são:
 - `complexity_analyzers.max_methods_per_root`;
 - `complexity_analyzers.maximum_complexity`;
 - `complexity_analyzers.maximum_cyclomatic_complexity`;
-- `complexity_analyzers.cyclomatic_complexity_mode`.
+- `complexity_analyzers.cyclomatic_complexity_mode`;
+- `complexity_analyzers.maximum_nesting_depth`.
 
 Valores específicos por syntax tree sobrescrevem valores globais para aquela árvore. Valores inválidos retornam aos defaults documentados em vez de gerar falhas do analyzer.
 
@@ -255,6 +259,7 @@ Veja [Configuração](configuration.md) para detalhes.
 - `BIG1005` para recursão direta suportada com crescimento exponencial resolvido;
 - `BIG1006` para estimativas conhecidas e comparáveis acima de um threshold configurado;
 - `BIG2001` para executable members suportados acima de um threshold configurado de Cyclomatic Complexity;
+- `BIG2002` para executable members suportados acima de um threshold configurado de Maximum Control-Flow Nesting Depth;
 - `BIG9000` como probe de execução opt-in.
 
 A análise de código gerado é desabilitada e a execução concorrente do analyzer é habilitada.
