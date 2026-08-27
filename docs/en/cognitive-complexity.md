@@ -141,8 +141,8 @@ proven with Roslyn symbol identity. The calculator does not use textual method
 names and does not perform project-wide call-graph analysis. Mutual recursion is
 outside the Cognitive Complexity convention.
 
-Lambda, anonymous-method, and expression-bodied-property roots do not currently
-participate in direct self-recursion scoring.
+Lambda and anonymous-method roots do not currently participate in direct
+self-recursion scoring.
 
 ## Jumps And Exclusions
 

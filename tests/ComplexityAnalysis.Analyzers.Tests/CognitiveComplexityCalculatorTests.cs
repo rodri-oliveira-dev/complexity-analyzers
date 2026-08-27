@@ -854,6 +854,144 @@ public sealed class CognitiveComplexityCalculatorTests
         Assert.Equal(0, result.Value);
     }
 
+    [Fact]
+    public void Recursive_operator_expression_counts_once()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                public static Sample operator +(Sample left, Sample right) => left + right;
+            }
+            """);
+        ExecutableMember member = CreateSingleMember<OperatorDeclarationSyntax>(facts);
+
+        CognitiveComplexity result = AnalyzeMember(facts, member);
+
+        Assert.Equal(1, result.Value);
+    }
+
+    [Fact]
+    public void Recursive_property_getter_access_counts_once()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                public int Value
+                {
+                    get
+                    {
+                        return Value;
+                    }
+                }
+            }
+            """);
+        ExecutableMember member = CreateSingleMember<AccessorDeclarationSyntax>(facts);
+
+        CognitiveComplexity result = AnalyzeMember(facts, member);
+
+        Assert.Equal(1, result.Value);
+    }
+
+    [Fact]
+    public void Recursive_property_setter_assignment_counts_once()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                public int Value
+                {
+                    set
+                    {
+                        Value = value;
+                    }
+                }
+            }
+            """);
+        ExecutableMember member = CreateSingleMember<AccessorDeclarationSyntax>(facts);
+
+        CognitiveComplexity result = AnalyzeMember(facts, member);
+
+        Assert.Equal(1, result.Value);
+    }
+
+    [Fact]
+    public void Recursive_conversion_cast_counts_once()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                public static explicit operator int(Sample value) => (int)value;
+            }
+            """);
+        ExecutableMember member = CreateSingleMember<ConversionOperatorDeclarationSyntax>(facts);
+
+        CognitiveComplexity result = AnalyzeMember(facts, member);
+
+        Assert.Equal(1, result.Value);
+    }
+
+    [Fact]
+    public void Recursive_expression_bodied_property_getter_counts_once()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                public int Value => Value;
+            }
+            """);
+        ExecutableMember member = CreateSingleMember<PropertyDeclarationSyntax>(facts);
+
+        CognitiveComplexity result = AnalyzeMember(facts, member);
+
+        Assert.Equal(1, result.Value);
+    }
+
+    [Fact]
+    public void Property_read_inside_setter_does_not_count_as_setter_recursion()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                private int value;
+
+                public int Value
+                {
+                    get
+                    {
+                        return value;
+                    }
+
+                    set
+                    {
+                        value = Value;
+                    }
+                }
+            }
+            """);
+        AccessorDeclarationSyntax setter = facts.SyntaxTree
+            .GetRoot()
+            .DescendantNodes()
+            .OfType<AccessorDeclarationSyntax>()
+            .Single(accessor => accessor.Keyword.ValueText == "set");
+        bool created = ExecutableMember.TryCreate(
+            setter,
+            facts.SemanticModel,
+            CancellationToken.None,
+            out ExecutableMember? member);
+
+        Assert.True(created);
+        Assert.NotNull(member);
+        CognitiveComplexity result = AnalyzeMember(facts, member);
+
+        Assert.Equal(0, result.Value);
+    }
+
     private static ExecutableMember CreateMethodMember(
         CompilationFacts facts,
         string methodName,
@@ -876,6 +1014,40 @@ public sealed class CognitiveComplexityCalculatorTests
         Assert.True(created);
         Assert.NotNull(member);
         return member;
+    }
+
+    private static ExecutableMember CreateSingleMember<TNode>(CompilationFacts facts)
+        where TNode : SyntaxNode
+    {
+        TNode node = facts.SyntaxTree
+            .GetRoot()
+            .DescendantNodes()
+            .OfType<TNode>()
+            .Single();
+
+        bool created = ExecutableMember.TryCreate(
+            node,
+            facts.SemanticModel,
+            CancellationToken.None,
+            out ExecutableMember? member);
+
+        Assert.True(created);
+        Assert.NotNull(member);
+        return member;
+    }
+
+    private static CognitiveComplexity AnalyzeMember(
+        CompilationFacts facts,
+        ExecutableMember member)
+    {
+        bool analyzed = new CognitiveComplexityCalculator().TryCalculate(
+            member,
+            facts.SemanticModel,
+            CancellationToken.None,
+            out CognitiveComplexity result);
+
+        Assert.True(analyzed);
+        return result;
     }
 
     private static CompilationFacts CreateCompilationFacts(string source)

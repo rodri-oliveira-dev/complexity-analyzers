@@ -143,8 +143,8 @@ alvo da chamada e comprovado com identidade de simbolo Roslyn. O calculator nao
 usa nomes textuais de metodos e nao faz analise de call graph do projeto inteiro.
 Recursao mutua fica fora da convencao de Cognitive Complexity.
 
-Roots de lambda, anonymous method e propriedade expression-bodied nao participam
-atualmente da pontuacao de recursao direta.
+Roots de lambda e anonymous method nao participam atualmente da pontuacao de
+recursao direta.
 
 ## Jumps E Exclusoes
 

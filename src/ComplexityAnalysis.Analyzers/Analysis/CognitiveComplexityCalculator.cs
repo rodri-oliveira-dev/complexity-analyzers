@@ -105,7 +105,40 @@ internal sealed class CognitiveComplexityCalculator
                 AnalyzePattern(patternExpression.Pattern, currentNesting);
                 break;
             case InvocationExpressionSyntax invocationExpression:
-                AnalyzeInvocationExpression(invocationExpression, currentNesting);
+                TryCountDirectSelfRecursion(invocationExpression);
+                AnalyzeChildren(invocationExpression, currentNesting);
+                break;
+            case BinaryExpressionSyntax binaryExpression:
+                TryCountDirectSelfRecursion(binaryExpression);
+                AnalyzeChildren(binaryExpression, currentNesting);
+                break;
+            case AssignmentExpressionSyntax assignmentExpression:
+                TryCountDirectSelfRecursion(assignmentExpression);
+                AnalyzeChildren(assignmentExpression, currentNesting);
+                break;
+            case PrefixUnaryExpressionSyntax prefixUnaryExpression:
+                TryCountDirectSelfRecursion(prefixUnaryExpression);
+                AnalyzeChildren(prefixUnaryExpression, currentNesting);
+                break;
+            case PostfixUnaryExpressionSyntax postfixUnaryExpression:
+                TryCountDirectSelfRecursion(postfixUnaryExpression);
+                AnalyzeChildren(postfixUnaryExpression, currentNesting);
+                break;
+            case CastExpressionSyntax castExpression:
+                TryCountDirectSelfRecursion(castExpression);
+                AnalyzeChildren(castExpression, currentNesting);
+                break;
+            case IdentifierNameSyntax identifierName:
+                TryCountDirectSelfRecursion(identifierName);
+                AnalyzeChildren(identifierName, currentNesting);
+                break;
+            case MemberAccessExpressionSyntax memberAccess:
+                TryCountDirectSelfRecursion(memberAccess);
+                AnalyzeChildren(memberAccess, currentNesting);
+                break;
+            case ElementAccessExpressionSyntax elementAccess:
+                TryCountDirectSelfRecursion(elementAccess);
+                AnalyzeChildren(elementAccess, currentNesting);
                 break;
             case BreakStatementSyntax
                 or ContinueStatementSyntax
@@ -283,15 +316,7 @@ internal sealed class CognitiveComplexityCalculator
         AnalyzeExpression(filter.FilterExpression, currentNesting);
     }
 
-    private void AnalyzeInvocationExpression(
-        InvocationExpressionSyntax invocationExpression,
-        int currentNesting)
-    {
-        TryCountDirectSelfRecursion(invocationExpression);
-        AnalyzeChildren(invocationExpression, currentNesting);
-    }
-
-    private void TryCountDirectSelfRecursion(InvocationExpressionSyntax invocationExpression)
+    private void TryCountDirectSelfRecursion(ExpressionSyntax expression)
     {
         if (directSelfRecursionCounted
             || member is null
@@ -301,23 +326,162 @@ internal sealed class CognitiveComplexityCalculator
             return;
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
+        ExecutableMember currentMember = member;
+        SemanticModel currentSemanticModel = semanticModel;
 
-        if (semanticModel.GetSymbolInfo(invocationExpression, cancellationToken).Symbol is not IMethodSymbol invokedSymbol)
+        if (!ShouldInspectDirectSelfRecursion(expression, currentMember))
         {
             return;
         }
 
-        IMethodSymbol targetSymbol = invokedSymbol.ReducedFrom ?? invokedSymbol;
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IMethodSymbol? referencedSymbol = GetReferencedMethodSymbol(
+            expression,
+            currentSemanticModel,
+            currentMember);
+        if (referencedSymbol is null)
+        {
+            return;
+        }
+
+        IMethodSymbol targetSymbol = referencedSymbol.ReducedFrom ?? referencedSymbol;
         if (!SymbolEqualityComparer.Default.Equals(
             targetSymbol.OriginalDefinition,
-            member.Symbol.OriginalDefinition))
+            currentMember.Symbol.OriginalDefinition))
         {
             return;
         }
 
         directSelfRecursionCounted = true;
         AddStructuralIncrementWithoutNesting();
+    }
+
+    private static bool ShouldInspectDirectSelfRecursion(
+        ExpressionSyntax expression,
+        ExecutableMember currentMember)
+    {
+        return expression switch
+        {
+            InvocationExpressionSyntax => true,
+            BinaryExpressionSyntax
+                or PrefixUnaryExpressionSyntax
+                or PostfixUnaryExpressionSyntax
+                or AssignmentExpressionSyntax => currentMember.Symbol.MethodKind == MethodKind.UserDefinedOperator,
+            CastExpressionSyntax => currentMember.Symbol.MethodKind == MethodKind.Conversion,
+            IdentifierNameSyntax
+                or MemberAccessExpressionSyntax
+                or ElementAccessExpressionSyntax => IsAccessorMethodKind(currentMember.Symbol.MethodKind),
+            _ => false,
+        };
+    }
+
+    private static bool IsAccessorMethodKind(MethodKind methodKind)
+    {
+        return methodKind is MethodKind.PropertyGet
+            or MethodKind.PropertySet
+            or MethodKind.EventAdd
+            or MethodKind.EventRemove;
+    }
+
+    private IMethodSymbol? GetReferencedMethodSymbol(
+        ExpressionSyntax expression,
+        SemanticModel currentSemanticModel,
+        ExecutableMember currentMember)
+    {
+        SymbolInfo symbolInfo = currentSemanticModel.GetSymbolInfo(expression, cancellationToken);
+        return symbolInfo.Symbol switch
+        {
+            IMethodSymbol methodSymbol => methodSymbol,
+            IPropertySymbol propertySymbol => GetReferencedPropertyAccessor(expression, propertySymbol, currentMember),
+            IEventSymbol eventSymbol => GetReferencedEventAccessor(expression, eventSymbol, currentMember),
+            _ => null,
+        };
+    }
+
+    private static IMethodSymbol? GetReferencedPropertyAccessor(
+        ExpressionSyntax expression,
+        IPropertySymbol propertySymbol,
+        ExecutableMember currentMember)
+    {
+        bool isSimpleWrite = IsLeftSideOfAssignment(expression, allowCompoundAssignment: false);
+        bool isReadWrite = IsLeftSideOfAssignment(expression, allowCompoundAssignment: true)
+            || IsOperandOfIncrementOrDecrement(expression);
+
+        return isReadWrite
+            && IsSameMethod(propertySymbol.GetMethod, currentMember.Symbol)
+                ? propertySymbol.GetMethod
+                : (isSimpleWrite || isReadWrite)
+                    && IsSameMethod(propertySymbol.SetMethod, currentMember.Symbol)
+                        ? propertySymbol.SetMethod
+                        : !isSimpleWrite
+                            && !isReadWrite
+                            && IsSameMethod(propertySymbol.GetMethod, currentMember.Symbol)
+                                ? propertySymbol.GetMethod
+                                : null;
+    }
+
+    private static IMethodSymbol? GetReferencedEventAccessor(
+        ExpressionSyntax expression,
+        IEventSymbol eventSymbol,
+        ExecutableMember currentMember)
+    {
+        return IsLeftSideOfAddAssignment(expression)
+            && IsSameMethod(eventSymbol.AddMethod, currentMember.Symbol)
+                ? eventSymbol.AddMethod
+                : IsLeftSideOfSubtractAssignment(expression)
+                    && IsSameMethod(eventSymbol.RemoveMethod, currentMember.Symbol)
+                        ? eventSymbol.RemoveMethod
+                        : null;
+    }
+
+    private static bool IsSameMethod(
+        IMethodSymbol? left,
+        IMethodSymbol right)
+    {
+        return left is not null
+            && SymbolEqualityComparer.Default.Equals(
+                (left.ReducedFrom ?? left).OriginalDefinition,
+                (right.ReducedFrom ?? right).OriginalDefinition);
+    }
+
+    private static bool IsLeftSideOfAssignment(
+        ExpressionSyntax expression,
+        bool allowCompoundAssignment)
+    {
+        return expression.Parent is AssignmentExpressionSyntax assignment
+            && assignment.Left == expression
+            && (allowCompoundAssignment || assignment.IsKind(SyntaxKind.SimpleAssignmentExpression));
+    }
+
+    private static bool IsLeftSideOfAddAssignment(ExpressionSyntax expression)
+    {
+        return expression.Parent is AssignmentExpressionSyntax assignment
+            && assignment.Left == expression
+            && assignment.IsKind(SyntaxKind.AddAssignmentExpression);
+    }
+
+    private static bool IsLeftSideOfSubtractAssignment(ExpressionSyntax expression)
+    {
+        return expression.Parent is AssignmentExpressionSyntax assignment
+            && assignment.Left == expression
+            && assignment.IsKind(SyntaxKind.SubtractAssignmentExpression);
+    }
+
+    private static bool IsOperandOfIncrementOrDecrement(ExpressionSyntax expression)
+    {
+        return expression.Parent switch
+        {
+            PrefixUnaryExpressionSyntax prefixUnary
+                when prefixUnary.Operand == expression
+                    && (prefixUnary.IsKind(SyntaxKind.PreIncrementExpression)
+                        || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression)) => true,
+            PostfixUnaryExpressionSyntax postfixUnary
+                when postfixUnary.Operand == expression
+                    && (postfixUnary.IsKind(SyntaxKind.PostIncrementExpression)
+                        || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression)) => true,
+            _ => false,
+        };
     }
 
     private void AnalyzeExpression(
