@@ -110,7 +110,7 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## Experimentar os diagnósticos
 
-`BIG1001` até `BIG1005` são habilitados por padrão com severidade `Info`. `BIG1006` e `BIG2001` também são habilitados como descriptors, mas só reportam quando thresholds concretos são configurados. A visibilidade de diagnósticos informativos no build depende do projeto consumidor e das configurações do SDK.
+`BIG1001` até `BIG1005` são habilitados por padrão com severidade `Info`. `BIG1006`, `BIG2001` e `BIG2002` também são habilitados como descriptors, mas só reportam quando thresholds concretos são configurados. A visibilidade de diagnósticos informativos no build depende do projeto consumidor e das configurações do SDK.
 
 Promova um diagnóstico acionável localmente:
 
@@ -153,6 +153,15 @@ Promova o diagnóstico de threshold de Cyclomatic Complexity:
 complexity_analyzers.maximum_cyclomatic_complexity = 10
 complexity_analyzers.cyclomatic_complexity_mode = standard
 dotnet_diagnostic.BIG2001.severity = warning
+```
+
+Promova o diagnóstico de threshold de Maximum Control-Flow Nesting Depth:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_nesting_depth = 3
+dotnet_diagnostic.BIG2002.severity = warning
 ```
 
 `BIG0001` é desabilitado por padrão. Habilite-o quando quiser estimativas de complexidade por método:

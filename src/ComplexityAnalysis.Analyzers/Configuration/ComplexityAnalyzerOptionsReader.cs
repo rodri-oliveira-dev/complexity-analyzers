@@ -17,6 +17,7 @@ internal static class ComplexityAnalyzerOptionsReader
     internal const string MaximumComplexityKey = "complexity_analyzers.maximum_complexity";
     internal const string MaximumCyclomaticComplexityKey = "complexity_analyzers.maximum_cyclomatic_complexity";
     internal const string CyclomaticComplexityModeKey = "complexity_analyzers.cyclomatic_complexity_mode";
+    internal const string MaximumNestingDepthKey = "complexity_analyzers.maximum_nesting_depth";
 
     internal static ComplexityAnalyzerOptions Read(
         AnalyzerConfigOptionsProvider optionsProvider,
@@ -36,7 +37,8 @@ internal static class ComplexityAnalyzerOptionsReader
             ReadInteger(treeOptions, globalOptions, MaxMethodsPerRootKey, defaults.MaxMethodsPerRoot, ComplexityAnalyzerOptions.MaximumMaxMethodsPerRoot),
             ReadThreshold(treeOptions, globalOptions, MaximumComplexityKey, defaults.MaximumComplexity),
             ReadOptionalPositiveInteger(treeOptions, globalOptions, MaximumCyclomaticComplexityKey, defaults.MaximumCyclomaticComplexity),
-            ReadCyclomaticComplexityMode(treeOptions, globalOptions, CyclomaticComplexityModeKey, defaults.CyclomaticComplexityMode));
+            ReadCyclomaticComplexityMode(treeOptions, globalOptions, CyclomaticComplexityModeKey, defaults.CyclomaticComplexityMode),
+            ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumNestingDepthKey, defaults.MaximumNestingDepth));
     }
 
     private static bool ReadBoolean(
@@ -81,6 +83,17 @@ internal static class ComplexityAnalyzerOptionsReader
     {
         return TryGetValue(treeOptions, globalOptions, key, out string value)
             ? ParseOptionalPositiveIntegerOrDefault(value, defaultValue)
+            : defaultValue;
+    }
+
+    private static int? ReadOptionalNonNegativeInteger(
+        AnalyzerConfigOptions treeOptions,
+        AnalyzerConfigOptions globalOptions,
+        string key,
+        int? defaultValue)
+    {
+        return TryGetValue(treeOptions, globalOptions, key, out string value)
+            ? ParseOptionalNonNegativeIntegerOrDefault(value, defaultValue)
             : defaultValue;
     }
 
@@ -131,6 +144,15 @@ internal static class ComplexityAnalyzerOptionsReader
         string trimmedValue = value.Trim();
         return int.TryParse(trimmedValue, NumberStyles.None, CultureInfo.InvariantCulture, out int parsedValue)
             && parsedValue >= 1
+            ? parsedValue
+            : defaultValue;
+    }
+
+    private static int? ParseOptionalNonNegativeIntegerOrDefault(string value, int? defaultValue)
+    {
+        string trimmedValue = value.Trim();
+        return int.TryParse(trimmedValue, NumberStyles.None, CultureInfo.InvariantCulture, out int parsedValue)
+            && parsedValue >= 0
             ? parsedValue
             : defaultValue;
     }

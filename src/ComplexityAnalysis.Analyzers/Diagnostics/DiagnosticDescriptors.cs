@@ -76,6 +76,15 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports supported executable members whose structural cyclomatic complexity exceeds the configured maximum.");
 
+    internal static readonly DiagnosticDescriptor MaximumNestingDepthExceedsConfiguredThreshold = new(
+        id: "BIG2002",
+        title: "Maximum nesting depth exceeds configured threshold",
+        messageFormat: "Member '{0}' has maximum control-flow nesting depth {1}, exceeding configured maximum {2}",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports supported executable members whose maximum control-flow nesting depth exceeds the configured maximum.");
+
     internal static readonly DiagnosticDescriptor AnalyzerExecutionProbe = new(
         id: "BIG9000",
         title: "Analyzer execution probe",

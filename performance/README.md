@@ -32,12 +32,13 @@ The baseline uses four workload groups.
 | --- | --- | --- |
 | Tiny | Straight-line methods, one known operation, one simple loop. | Basic analyzer overhead and ordinary method reporting. |
 | Small | Loops, LINQ, simple source calls, and known BCL operations. | Common per-method semantic analysis. |
-| Medium | Multiple methods, shared callees, interprocedural chains, nested iteration, deferred LINQ consumption, supported direct recursion. | Representative compiler analyzer execution. |
+| Medium | Multiple methods, shared callees, interprocedural chains, nested iteration, deferred LINQ consumption, supported direct recursion, flat-heavy control flow, deep-heavy control flow, mixed switch/try/loop nesting, and nested executable members. | Representative compiler analyzer execution and separation between path count and nesting depth. |
 | Stress/adversarial synthetic | Call chains near `max_call_depth`, fanout near `max_methods_per_root`, cycles, repeated calls to the same callee, unsupported recurrence shapes, numerical solver exhaustion, cancellation. | Termination, boundedness, cache ownership, and conservative fallback. |
 
 Workload sources are committed in:
 
 - `performance/ComplexityAnalysis.Analyzers.Performance/TimingWorkload.cs`
+- `performance/.editorconfig`
 - `tests/ComplexityAnalysis.Analyzers.Tests/PerformanceSyntheticCorpusTests.cs`
 - `tests/ComplexityAnalysis.Analyzers.Tests/AnalyzerPerformanceBudgetContractTests.cs`
 

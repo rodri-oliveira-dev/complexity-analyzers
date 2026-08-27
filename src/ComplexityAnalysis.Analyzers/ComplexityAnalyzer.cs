@@ -31,6 +31,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.ExponentialRecursiveGrowth,
             DiagnosticDescriptors.MethodComplexityExceedsConfiguredThreshold,
             DiagnosticDescriptors.CyclomaticComplexityExceedsConfiguredThreshold,
+            DiagnosticDescriptors.MaximumNestingDepthExceedsConfiguredThreshold,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)
@@ -91,6 +92,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             context.CancellationToken);
 
         ReportCyclomaticThresholdDiagnosticIfNeeded(context, member, options);
+        ReportMaximumNestingDepthThresholdDiagnosticIfNeeded(context, member, options);
 
         foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMember(
             member,
@@ -166,6 +168,44 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             actualText,
             thresholdText,
             modeText));
+    }
+
+    private static void ReportMaximumNestingDepthThresholdDiagnosticIfNeeded(
+        SyntaxNodeAnalysisContext context,
+        ExecutableMember member,
+        ComplexityAnalyzerOptions options)
+    {
+        if (!options.MaximumNestingDepth.HasValue)
+        {
+            return;
+        }
+
+        if (!new MaximumNestingDepthAnalyzer().TryAnalyze(
+            member,
+            context.CancellationToken,
+            out MaximumNestingDepthResult result))
+        {
+            return;
+        }
+
+        int threshold = options.MaximumNestingDepth.Value;
+        if (result.Value <= threshold)
+        {
+            return;
+        }
+
+        string actualText = result.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string thresholdText = threshold.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            DiagnosticDescriptors.MaximumNestingDepthExceedsConfiguredThreshold,
+            member.DiagnosticLocation,
+            ImmutableDictionary<string, string?>.Empty
+                .Add(DiagnosticPropertyNames.MaximumNestingDepth, actualText)
+                .Add(DiagnosticPropertyNames.Threshold, thresholdText),
+            member.DisplayName,
+            actualText,
+            thresholdText));
     }
 
     private static void ReportThresholdDiagnosticIfNeeded(

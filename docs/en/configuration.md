@@ -22,10 +22,11 @@ Invalid values are safe: they do not fail the build or report an analyzer failur
 | `complexity_analyzers.maximum_complexity` | String | `none` | `none`, `constant`, `log_n`, `n`, `n_log_n`, `n2`, `n3`, `exponential`, `factorial` | Enables `BIG1006` when a known comparable method estimate exceeds this threshold. |
 | `complexity_analyzers.maximum_cyclomatic_complexity` | Integer | unset | Positive base-10 integer | Enables `BIG2001` when a supported executable member's Cyclomatic Complexity exceeds this threshold. |
 | `complexity_analyzers.cyclomatic_complexity_mode` | String | `standard` | `standard`, `modified_mccabe` | Selects switch accounting for Cyclomatic Complexity. |
+| `complexity_analyzers.maximum_nesting_depth` | Integer | unset | Non-negative base-10 integer | Enables `BIG2002` when a supported executable member's Maximum Control-Flow Nesting Depth exceeds this threshold. |
 
 Boolean values are case-insensitive after trimming surrounding whitespace. Integer values must be base-10 non-negative integers with no sign, decimal point, separators, or embedded whitespace. Threshold values are case-sensitive.
 
-Values outside the public budget limits fall back to the default: `max_call_depth = 5` and `max_methods_per_root = 32`. Invalid cyclomatic thresholds fall back to unset. Invalid cyclomatic modes fall back to `standard`.
+Values outside the public budget limits fall back to the default: `max_call_depth = 5` and `max_methods_per_root = 32`. Invalid cyclomatic and nesting thresholds fall back to unset. Invalid cyclomatic modes fall back to `standard`.
 
 ## Example
 
@@ -39,9 +40,11 @@ complexity_analyzers.max_methods_per_root = 32
 complexity_analyzers.maximum_complexity = n_log_n
 complexity_analyzers.maximum_cyclomatic_complexity = 10
 complexity_analyzers.cyclomatic_complexity_mode = standard
+complexity_analyzers.maximum_nesting_depth = 3
 
 dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG2001.severity = warning
+dotnet_diagnostic.BIG2002.severity = warning
 ```
 
 ## Threshold behavior
@@ -93,6 +96,33 @@ Examples:
 | `10` | `10` | No report. |
 | `11` | `10` | Reports `BIG2001`. |
 
+## Maximum nesting depth behavior
+
+`complexity_analyzers.maximum_nesting_depth` is opt-in. When it is unset or
+invalid, `BIG2002` does not report. Valid values are non-negative base-10
+integers. Equality does not report; only a strictly greater actual value reports.
+
+Maximum Control-Flow Nesting Depth measures the deepest nested control-flow
+structure inside one executable member. Straight-line code has depth `0`, a
+single `if` or loop has depth `1`, and truly nested constructs increase the
+depth. Sibling branches do not accumulate.
+
+The nesting convention counts `if`, loops, `switch` statements, switch
+expressions, `try`, and conditional `?:` expressions as one nesting level.
+`else`, `else if`, cases, switch arms, catches, `finally`, boolean chains,
+patterns, guards, plain blocks, initializers, `lock`, `using`, `fixed`,
+`checked`, and `unchecked` do not add a level by themselves. Nested local
+functions, lambdas, and anonymous methods are analyzed as independent executable
+members rather than inflating their lexical parent.
+
+Examples:
+
+| Actual value | Threshold | Result |
+| --- | --- | --- |
+| `2` | `3` | No report. |
+| `3` | `3` | No report. |
+| `4` | `3` | Reports `BIG2002`. |
+
 ## Feature flags
 
 `complexity_analyzers.interprocedural_analysis = false` prevents expansion into supported source callees. Intraprocedural analysis and supported BCL/LINQ operation analysis remain active.
@@ -143,11 +173,14 @@ The compiler and SDK determine the exact build behavior for each severity.
 | `BIG1005` | `Info` | `true` |
 | `BIG1006` | `Info` | `true` |
 | `BIG2001` | `Info` | `true` |
+| `BIG2002` | `Info` | `true` |
 | `BIG9000` | `Info` | `false` |
 
 `BIG1006` is enabled by default as a descriptor, but it is functionally inactive until `complexity_analyzers.maximum_complexity` is set to a concrete threshold.
 
 `BIG2001` is enabled by default as a descriptor, but it is functionally inactive until `complexity_analyzers.maximum_cyclomatic_complexity` is set to a concrete threshold.
+
+`BIG2002` is enabled by default as a descriptor, but it is functionally inactive until `complexity_analyzers.maximum_nesting_depth` is set to a concrete threshold.
 
 ## Common settings
 
@@ -174,6 +207,8 @@ dotnet_diagnostic.BIG1006.severity = warning
 complexity_analyzers.maximum_cyclomatic_complexity = 10
 complexity_analyzers.cyclomatic_complexity_mode = modified_mccabe
 dotnet_diagnostic.BIG2001.severity = warning
+complexity_analyzers.maximum_nesting_depth = 3
+dotnet_diagnostic.BIG2002.severity = warning
 ```
 
 Temporarily prove package loading:

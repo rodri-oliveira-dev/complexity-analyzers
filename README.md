@@ -23,6 +23,7 @@ The analyzer is deliberately conservative: when complexity cannot be proven safe
 - Performs bounded, demand-driven interprocedural analysis for safe source-method calls in the same compilation.
 - Solves selected direct-recursion recurrence families, including decrement recurrences, simple exponential recursion, Master Theorem forms, and a restricted Akra-Bazzi subset.
 - Measures structural Cyclomatic Complexity independently from Big-O, with standard and Modified McCabe switch accounting.
+- Measures Maximum Control-Flow Nesting Depth independently from Big-O and Cyclomatic Complexity.
 - Supports configurable analysis budgets and a maximum-complexity threshold through `.editorconfig`/analyzer config.
 - Runs as a normal Roslyn analyzer during builds and IDE analysis; consumer code does not call the analyzer at runtime.
 
@@ -38,6 +39,7 @@ The analyzer is deliberately conservative: when complexity cannot be proven safe
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | Yes |
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | Yes |
 | `BIG2001` | Cyclomatic complexity exceeds configured threshold | `Complexity` | `Info` | Yes |
+| `BIG2002` | Maximum nesting depth exceeds configured threshold | `Complexity` | `Info` | Yes |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | No |
 
 `BIG0001` is an opt-in informational diagnostic that reports a known method-complexity estimate at the method identifier.
@@ -47,6 +49,8 @@ The analyzer is deliberately conservative: when complexity cannot be proven safe
 `BIG1006` reports when `complexity_analyzers.maximum_complexity` is configured and a known, comparable estimate exceeds the configured threshold. `Unknown` and incomparable estimates are not reported.
 
 `BIG2001` reports when `complexity_analyzers.maximum_cyclomatic_complexity` is configured and a supported executable member's structural Cyclomatic Complexity exceeds that maximum. It is independent from Big-O and can use standard or Modified McCabe switch accounting.
+
+`BIG2002` reports when `complexity_analyzers.maximum_nesting_depth` is configured and a supported executable member's Maximum Control-Flow Nesting Depth exceeds that maximum. Straight-line code has depth `0`; sibling branches do not accumulate; nested local functions, lambdas, and anonymous methods are analyzed independently.
 
 `BIG9000` is an infrastructure probe used to prove that the analyzer package loaded and executed. It is not a performance recommendation.
 
@@ -139,6 +143,7 @@ complexity_analyzers.max_methods_per_root = 32
 complexity_analyzers.maximum_complexity = n_log_n
 complexity_analyzers.maximum_cyclomatic_complexity = 10
 complexity_analyzers.cyclomatic_complexity_mode = standard
+complexity_analyzers.maximum_nesting_depth = 3
 
 dotnet_diagnostic.BIG0001.severity = suggestion
 dotnet_diagnostic.BIG1001.severity = warning
@@ -148,10 +153,11 @@ dotnet_diagnostic.BIG1004.severity = warning
 dotnet_diagnostic.BIG1005.severity = warning
 dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG2001.severity = warning
+dotnet_diagnostic.BIG2002.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-Defaults keep interprocedural and recursion analysis enabled, `max_call_depth` at `5`, `max_methods_per_root` at `32`, `maximum_complexity` at `none`, `maximum_cyclomatic_complexity` unset, and `cyclomatic_complexity_mode` at `standard`. Threshold reporting only applies to the configured metric.
+Defaults keep interprocedural and recursion analysis enabled, `max_call_depth` at `5`, `max_methods_per_root` at `32`, `maximum_complexity` at `none`, `maximum_cyclomatic_complexity` unset, `cyclomatic_complexity_mode` at `standard`, and `maximum_nesting_depth` unset. Threshold reporting only applies to the configured metric.
 
 See [Configuration](docs/en/configuration.md).
 

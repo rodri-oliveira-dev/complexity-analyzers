@@ -10,6 +10,7 @@ BIG1004 | Complexity | Info | Input-dependent method call inside iteration.
 BIG1005 | Complexity | Info | Exponential recursive growth.
 BIG1006 | Complexity | Info | Method complexity exceeds configured threshold.
 BIG2001 | Complexity | Info | Cyclomatic complexity exceeds configured threshold.
+BIG2002 | Complexity | Info | Maximum nesting depth exceeds configured threshold.
 BIG9000 | Infrastructure | Info | Analyzer execution probe.
 
 ### Changed Rules
@@ -29,3 +30,4 @@ BIG1001-BIG1004 | Actionable diagnostics now respect executable-member body boun
 BIG1005 | Direct-recursion reporting can now use the shared executable-member abstraction for supported non-lambda executable roots when recurrence extraction succeeds.
 BIG1006 | Threshold diagnostics can now report for supported executable members when their known complexity exceeds the configured maximum.
 BIG2001 | Added configurable Cyclomatic Complexity / Modified McCabe threshold reporting with `cyclomaticComplexity`, `threshold` and `cyclomaticComplexityMode` diagnostic properties.
+BIG2002 | Added configurable Maximum Control-Flow Nesting Depth threshold reporting with `maximumNestingDepth` and `threshold` diagnostic properties.

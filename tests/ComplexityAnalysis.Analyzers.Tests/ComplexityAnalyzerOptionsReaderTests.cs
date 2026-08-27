@@ -31,6 +31,7 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(ComplexityThreshold.None, options.MaximumComplexity);
         Assert.Null(options.MaximumCyclomaticComplexity);
         Assert.Equal(CyclomaticComplexityAnalysisMode.Standard, options.CyclomaticComplexityMode);
+        Assert.Null(options.MaximumNestingDepth);
     }
 
     [Theory]
@@ -172,6 +173,34 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
     }
 
     [Theory]
+    [InlineData("0", 0)]
+    [InlineData("1", 1)]
+    [InlineData("10", 10)]
+    [InlineData(" 42 ", 42)]
+    [InlineData("2147483647", int.MaxValue)]
+    public void Maximum_nesting_depth_accepts_non_negative_integers(string value, int expected)
+    {
+        ComplexityAnalyzerOptions options = ReadOptions((ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, value));
+
+        Assert.Equal(expected, options.MaximumNestingDepth);
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("+1")]
+    [InlineData("1.5")]
+    [InlineData("1 2")]
+    [InlineData("999999999999")]
+    [InlineData("")]
+    [InlineData("ten")]
+    public void Invalid_maximum_nesting_depth_falls_back_to_unset(string value)
+    {
+        ComplexityAnalyzerOptions options = ReadOptions((ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, value));
+
+        Assert.Null(options.MaximumNestingDepth);
+    }
+
+    [Theory]
     [InlineData("standard", "Standard")]
     [InlineData("modified_mccabe", "ModifiedMcCabe")]
     [InlineData(" modified_mccabe ", "ModifiedMcCabe")]
@@ -206,7 +235,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
                 (ComplexityAnalyzerOptionsReader.MaxCallDepthKey, "4"),
                 (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n"),
                 (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "5"),
-                (ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, "standard")),
+                (ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, "standard"),
+                (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "4")),
             ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>.Empty.Add(
                 syntaxTree,
                 Options(
@@ -214,7 +244,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
                     (ComplexityAnalyzerOptionsReader.MaxCallDepthKey, "9"),
                     (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n2"),
                     (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "3"),
-                    (ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, "modified_mccabe"))));
+                    (ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, "modified_mccabe"),
+                    (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "2"))));
 
         ComplexityAnalyzerOptions options = ComplexityAnalyzerOptionsReader.Read(provider, syntaxTree);
 
@@ -223,6 +254,7 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(ComplexityThreshold.Quadratic, options.MaximumComplexity);
         Assert.Equal(3, options.MaximumCyclomaticComplexity);
         Assert.Equal(CyclomaticComplexityAnalysisMode.ModifiedMcCabe, options.CyclomaticComplexityMode);
+        Assert.Equal(2, options.MaximumNestingDepth);
     }
 
     [Fact]
@@ -236,7 +268,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
                 .Add(firstTree, Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n")))
                 .Add(secondTree, Options(
                     (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n3"),
-                    (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "12"))));
+                    (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "12"),
+                    (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "0"))));
 
         ComplexityAnalyzerOptions firstOptions = ComplexityAnalyzerOptionsReader.Read(provider, firstTree);
         ComplexityAnalyzerOptions secondOptions = ComplexityAnalyzerOptionsReader.Read(provider, secondTree);
@@ -247,6 +280,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(ComplexityThreshold.Cubic, secondOptions.MaximumComplexity);
         Assert.Null(firstOptions.MaximumCyclomaticComplexity);
         Assert.Equal(12, secondOptions.MaximumCyclomaticComplexity);
+        Assert.Null(firstOptions.MaximumNestingDepth);
+        Assert.Equal(0, secondOptions.MaximumNestingDepth);
     }
 
     [Fact]
