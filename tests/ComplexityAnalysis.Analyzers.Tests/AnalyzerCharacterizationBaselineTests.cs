@@ -30,6 +30,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
     private const string InputDependentCallInsideIterationId = "BIG1004";
     private const string ExponentialRecursiveGrowthId = "BIG1005";
     private const string MethodComplexityExceedsConfiguredThresholdId = "BIG1006";
+    private const string CyclomaticComplexityExceedsConfiguredThresholdId = "BIG2001";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -46,6 +47,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
             new(InputDependentCallInsideIterationId, "Input-dependent method call inside iteration", "Complexity", DiagnosticSeverity.Info, true),
             new(ExponentialRecursiveGrowthId, "Exponential recursive growth", "Complexity", DiagnosticSeverity.Info, true),
             new(MethodComplexityExceedsConfiguredThresholdId, "Method complexity exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
+            new(CyclomaticComplexityExceedsConfiguredThresholdId, "Cyclomatic complexity exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(AnalyzerExecutionProbeId, "Analyzer execution probe", "Infrastructure", DiagnosticSeverity.Info, false)
         ];
 

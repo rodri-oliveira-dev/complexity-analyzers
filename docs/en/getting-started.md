@@ -110,7 +110,7 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## Try the diagnostics
 
-`BIG1001` through `BIG1005` are enabled by default with `Info` severity. `BIG1006` is also enabled as a descriptor, but it only reports after a concrete `maximum_complexity` threshold is configured. Build visibility for informational diagnostics depends on the consuming project and SDK settings.
+`BIG1001` through `BIG1005` are enabled by default with `Info` severity. `BIG1006` and `BIG2001` are also enabled as descriptors, but they only report after concrete thresholds are configured. Build visibility for informational diagnostics depends on the consuming project and SDK settings.
 
 Promote an actionable diagnostic locally:
 
@@ -143,6 +143,16 @@ Configure a maximum-complexity threshold:
 
 complexity_analyzers.maximum_complexity = n_log_n
 dotnet_diagnostic.BIG1006.severity = warning
+```
+
+Promote the Cyclomatic Complexity threshold diagnostic:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_cyclomatic_complexity = 10
+complexity_analyzers.cyclomatic_complexity_mode = standard
+dotnet_diagnostic.BIG2001.severity = warning
 ```
 
 `BIG0001` is disabled by default. Enable it when you want method-level complexity estimates:

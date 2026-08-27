@@ -23,6 +23,7 @@ inconclusivos ou não resolvidos permanecem `Unknown` em vez de serem estimados.
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | `true` |
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2001` | Cyclomatic complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Executable Members Suportados
@@ -82,7 +83,9 @@ como um trace interno completo.
 | Propriedade | Significado |
 | --- | --- |
 | `complexity` | Estimativa conhecida emitida por `BIG0001`, `BIG1005` ou `BIG1006`. |
-| `threshold` | Expressão do threshold configurado emitida por `BIG1006`. |
+| `threshold` | Threshold configurado emitido por `BIG1006` ou `BIG2001`. |
+| `cyclomaticComplexity` | Cyclomatic Complexity real emitida por `BIG2001`. |
+| `cyclomaticComplexityMode` | Modo de contabilização de `switch` emitido por `BIG2001`: `standard` ou `modified_mccabe`. |
 | `operation` | Nome estável da operação ou método responsável por um diagnóstico acionável. |
 | `operationComplexity` | Custo conhecido da operação ou callee no local do diagnóstico. |
 | `iterationComplexity` | Complexidade conhecida da iteração envolvente. |
@@ -567,6 +570,100 @@ configurado quando o projeto aceitar intencionalmente o custo.
 `Unknown` e expressões multivariadas incomparáveis não produzem diagnóstico de
 threshold. `BIG1006` é um sinal prático de análise estática, não uma prova
 matemática universal.
+
+## BIG2001 - Cyclomatic Complexity Acima do Threshold Configurado
+
+| Propriedade | Valor |
+| --- | --- |
+| Categoria | `Complexity` |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Localização estável do executable member |
+| Mensagem | `Member '{member}' has cyclomatic complexity {actual}, exceeding configured maximum {threshold} ({mode} mode)` |
+| Diagnostic properties | `cyclomaticComplexity`, `threshold`, `cyclomaticComplexityMode` |
+
+### O Que Detecta
+
+`BIG2001` reporta um executable member suportado cuja Cyclomatic Complexity
+estrutural é estritamente maior que
+`complexity_analyzers.maximum_cyclomatic_complexity`.
+
+### Por Que Importa
+
+Cyclomatic Complexity mede complexidade de caminhos de controle. Ela é
+independente da complexidade algorítmica de tempo: um membro pode ser `O(n)` e,
+ao mesmo tempo, possuir muitos branches, guards e caminhos independentes.
+
+### Exemplo Que Dispara
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_cyclomatic_complexity = 2
+dotnet_diagnostic.BIG2001.severity = warning
+```
+
+```csharp
+int M(int value)
+{
+    if (value > 0)
+    {
+        return 1;
+    }
+    else if (value < 0)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+```
+
+O método tem baseline `1`, mais uma decisão para `if` e uma para `else if`,
+então o valor real é `3`.
+
+### Exemplo Que Não Dispara
+
+```csharp
+int M(int value)
+{
+    if (value > 0)
+    {
+        return 1;
+    }
+
+    return 0;
+}
+```
+
+Com `maximum_cyclomatic_complexity = 2`, igualdade não reporta.
+
+### Raciocínio de Complexidade
+
+A convenção standard conta `1 + decision points`. Decision points incluem `if`,
+loops, `catch`, filtros de catch, expressões condicionais, short-circuit
+`&&`/`||`, cases de switch não default, arms de switch expression não discard,
+arms discard com guarda em switch expression, guards `when` e patterns `or`.
+`else`, `try`, `finally`, blocos simples,
+initializers, `??`, `?.`, pattern `and` e pattern `not` não adicionam pontos por
+si só.
+
+No modo `modified_mccabe`, cada switch statement ou switch expression contribui
+uma decisão para a família de `switch`, em vez de uma por case não default, arm
+não discard ou arm discard com guarda. Guards e patterns `or` continuam
+adicionando pontos.
+
+### Orientação
+
+Considere dividir ou simplificar o fluxo de controle quando um membro acumula
+muitos caminhos independentes e o threshold do projeto representa a política de
+manutenibilidade do time.
+
+### Limitações
+
+Este diagnóstico não é uma estimativa Big-O e não afirma que o membro seja lento.
+Local functions, lambdas e anonymous methods aninhados são analisados como
+executable members próprios em vez de inflarem o pai lexical.
 
 ## BIG9000 - Probe de Execução do Analyzer
 

@@ -67,6 +67,15 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports methods whose known estimated time complexity exceeds the configured maximum complexity.");
 
+    internal static readonly DiagnosticDescriptor CyclomaticComplexityExceedsConfiguredThreshold = new(
+        id: "BIG2001",
+        title: "Cyclomatic complexity exceeds configured threshold",
+        messageFormat: "Member '{0}' has cyclomatic complexity {1}, exceeding configured maximum {2} ({3} mode)",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports supported executable members whose structural cyclomatic complexity exceeds the configured maximum.");
+
     internal static readonly DiagnosticDescriptor AnalyzerExecutionProbe = new(
         id: "BIG9000",
         title: "Analyzer execution probe",
