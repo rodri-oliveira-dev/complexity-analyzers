@@ -11,6 +11,11 @@ public sealed class AnalyzerPackageContractTests
     private const string PackageId = "ComplexityAnalysis.Analyzers";
     private const string PackageVersion = "0.0.0-package-contract";
     private const string AnalyzerDllPath = "analyzers/dotnet/cs/ComplexityAnalysis.Analyzers.dll";
+    private const string PackageIconPath = "icon.png";
+    private const string PackageReadmePath = "README.md";
+    private const string PackageTitle = "Complexity Analysis Analyzers for C#";
+    private const string PackageDescription = "Roslyn analyzers for C# that detect algorithmic and structural code complexity at compile time, including Big-O estimation, cyclomatic complexity, nesting depth, method-size metrics, costly LINQ/BCL patterns, interprocedural analysis, and recurrence solving.";
+    private const string PackageTags = "roslyn roslyn-analyzer analyzer csharp dotnet static-analysis code-analysis code-quality complexity algorithmic-complexity big-o cyclomatic-complexity code-metrics nesting-depth performance linq";
 
     private static readonly Lazy<PackageArtifacts> Artifacts = new(
         CreatePackageArtifacts,
@@ -45,16 +50,21 @@ public sealed class AnalyzerPackageContractTests
         XElement metadata = GetMetadata(nuspec);
         XNamespace ns = metadata.Name.Namespace;
 
-        Assert.Contains("README.md", GetEntryNames(package));
+        string[] entries = GetEntryNames(package);
+        Assert.Contains(PackageReadmePath, entries);
+        ZipArchiveEntry icon = Assert.Single(package.Entries, entry => entry.FullName == PackageIconPath);
+        Assert.True(icon.Length > 0, "The package icon entry should contain the approved PNG asset.");
         Assert.Equal(PackageId, ElementValue(metadata, ns, "id"));
         Assert.Equal(PackageVersion, ElementValue(metadata, ns, "version"));
-        Assert.Equal(PackageId, ElementValue(metadata, ns, "title"));
+        Assert.Equal(PackageTitle, ElementValue(metadata, ns, "title"));
         Assert.Equal("Rodrigo de Oliveira", ElementValue(metadata, ns, "authors"));
         Assert.Equal("true", ElementValue(metadata, ns, "developmentDependency"));
-        Assert.Equal("README.md", ElementValue(metadata, ns, "readme"));
+        Assert.Equal(PackageReadmePath, ElementValue(metadata, ns, "readme"));
+        Assert.Equal(PackageIconPath, ElementValue(metadata, ns, "icon"));
         Assert.Equal("https://github.com/rodri-oliveira-dev/complexity-analyzers", ElementValue(metadata, ns, "projectUrl"));
-        Assert.Equal("Roslyn analyzer package for algorithmic complexity diagnostics in C#.", ElementValue(metadata, ns, "description"));
-        Assert.Equal("roslyn analyzer complexity big-o csharp", ElementValue(metadata, ns, "tags"));
+        Assert.Equal(PackageDescription, ElementValue(metadata, ns, "description"));
+        Assert.Equal(PackageTags, ElementValue(metadata, ns, "tags"));
+        Assert.Null(metadata.Element(ns + "iconUrl"));
         Assert.Null(metadata.Element(ns + "releaseNotes"));
         Assert.Null(metadata.Element(ns + "copyright"));
     }

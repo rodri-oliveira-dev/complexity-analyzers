@@ -105,9 +105,21 @@ dotnet pack ./src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.cspr
 
 Quando a tarefa afetar CI, cobertura, empacotamento ou performance, valide tambem os arquivos e harnesses diretamente relacionados em `.github/workflows/`, `tests/` e `performance/`.
 
+## Relatorios de validacao e Pull Requests
+
+- Nunca exponha caminhos absolutos locais, nomes de usuario do sistema operacional, diretorios home, paths de ferramentas instaladas localmente ou outros detalhes especificos da maquina em commits, documentacao, comentarios, issues ou Pull Requests.
+- Ao registrar comandos executados durante a validacao, normalize-os para uma forma portavel e reproduzivel a partir da raiz do repositorio.
+- Use `dotnet` em vez do caminho absoluto para `dotnet.exe`.
+- Prefira caminhos relativos ao repositorio, como `./ComplexityAnalysis.Analyzers.slnx`, `./src/...` e `./artifacts/...`.
+- Nao publique paths como `C:\Users\<user>\...`, `/home/<user>/...`, `%USERPROFILE%`, `$HOME` resolvido ou diretorios temporarios especificos da maquina.
+- Se a execucao local exigir uma ferramenta localizada por caminho absoluto, o caminho pode ser usado internamente para executar o comando, mas deve ser sanitizado antes de aparecer em qualquer saida publica.
+- Antes de criar ou atualizar um Pull Request, revise a descricao final e remova qualquer informacao especifica do ambiente local.
+- A secao `Validation` de um Pull Request deve mostrar os comandos canonicos e reproduziveis, nao necessariamente a invocacao literal usada internamente pelo agente.
+
 ## Git
 
 - Nunca publique branch, push, GitHub Release, NuGet publish ou `dotnet nuget push` sem pedido explicito.
 - Use commits semanticos.
 - Revise `git diff --check` e `git diff` antes de commitar.
 - Nao inclua artifacts locais, packages, coverage ou saidas de build no commit.
+- Sanitizar descricoes de Pull Request e demais saidas publicas, removendo paths absolutos e informacoes especificas da maquina local.

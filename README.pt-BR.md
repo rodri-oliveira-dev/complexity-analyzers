@@ -15,6 +15,36 @@
 
 O analyzer é deliberadamente conservador: quando não consegue comprovar a complexidade com segurança a partir das informações sintáticas e semânticas disponíveis, retorna `Unknown` em vez de fazer uma estimativa insegura.
 
+## Instalação rápida
+
+Ao consumir uma versão publicada do pacote no NuGet.org:
+
+```bash
+dotnet add package ComplexityAnalysis.Analyzers
+```
+
+O pacote funciona como um analyzer de tempo de compilação. Depois da instalação, o Roslyn o carrega durante builds e análise na IDE; o código da aplicação não chama o analyzer e não assume uma dependência de runtime nele. Para criação local do pacote e consumo a partir do repositório, veja [Primeiros Passos](docs/pt-BR/getting-started.md).
+
+## Exemplo rápido
+
+```csharp
+foreach (var item in items)
+{
+    if (otherItems.Contains(item))
+    {
+        // ...
+    }
+}
+```
+
+Quando `otherItems` é uma coleção com busca linear, como `List<T>`, isso pode reportar:
+
+```text
+BIG1001 - Linear lookup inside iteration
+```
+
+Quer ver o analyzer em ação? Consulte o [sample executável](samples/ComplexityAnalysis.Sample/README.md). Para a referência completa de regras e configuração, comece por [Primeiros Passos](docs/pt-BR/getting-started.md) e pelo [Catálogo de Analyzers](docs/pt-BR/analyzers.md).
+
 ## O que ele faz
 
 - Estima complexidade Big-O de métodos C# suportados usando sintaxe, símbolos e informações semânticas do Roslyn.
@@ -135,7 +165,7 @@ dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 ```
 
-O repositório atualmente documenta criação e consumo local do pacote. Não presuma uma versão publicada no NuGet.org sem que ela exista de forma independente.
+O repositório também documenta criação e consumo local do pacote. Se você estiver trabalhando antes de uma versão estável estar disponível no NuGet.org, use o fluxo de pacote local em [Primeiros Passos](docs/pt-BR/getting-started.md).
 
 Veja [Primeiros Passos](docs/pt-BR/getting-started.md).
 
@@ -217,6 +247,7 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 - [Catálogo de Analyzers](docs/pt-BR/analyzers.md)
 - [Arquitetura](docs/pt-BR/architecture.md)
 - [Configuração](docs/pt-BR/configuration.md)
+- [Sample executável](samples/ComplexityAnalysis.Sample/README.md)
 - [Governança de Qualidade de Release](docs/pt-BR/development/quality-gates.md)
 - [Documentation in English](README.md)
 

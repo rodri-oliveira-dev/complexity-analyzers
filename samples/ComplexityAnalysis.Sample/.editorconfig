@@ -1,0 +1,15 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+complexity_analyzers.maximum_cyclomatic_complexity = 3
+
+dotnet_diagnostic.BIG1001.severity = warning
+dotnet_diagnostic.BIG2001.severity = warning

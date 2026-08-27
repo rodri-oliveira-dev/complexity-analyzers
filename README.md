@@ -15,6 +15,36 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 The analyzer is deliberately conservative: when complexity cannot be proven safely from the available syntax and semantic information, it returns `Unknown` instead of guessing.
 
+## Quick install
+
+When consuming a published package version from NuGet.org:
+
+```bash
+dotnet add package ComplexityAnalysis.Analyzers
+```
+
+The package works as a compile-time analyzer. After installation, Roslyn loads it during builds and IDE analysis; application code does not call the analyzer and does not take a runtime dependency on it. For local package creation and repository-based consumption, see [Getting Started](docs/en/getting-started.md).
+
+## Quick example
+
+```csharp
+foreach (var item in items)
+{
+    if (otherItems.Contains(item))
+    {
+        // ...
+    }
+}
+```
+
+When `otherItems` is a linear-lookup collection such as `List<T>`, this can report:
+
+```text
+BIG1001 - Linear lookup inside iteration
+```
+
+Want to see the analyzer in action? See the [runnable sample](samples/ComplexityAnalysis.Sample/README.md). For the full rule and configuration reference, start with [Getting Started](docs/en/getting-started.md) and the [Analyzer Catalog](docs/en/analyzers.md).
+
 ## What it does
 
 - Estimates Big-O complexity for supported C# methods using Roslyn syntax, symbols, and semantic information.
@@ -135,7 +165,7 @@ dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 ```
 
-The repository currently documents local package creation and consumption. Do not assume a NuGet.org release unless one exists independently.
+The repository also documents local package creation and consumption. If you are working before a stable NuGet.org package version is available, use the local package flow in [Getting Started](docs/en/getting-started.md).
 
 See [Getting Started](docs/en/getting-started.md).
 
@@ -217,6 +247,7 @@ See [Architecture](docs/en/architecture.md).
 - [Analyzer Catalog](docs/en/analyzers.md)
 - [Architecture](docs/en/architecture.md)
 - [Configuration](docs/en/configuration.md)
+- [Runnable sample](samples/ComplexityAnalysis.Sample/README.md)
 - [Release Quality Governance](docs/en/development/quality-gates.md)
 - [Documentação em português](README.pt-BR.md)
 

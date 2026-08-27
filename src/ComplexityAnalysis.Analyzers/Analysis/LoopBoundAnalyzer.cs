@@ -386,47 +386,121 @@ internal sealed class LoopBoundAnalyzer
 
         progression = default;
 
-        if (binary.IsKind(SyntaxKind.AddExpression))
+        if (TryAnalyzeLinearIncreasingSelfAssignment(binary, loopVariable, out progression))
         {
-            if ((IsSymbolReference(binary.Left, loopVariable)
-                    && TryGetPositiveIntegerConstant(binary.Right, out _))
-                || (IsSymbolReference(binary.Right, loopVariable)
-                    && TryGetPositiveIntegerConstant(binary.Left, out _)))
-            {
-                progression = LoopProgression.Linear(LoopDirection.Increasing);
-                return true;
-            }
-        }
-
-        if (binary.IsKind(SyntaxKind.SubtractExpression)
-            && IsSymbolReference(binary.Left, loopVariable)
-            && TryGetPositiveIntegerConstant(binary.Right, out _))
-        {
-            progression = LoopProgression.Linear(LoopDirection.Decreasing);
             return true;
         }
 
-        if (binary.IsKind(SyntaxKind.MultiplyExpression))
-        {
-            if ((IsSymbolReference(binary.Left, loopVariable)
-                    && TryGetIntegerConstantGreaterThanOne(binary.Right, out _))
-                || (IsSymbolReference(binary.Right, loopVariable)
-                    && TryGetIntegerConstantGreaterThanOne(binary.Left, out _)))
-            {
-                progression = LoopProgression.Logarithmic(LoopDirection.Increasing);
-                return true;
-            }
-        }
+        return TryAnalyzeLinearDecreasingSelfAssignment(binary, loopVariable, out progression)
+            || TryAnalyzeLogarithmicIncreasingSelfAssignment(binary, loopVariable, out progression)
+            || TryAnalyzeLogarithmicDecreasingSelfAssignment(binary, loopVariable, out progression);
+    }
 
-        if (binary.IsKind(SyntaxKind.DivideExpression)
-            && IsSymbolReference(binary.Left, loopVariable)
-            && TryGetIntegerConstantGreaterThanOne(binary.Right, out _))
+    private bool TryAnalyzeLinearIncreasingSelfAssignment(
+        BinaryExpressionSyntax binary,
+        ISymbol loopVariable,
+        out LoopProgression progression)
+    {
+        return TryAnalyzeCommutativeSelfAssignment(
+            binary,
+            SyntaxKind.AddExpression,
+            loopVariable,
+            constantGreaterThanOne: false,
+            LoopProgression.Linear(LoopDirection.Increasing),
+            out progression);
+    }
+
+    private bool TryAnalyzeLinearDecreasingSelfAssignment(
+        BinaryExpressionSyntax binary,
+        ISymbol loopVariable,
+        out LoopProgression progression)
+    {
+        return TryAnalyzeOrderedSelfAssignment(
+            binary,
+            SyntaxKind.SubtractExpression,
+            loopVariable,
+            constantGreaterThanOne: false,
+            LoopProgression.Linear(LoopDirection.Decreasing),
+            out progression);
+    }
+
+    private bool TryAnalyzeLogarithmicIncreasingSelfAssignment(
+        BinaryExpressionSyntax binary,
+        ISymbol loopVariable,
+        out LoopProgression progression)
+    {
+        return TryAnalyzeCommutativeSelfAssignment(
+            binary,
+            SyntaxKind.MultiplyExpression,
+            loopVariable,
+            constantGreaterThanOne: true,
+            LoopProgression.Logarithmic(LoopDirection.Increasing),
+            out progression);
+    }
+
+    private bool TryAnalyzeLogarithmicDecreasingSelfAssignment(
+        BinaryExpressionSyntax binary,
+        ISymbol loopVariable,
+        out LoopProgression progression)
+    {
+        return TryAnalyzeOrderedSelfAssignment(
+            binary,
+            SyntaxKind.DivideExpression,
+            loopVariable,
+            constantGreaterThanOne: true,
+            LoopProgression.Logarithmic(LoopDirection.Decreasing),
+            out progression);
+    }
+
+    private bool TryAnalyzeCommutativeSelfAssignment(
+        BinaryExpressionSyntax binary,
+        SyntaxKind expressionKind,
+        ISymbol loopVariable,
+        bool constantGreaterThanOne,
+        LoopProgression matchedProgression,
+        out LoopProgression progression)
+    {
+        if (binary.IsKind(expressionKind)
+            && (IsSelfReferenceWithConstant(binary.Left, binary.Right, loopVariable, constantGreaterThanOne)
+                || IsSelfReferenceWithConstant(binary.Right, binary.Left, loopVariable, constantGreaterThanOne)))
         {
-            progression = LoopProgression.Logarithmic(LoopDirection.Decreasing);
+            progression = matchedProgression;
             return true;
         }
 
+        progression = default;
         return false;
+    }
+
+    private bool TryAnalyzeOrderedSelfAssignment(
+        BinaryExpressionSyntax binary,
+        SyntaxKind expressionKind,
+        ISymbol loopVariable,
+        bool constantGreaterThanOne,
+        LoopProgression matchedProgression,
+        out LoopProgression progression)
+    {
+        if (binary.IsKind(expressionKind)
+            && IsSelfReferenceWithConstant(binary.Left, binary.Right, loopVariable, constantGreaterThanOne))
+        {
+            progression = matchedProgression;
+            return true;
+        }
+
+        progression = default;
+        return false;
+    }
+
+    private bool IsSelfReferenceWithConstant(
+        ExpressionSyntax variableExpression,
+        ExpressionSyntax constantExpression,
+        ISymbol loopVariable,
+        bool constantGreaterThanOne)
+    {
+        return IsSymbolReference(variableExpression, loopVariable)
+            && (constantGreaterThanOne
+                ? TryGetIntegerConstantGreaterThanOne(constantExpression, out _)
+                : TryGetPositiveIntegerConstant(constantExpression, out _));
     }
 
     private bool TryGetLoopVariable(
@@ -712,6 +786,7 @@ internal sealed class LoopBoundAnalyzer
         Increasing,
         Decreasing,
     }
+
 }
 
 internal readonly struct LoopBoundExpression

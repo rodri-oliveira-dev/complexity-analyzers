@@ -2128,6 +2128,66 @@ public sealed class MethodComplexityExtractorTests
             "O(log n)");
     }
 
+    [Theory]
+    [InlineData("var i = 0", "i < count", "i = i + 2", "O(n)")]
+    [InlineData("var i = 0", "i < count", "i = 2 + i", "O(n)")]
+    [InlineData("var i = count", "i > 0", "i = i - 2", "O(n)")]
+    [InlineData("var i = 1", "i < count", "i = i * 2", "O(log n)")]
+    [InlineData("var i = 1", "i < count", "i = 2 * i", "O(log n)")]
+    [InlineData("var i = count", "i > 1", "i = i / 2", "O(log n)")]
+    public void For_with_simple_self_assignment_progression_is_classified(
+        string initializer,
+        string condition,
+        string progression,
+        string expectedComplexity)
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (
+            """ + initializer + """
+            ;
+            """ + condition + """
+            ;
+            """ + progression + """
+            )
+                    {
+                        var x = i + 1;
+                    }
+                }
+            }
+            """,
+            expectedComplexity);
+    }
+
+    [Theory]
+    [InlineData("i = i * 1")]
+    [InlineData("i = i / 1")]
+    [InlineData("i = i + factor")]
+    [InlineData("i = factor + i")]
+    public void For_with_unsupported_simple_self_assignment_progression_is_unknown(string progression)
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count, int factor)
+                {
+                    for (var i = 1; i < count;
+            """ + progression + """
+            )
+                    {
+                        var x = i + 1;
+                    }
+                }
+            }
+            """,
+            "Unknown");
+    }
+
     [Fact]
     public void Constant_bound_for_is_constant_with_constant_body()
     {

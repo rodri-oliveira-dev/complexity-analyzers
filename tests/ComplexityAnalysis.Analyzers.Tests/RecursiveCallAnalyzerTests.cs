@@ -76,6 +76,7 @@ public sealed class RecursiveCallAnalyzerTests
     [InlineData("n / 3", (int)RecurrenceReductionKind.Scale, 0.33333333333333331)]
     [InlineData("n * 0.5", (int)RecurrenceReductionKind.Scale, 0.5)]
     [InlineData("0.5 * n", (int)RecurrenceReductionKind.Scale, 0.5)]
+    [InlineData("(-2) + n", (int)RecurrenceReductionKind.SubtractConstant, 2)]
     public void Reducing_argument_forms_are_identified(
         string argument,
         int expectedKind,
@@ -93,8 +94,12 @@ public sealed class RecursiveCallAnalyzerTests
     [Theory]
     [InlineData("n", (int)RecursiveArgumentRelationKind.Unchanged)]
     [InlineData("n + 1", (int)RecursiveArgumentRelationKind.Increasing)]
+    [InlineData("1 + n", (int)RecursiveArgumentRelationKind.Increasing)]
+    [InlineData("n - 0", (int)RecursiveArgumentRelationKind.Increasing)]
     [InlineData("n * 1", (int)RecursiveArgumentRelationKind.Unchanged)]
     [InlineData("n / 1", (int)RecursiveArgumentRelationKind.Unchanged)]
+    [InlineData("n % 2", (int)RecursiveArgumentRelationKind.Unknown)]
+    [InlineData("1 - n", (int)RecursiveArgumentRelationKind.Unknown)]
     public void Non_reducing_argument_forms_are_not_marked_as_reducing(
         string argument,
         int expectedKind)

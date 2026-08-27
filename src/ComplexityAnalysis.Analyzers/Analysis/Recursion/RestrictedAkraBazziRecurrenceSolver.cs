@@ -125,67 +125,97 @@ internal sealed class RestrictedAkraBazziRecurrenceSolver
     {
         criticalExponent = 0;
 
-        if (!TryEvaluateCharacteristic(relation, exponent: 0, out double lowValue))
+        if (!TryEvaluateInitialCriticalExponent(relation, out bool foundInitialExponent))
         {
             return false;
         }
 
-        lowValue -= 1;
+        return foundInitialExponent
+            || (TryFindCriticalExponentBracket(
+                relation,
+                out double high,
+                out bool foundExactExponent,
+                out criticalExponent)
+                && (foundExactExponent
+                    || TryBisectCriticalExponent(relation, low: 0, high, out criticalExponent)));
+    }
+
+    private static bool TryEvaluateInitialCriticalExponent(
+        RecurrenceRelation relation,
+        out bool foundInitialExponent)
+    {
+        foundInitialExponent = false;
+
+        if (!TryEvaluateShiftedCharacteristic(relation, exponent: 0, out double lowValue))
+        {
+            return false;
+        }
+
         if (Math.Abs(lowValue) <= RecurrenceNumerics.ComparisonEpsilon)
         {
+            foundInitialExponent = true;
             return true;
         }
 
-        if (lowValue < 0)
-        {
-            return false;
-        }
+        return lowValue >= 0;
+    }
 
-        double low = 0;
-        double high = 1;
-        bool bracketed = false;
+    private bool TryFindCriticalExponentBracket(
+        RecurrenceRelation relation,
+        out double high,
+        out bool foundExactExponent,
+        out double criticalExponent)
+    {
+        high = 1;
+        foundExactExponent = false;
+        criticalExponent = 0;
+
         for (int attempt = 0; attempt < maxBracketExpansions; attempt++)
         {
-            if (!TryEvaluateCharacteristic(relation, high, out double highValue))
+            if (!TryEvaluateShiftedCharacteristic(relation, high, out double highValue))
             {
                 return false;
             }
 
-            highValue -= 1;
             if (Math.Abs(highValue) <= RecurrenceNumerics.ComparisonEpsilon)
             {
                 criticalExponent = high;
+                foundExactExponent = true;
                 return true;
             }
 
             if (highValue < 0)
             {
-                bracketed = true;
-                break;
+                return true;
             }
 
             if (high >= maxHighExponent)
             {
-                break;
+                return false;
             }
 
             high = Math.Min(high * 2, maxHighExponent);
         }
 
-        if (!bracketed)
-        {
-            return false;
-        }
+        return false;
+    }
+
+    private bool TryBisectCriticalExponent(
+        RecurrenceRelation relation,
+        double low,
+        double high,
+        out double criticalExponent)
+    {
+        criticalExponent = 0;
 
         for (int iteration = 0; iteration < maxBisectionIterations; iteration++)
         {
             double mid = low + ((high - low) / 2);
-            if (!TryEvaluateCharacteristic(relation, mid, out double midValue))
+            if (!TryEvaluateShiftedCharacteristic(relation, mid, out double midValue))
             {
                 return false;
             }
 
-            midValue -= 1;
             if (Math.Abs(midValue) <= RecurrenceNumerics.ComparisonEpsilon
                 || high - low <= RecurrenceNumerics.ComparisonEpsilon)
             {
@@ -204,6 +234,20 @@ internal sealed class RestrictedAkraBazziRecurrenceSolver
         }
 
         return false;
+    }
+
+    private static bool TryEvaluateShiftedCharacteristic(
+        RecurrenceRelation relation,
+        double exponent,
+        out double value)
+    {
+        if (!TryEvaluateCharacteristic(relation, exponent, out value))
+        {
+            return false;
+        }
+
+        value -= 1;
+        return true;
     }
 
     private static bool TryEvaluateCharacteristic(
