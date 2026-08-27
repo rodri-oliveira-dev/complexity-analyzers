@@ -28,6 +28,7 @@ unresolved behavior remains `Unknown` rather than being guessed.
 | `BIG2004` | Statement count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2005` | Token count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2006` | Parameter count exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2007` | Cognitive complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Supported Executable Members
@@ -86,10 +87,11 @@ internal trace.
 | Property | Meaning |
 | --- | --- |
 | `complexity` | Known method estimate emitted by `BIG0001`, `BIG1005`, or `BIG1006`. |
-| `threshold` | Configured threshold emitted by `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004`, `BIG2005`, or `BIG2006`. |
+| `threshold` | Configured threshold emitted by `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004`, `BIG2005`, `BIG2006`, or `BIG2007`. |
 | `cyclomaticComplexity` | Actual Cyclomatic Complexity emitted by `BIG2001`. |
 | `cyclomaticComplexityMode` | Switch accounting mode emitted by `BIG2001`, either `standard` or `modified_mccabe`. |
 | `maximumNestingDepth` | Actual Maximum Control-Flow Nesting Depth emitted by `BIG2002`. |
+| `cognitiveComplexity` | Actual Cognitive Complexity emitted by `BIG2007`. |
 | `methodNloc` | Actual NLOC emitted by `BIG2003`. |
 | `statementCount` | Actual structural statement count emitted by `BIG2004`. |
 | `tokenCount` | Actual executable-body token count emitted by `BIG2005`. |
@@ -981,6 +983,92 @@ Parameter Count is not a Big-O, control-flow, line, statement, token, Cognitive
 Complexity, Halstead, dependency-count, or API-design metric. It does not infer
 whether a parameter object, dependency injection redesign, or breaking API
 change is appropriate.
+
+## BIG2007 - Cognitive Complexity Exceeds Configured Threshold
+
+| Property | Value |
+| --- | --- |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Stable executable-member location |
+| Message | `Member '{member}' has cognitive complexity {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `cognitiveComplexity`, `threshold` |
+
+### What It Detects
+
+`BIG2007` reports a supported executable member whose Cognitive Complexity is
+strictly greater than `complexity_analyzers.maximum_cognitive_complexity`.
+
+The implemented metric is the documented C# Cognitive Complexity convention for
+this project. No exact external-tool equivalence is claimed. The full
+reproducible convention is documented in [Cognitive Complexity
+Convention](cognitive-complexity.md).
+
+### Why It Matters
+
+Cognitive Complexity measures structural comprehension cost from control-flow
+breaks and local nesting. It complements Cyclomatic Complexity and Maximum
+Nesting Depth without replacing or combining them.
+
+### Example That Triggers
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_cognitive_complexity = 5
+dotnet_diagnostic.BIG2007.severity = warning
+```
+
+```csharp
+void M(bool a, bool b, bool c)
+{
+    if (a)
+    {
+        while (b)
+        {
+            if (c)
+            {
+            }
+        }
+    }
+}
+```
+
+The score is `6`: outer `if` contributes `1`, `while` contributes `2`, and the
+inner `if` contributes `3`.
+
+### Example That Does Not Trigger
+
+```csharp
+void M(bool a, bool b, bool c)
+{
+    if (a) {}
+    if (b) {}
+    if (c) {}
+}
+```
+
+The three sibling `if` statements each run at nesting `0`, so the score is `3`.
+With `maximum_cognitive_complexity = 3`, equality does not report.
+
+### Scoring Rules
+
+Straight-line code starts at `0`. Structural constructs such as `if`, loops,
+switch families, `catch`, `when`, and `?:` add `1 + current nesting` according to
+the convention. `else` adds `1` without a nesting penalty. Boolean and pattern
+logical sequences add one point for a sequence and one more point for each
+operator change. Direct self-recursion adds one point once per member when proven
+by symbol identity. `break`, `continue`, and `goto` add one point each.
+
+Nested local functions, lambdas, and anonymous methods are analyzed as separate
+executable members rather than inflating their lexical parent.
+
+### Limitations
+
+This diagnostic is not a Big-O estimate, path count, maximum-depth value, line
+count, token count, Parameter Count, Halstead metric, subjective readability
+score, or automatic refactoring recommendation.
 
 ## BIG9000 - Analyzer Execution Probe
 

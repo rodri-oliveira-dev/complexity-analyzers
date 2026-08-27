@@ -27,10 +27,11 @@ Valores inválidos são tratados com segurança: não quebram o build nem geram 
 | `complexity_analyzers.maximum_statement_count` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2004` quando o statement count de um executable member suportado excede esse threshold. |
 | `complexity_analyzers.maximum_token_count` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2005` quando o token count de um executable member suportado excede esse threshold. |
 | `complexity_analyzers.maximum_parameters` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2006` quando o Parameter Count source-declared de um executable member suportado excede esse threshold. |
+| `complexity_analyzers.maximum_cognitive_complexity` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2007` quando a Cognitive Complexity de um executable member suportado excede esse threshold. |
 
 Valores booleanos ignoram diferenças entre maiúsculas e minúsculas depois da remoção de espaços nas extremidades. Valores inteiros devem ser números decimais não negativos, sem sinal, ponto decimal, separadores ou espaços internos. Valores de threshold são case-sensitive.
 
-Valores fora dos limites públicos de budget retornam ao padrão: `max_call_depth = 5` e `max_methods_per_root = 32`. Thresholds ciclomáticos, de nesting, NLOC, statement count, token count e Parameter Count inválidos retornam para sem valor configurado. Modos ciclomáticos inválidos retornam para `standard`.
+Valores fora dos limites públicos de budget retornam ao padrão: `max_call_depth = 5` e `max_methods_per_root = 32`. Thresholds ciclomáticos, de nesting, NLOC, statement count, token count, Parameter Count e Cognitive Complexity inválidos retornam para sem valor configurado. Modos ciclomáticos inválidos retornam para `standard`.
 
 ## Exemplo
 
@@ -49,6 +50,7 @@ complexity_analyzers.maximum_method_nloc = 40
 complexity_analyzers.maximum_statement_count = 25
 complexity_analyzers.maximum_token_count = 300
 complexity_analyzers.maximum_parameters = 5
+complexity_analyzers.maximum_cognitive_complexity = 15
 
 dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG2001.severity = warning
@@ -57,6 +59,7 @@ dotnet_diagnostic.BIG2003.severity = warning
 dotnet_diagnostic.BIG2004.severity = warning
 dotnet_diagnostic.BIG2005.severity = warning
 dotnet_diagnostic.BIG2006.severity = warning
+dotnet_diagnostic.BIG2007.severity = warning
 ```
 
 ## Comportamento do threshold
@@ -204,6 +207,33 @@ Exemplos:
 | `6` | `5` | Reporta `BIG2006`. |
 | `1` | `0` | Reporta `BIG2006`. |
 
+## Comportamento de Cognitive Complexity
+
+`complexity_analyzers.maximum_cognitive_complexity` é opt-in. Quando não está
+configurado ou é inválido, `BIG2007` não reporta. Valores válidos são inteiros
+decimais não negativos. Igualdade não reporta; apenas valor real estritamente
+maior gera diagnóstico.
+
+Cognitive Complexity usa a convenção C# documentada deste projeto. Código
+straight-line começa em `0`. Quebras estruturais de fluxo de controle adicionam
+`1 + nesting atual`; `else` adiciona `1`; sequências lógicas booleanas e de
+pattern adicionam custo de sequência/mudança; recursão direta a si mesmo adiciona
+um ponto uma vez por membro quando comprovada por identidade de símbolo; e
+`break`, `continue` e `goto` adicionam um ponto cada. Local functions, lambdas e
+anonymous methods aninhados são pontuados independentemente.
+
+Veja [Convenção de Cognitive Complexity](cognitive-complexity.md) para a tabela
+completa de score e exemplos passo a passo.
+
+Exemplos:
+
+| Valor real | Threshold | Resultado |
+| --- | --- | --- |
+| `14` | `15` | Não reporta. |
+| `15` | `15` | Não reporta. |
+| `16` | `15` | Reporta `BIG2007`. |
+| `1` | `0` | Reporta `BIG2007`. |
+
 ## Feature flags
 
 `complexity_analyzers.interprocedural_analysis = false` impede expansão para callees fonte suportados. A análise intraprocedural e a análise de operações BCL/LINQ suportadas permanecem ativas.
@@ -259,6 +289,7 @@ O compilador e o SDK determinam o comportamento exato do build para cada severid
 | `BIG2004` | `Info` | `true` |
 | `BIG2005` | `Info` | `true` |
 | `BIG2006` | `Info` | `true` |
+| `BIG2007` | `Info` | `true` |
 | `BIG9000` | `Info` | `false` |
 
 `BIG1006` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_complexity` seja configurado com um threshold concreto.
@@ -270,6 +301,8 @@ O compilador e o SDK determinam o comportamento exato do build para cada severid
 `BIG2003`, `BIG2004` e `BIG2005` são habilitados por padrão como descriptors, mas cada um permanece funcionalmente inativo até que seu threshold de tamanho correspondente seja configurado.
 
 `BIG2006` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_parameters` seja configurado.
+
+`BIG2007` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_cognitive_complexity` seja configurado.
 
 ## Configurações comuns
 
@@ -306,6 +339,8 @@ complexity_analyzers.maximum_token_count = 300
 dotnet_diagnostic.BIG2005.severity = warning
 complexity_analyzers.maximum_parameters = 5
 dotnet_diagnostic.BIG2006.severity = warning
+complexity_analyzers.maximum_cognitive_complexity = 15
+dotnet_diagnostic.BIG2007.severity = warning
 ```
 
 Comprove temporariamente que o pacote carregou:
@@ -326,6 +361,6 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## O que não é configurável
 
-O analyzer não expõe opções para mappings customizados de operações, regras customizadas de decision points ciclomáticos além do modo de `switch` documentado, convenções customizadas para métricas de tamanho, convenções customizadas de Parameter Count, comportamento dos mappings BCL/LINQ, seleção de famílias de recorrência, tolerâncias de teoremas, análise de solution inteira, code fixes, complexidade de memória, complexidade paralela ou complexidade probabilística.
+O analyzer não expõe opções para mappings customizados de operações, regras customizadas de decision points ciclomáticos além do modo de `switch` documentado, convenções customizadas para métricas de tamanho, convenções customizadas de Parameter Count, convenções customizadas de Cognitive Complexity, comportamento dos mappings BCL/LINQ, seleção de famílias de recorrência, tolerâncias de teoremas, análise de solution inteira, code fixes, complexidade de memória, complexidade paralela ou complexidade probabilística.
 
 Operações não suportadas ou não resolvidas permanecem `Unknown`; não existe opção para convertê-las em uma classe de complexidade conhecida.

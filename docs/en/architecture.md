@@ -52,6 +52,7 @@ DiagnosticAnalyzer
     +-- BIG2004 statement-count threshold exceeded
     +-- BIG2005 token-count threshold exceeded
     +-- BIG2006 parameter-count threshold exceeded
+    +-- BIG2007 cognitive-complexity threshold exceeded
     `-- BIG9000 execution probe
 ```
 
@@ -135,9 +136,10 @@ The model supports:
 
 When the analyzer cannot prove a safe result, the model preserves `Unknown` rather than coercing the operation to a guessed complexity class.
 
-Cyclomatic Complexity and Maximum Control-Flow Nesting Depth are separate
-integer structural metrics. They are computed from executable-member control
-flow and are not combined with the Big-O complexity model or with each other.
+Cyclomatic Complexity, Maximum Control-Flow Nesting Depth, and Cognitive
+Complexity are separate integer structural metrics. They are computed from
+executable-member control flow and are not combined with the Big-O complexity
+model or with each other.
 
 ## Roslyn analysis
 
@@ -161,6 +163,7 @@ Representative components include:
 - `KnownOperationComplexityAnalyzer` for supported BCL/LINQ costs.
 - `CyclomaticComplexityAnalyzer` for structural path-complexity scoring that stays independent from Big-O.
 - `MaximumNestingDepthAnalyzer` for maximum control-flow nesting depth scoring that stays independent from Big-O and Cyclomatic Complexity.
+- `CognitiveComplexityCalculator` for the documented structural comprehension score that stays independent from Big-O, Cyclomatic Complexity, and Maximum Nesting Depth.
 
 The analyzer does not require a whole-compilation or whole-solution call graph.
 Nested executable constructs are analyzed as their own roots. A parent member does
@@ -247,7 +250,8 @@ Public behavior options are:
 - `complexity_analyzers.maximum_method_nloc`;
 - `complexity_analyzers.maximum_statement_count`;
 - `complexity_analyzers.maximum_token_count`;
-- `complexity_analyzers.maximum_parameters`.
+- `complexity_analyzers.maximum_parameters`;
+- `complexity_analyzers.maximum_cognitive_complexity`.
 
 Tree-specific analyzer config values override global values for that syntax tree. Invalid values fall back to documented defaults rather than producing analyzer failures.
 
@@ -270,6 +274,7 @@ See [Configuration](configuration.md) for details.
 - `BIG2004` for supported executable members above a configured statement-count threshold;
 - `BIG2005` for supported executable members above a configured token-count threshold;
 - `BIG2006` for supported executable members above a configured source-declared parameter threshold;
+- `BIG2007` for supported executable members above a configured Cognitive Complexity threshold;
 - `BIG9000` as an opt-in execution probe.
 
 Generated-code analysis is disabled and concurrent analyzer execution is enabled.

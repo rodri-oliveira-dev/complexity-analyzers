@@ -36,6 +36,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.StatementCountExceedsConfiguredThreshold,
             DiagnosticDescriptors.TokenCountExceedsConfiguredThreshold,
             DiagnosticDescriptors.ParameterCountExceedsConfiguredThreshold,
+            DiagnosticDescriptors.CognitiveComplexityExceedsConfiguredThreshold,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)
@@ -99,6 +100,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         ReportMaximumNestingDepthThresholdDiagnosticIfNeeded(context, member, options);
         ReportMethodSizeThresholdDiagnosticsIfNeeded(context, member, options);
         ReportParameterCountThresholdDiagnosticIfNeeded(context, member, options);
+        ReportCognitiveComplexityThresholdDiagnosticIfNeeded(context, member, options);
 
         foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMember(
             member,
@@ -283,6 +285,34 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticPropertyNames.ParameterCount,
             parameterCount.Value,
             options.MaximumParameters);
+    }
+
+    private static void ReportCognitiveComplexityThresholdDiagnosticIfNeeded(
+        SyntaxNodeAnalysisContext context,
+        ExecutableMember member,
+        ComplexityAnalyzerOptions options)
+    {
+        if (!options.MaximumCognitiveComplexity.HasValue)
+        {
+            return;
+        }
+
+        if (!new CognitiveComplexityCalculator().TryCalculate(
+            member,
+            context.SemanticModel,
+            context.CancellationToken,
+            out CognitiveComplexity cognitiveComplexity))
+        {
+            return;
+        }
+
+        ReportIntegerThresholdDiagnosticIfNeeded(
+            context,
+            member,
+            DiagnosticDescriptors.CognitiveComplexityExceedsConfiguredThreshold,
+            DiagnosticPropertyNames.CognitiveComplexity,
+            cognitiveComplexity.Value,
+            options.MaximumCognitiveComplexity);
     }
 
     private static void ReportIntegerThresholdDiagnosticIfNeeded(
