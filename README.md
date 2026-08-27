@@ -17,11 +17,13 @@ The analyzer is deliberately conservative: when complexity cannot be proven safe
 
 ## Quick install
 
+When consuming a published package version from NuGet.org:
+
 ```bash
 dotnet add package ComplexityAnalysis.Analyzers
 ```
 
-The package works as a compile-time analyzer. After installation, Roslyn loads it during builds and IDE analysis; application code does not call the analyzer and does not take a runtime dependency on it.
+The package works as a compile-time analyzer. After installation, Roslyn loads it during builds and IDE analysis; application code does not call the analyzer and does not take a runtime dependency on it. For local package creation and repository-based consumption, see [Getting Started](docs/en/getting-started.md).
 
 ## Quick example
 
@@ -163,7 +165,7 @@ dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 dotnet pack src/ComplexityAnalysis.Analyzers/ComplexityAnalysis.Analyzers.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 ```
 
-For normal package consumption, use the quick install command above. The local pack command is intended for repository validation.
+The repository also documents local package creation and consumption. If you are working before a stable NuGet.org package version is available, use the local package flow in [Getting Started](docs/en/getting-started.md).
 
 See [Getting Started](docs/en/getting-started.md).
 
