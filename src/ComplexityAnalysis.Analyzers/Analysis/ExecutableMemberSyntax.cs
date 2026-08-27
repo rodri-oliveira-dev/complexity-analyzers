@@ -80,11 +80,6 @@ internal static class ExecutableMemberSyntax
 
     private static IEnumerable<SyntaxToken> DescendantTokensExcludingNestedExecutableBodies(SyntaxNode node)
     {
-        if (node is AnonymousFunctionExpressionSyntax)
-        {
-            yield break;
-        }
-
         foreach (SyntaxNodeOrToken child in node.ChildNodesAndTokens())
         {
             if (child.IsToken)
@@ -94,8 +89,7 @@ internal static class ExecutableMemberSyntax
             }
 
             SyntaxNode childNode = child.AsNode()!;
-            if (node is LocalFunctionStatementSyntax localFunction
-                && (childNode == localFunction.Body || childNode == localFunction.ExpressionBody))
+            if (IsNestedExecutableBody(node, childNode))
             {
                 continue;
             }
@@ -105,6 +99,21 @@ internal static class ExecutableMemberSyntax
                 yield return syntaxToken;
             }
         }
+    }
+
+    private static bool IsNestedExecutableBody(
+        SyntaxNode node,
+        SyntaxNode childNode)
+    {
+        return node switch
+        {
+            LocalFunctionStatementSyntax localFunction =>
+                childNode == localFunction.Body
+                    || childNode == localFunction.ExpressionBody,
+            LambdaExpressionSyntax lambda => childNode == lambda.Body,
+            AnonymousMethodExpressionSyntax anonymousMethod => childNode == anonymousMethod.Block,
+            _ => false,
+        };
     }
 
     private static bool ShouldDescendIntoChildren(SyntaxNode node)

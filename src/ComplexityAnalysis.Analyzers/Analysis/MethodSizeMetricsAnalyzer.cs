@@ -13,6 +13,7 @@ internal sealed class MethodSizeMetricsAnalyzer
 {
     internal bool TryAnalyze(
         ExecutableMember member,
+        MethodSizeMetricTargets targets,
         CancellationToken cancellationToken,
         out MethodSizeMetricsResult result)
     {
@@ -20,46 +21,60 @@ internal sealed class MethodSizeMetricsAnalyzer
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!member.Body.HasBody)
+        if (!member.Body.HasBody || targets == MethodSizeMetricTargets.None)
         {
             result = default;
             return false;
         }
 
-        SourceText sourceText = member.SyntaxTree.GetText(cancellationToken);
-        HashSet<int> nlocLines = [];
-        int statementCount = member.Body.Expression is not null ? 1 : 0;
+        bool countNloc = (targets & MethodSizeMetricTargets.Nloc) != 0;
+        bool countStatements = (targets & MethodSizeMetricTargets.StatementCount) != 0;
+        bool countTokens = (targets & MethodSizeMetricTargets.TokenCount) != 0;
+        SourceText? sourceText = countNloc
+            ? member.SyntaxTree.GetText(cancellationToken)
+            : null;
+        HashSet<int>? nlocLines = countNloc ? [] : null;
+        int statementCount = countStatements && member.Body.Expression is not null ? 1 : 0;
         int tokenCount = 0;
 
-        foreach (StatementSyntax statement in ExecutableMemberSyntax.DescendantNodesInOwnBody<StatementSyntax>(member))
+        if (countStatements)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (statement is not BlockSyntax)
+            foreach (StatementSyntax statement in ExecutableMemberSyntax.DescendantNodesInOwnBody<StatementSyntax>(member))
             {
-                statementCount = AddSaturating(statementCount, 1);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (statement is not BlockSyntax)
+                {
+                    statementCount = AddSaturating(statementCount, 1);
+                }
             }
         }
 
-        foreach (SyntaxToken syntaxToken in ExecutableMemberSyntax.DescendantTokensInOwnBody(member))
+        if (countNloc || countTokens)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (syntaxToken.IsMissing || syntaxToken.IsKind(SyntaxKind.EndOfFileToken))
+            foreach (SyntaxToken syntaxToken in ExecutableMemberSyntax.DescendantTokensInOwnBody(member))
             {
-                continue;
-            }
+                cancellationToken.ThrowIfCancellationRequested();
 
-            tokenCount = AddSaturating(tokenCount, 1);
+                if (syntaxToken.IsMissing || syntaxToken.IsKind(SyntaxKind.EndOfFileToken))
+                {
+                    continue;
+                }
 
-            if (IsNlocRelevantToken(syntaxToken))
-            {
-                AddTokenLines(nlocLines, sourceText, syntaxToken);
+                if (countTokens)
+                {
+                    tokenCount = AddSaturating(tokenCount, 1);
+                }
+
+                if (countNloc && IsNlocRelevantToken(syntaxToken))
+                {
+                    AddTokenLines(nlocLines!, sourceText!, syntaxToken);
+                }
             }
         }
 
         result = new MethodSizeMetricsResult(
-            nlocLines.Count,
+            nlocLines?.Count ?? 0,
             statementCount,
             tokenCount);
         return true;

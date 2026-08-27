@@ -116,6 +116,54 @@ public sealed class MethodSizeMetricsAnalyzerTests
     }
 
     [Fact]
+    public void Expression_bodied_member_returning_lambda_preserves_lambda_header_tokens()
+    {
+        MethodSizeMetricsResult result = AnalyzeMethod(
+            """
+            public sealed class Sample
+            {
+                System.Func<int> M() => () => 1;
+            }
+            """);
+
+        Assert.Equal(1, result.Nloc);
+        Assert.Equal(1, result.StatementCount);
+        Assert.Equal(3, result.TokenCount);
+    }
+
+    [Fact]
+    public void Analyzer_calculates_only_requested_method_size_metrics()
+    {
+        CompilationFacts facts = CreateCompilationFacts(
+            """
+            public sealed class Sample
+            {
+                int M(int left, int right)
+                {
+                    var value = left + right;
+                    value *= 2;
+                    return value;
+                }
+            }
+            """);
+        ExecutableMember member = CreateMethodMember(facts, "M");
+
+        MethodSizeMetricsResult nlocOnly = Analyze(member, MethodSizeMetricTargets.Nloc);
+        MethodSizeMetricsResult statementCountOnly = Analyze(member, MethodSizeMetricTargets.StatementCount);
+        MethodSizeMetricsResult tokenCountOnly = Analyze(member, MethodSizeMetricTargets.TokenCount);
+
+        Assert.Equal(3, nlocOnly.Nloc);
+        Assert.Equal(0, nlocOnly.StatementCount);
+        Assert.Equal(0, nlocOnly.TokenCount);
+        Assert.Equal(0, statementCountOnly.Nloc);
+        Assert.Equal(3, statementCountOnly.StatementCount);
+        Assert.Equal(0, statementCountOnly.TokenCount);
+        Assert.Equal(0, tokenCountOnly.Nloc);
+        Assert.Equal(0, tokenCountOnly.StatementCount);
+        Assert.Equal(16, tokenCountOnly.TokenCount);
+    }
+
+    [Fact]
     public void Nested_blocks_do_not_count_as_structural_statements()
     {
         MethodSizeMetricsResult result = AnalyzeMethod(
@@ -170,11 +218,13 @@ public sealed class MethodSizeMetricsAnalyzerTests
             """);
         ExecutableMember member = CreateMethodMember(facts, "M");
 
-        MethodSizeMetricsResult result = Analyze(member);
+        MethodSizeMetricsResult result = Analyze(
+            member,
+            MethodSizeMetricTargets.Nloc | MethodSizeMetricTargets.StatementCount | MethodSizeMetricTargets.TokenCount);
 
         Assert.Equal(4, result.Nloc);
         Assert.Equal(4, result.StatementCount);
-        Assert.Equal(22, result.TokenCount);
+        Assert.Equal(25, result.TokenCount);
     }
 
     [Fact]
@@ -209,7 +259,9 @@ public sealed class MethodSizeMetricsAnalyzerTests
             out ExecutableMember? member));
         Assert.NotNull(member);
 
-        MethodSizeMetricsResult result = Analyze(member);
+        MethodSizeMetricsResult result = Analyze(
+            member,
+            MethodSizeMetricTargets.Nloc | MethodSizeMetricTargets.StatementCount | MethodSizeMetricTargets.TokenCount);
 
         Assert.Equal(2, result.Nloc);
         Assert.Equal(2, result.StatementCount);
@@ -249,7 +301,9 @@ public sealed class MethodSizeMetricsAnalyzerTests
             out ExecutableMember? member));
         Assert.NotNull(member);
 
-        MethodSizeMetricsResult result = Analyze(member);
+        MethodSizeMetricsResult result = Analyze(
+            member,
+            MethodSizeMetricTargets.Nloc | MethodSizeMetricTargets.StatementCount | MethodSizeMetricTargets.TokenCount);
 
         Assert.Equal(3, result.Nloc);
         Assert.Equal(3, result.StatementCount);
@@ -270,6 +324,7 @@ public sealed class MethodSizeMetricsAnalyzerTests
 
         bool analyzed = new MethodSizeMetricsAnalyzer().TryAnalyze(
             member,
+            MethodSizeMetricTargets.Nloc | MethodSizeMetricTargets.StatementCount | MethodSizeMetricTargets.TokenCount,
             CancellationToken.None,
             out _);
 
@@ -296,6 +351,7 @@ public sealed class MethodSizeMetricsAnalyzerTests
         OperationCanceledException exception = Assert.Throws<OperationCanceledException>(() =>
             new MethodSizeMetricsAnalyzer().TryAnalyze(
                 member,
+                MethodSizeMetricTargets.Nloc | MethodSizeMetricTargets.StatementCount | MethodSizeMetricTargets.TokenCount,
                 cancellation.Token,
                 out _));
 
@@ -307,13 +363,18 @@ public sealed class MethodSizeMetricsAnalyzerTests
         CompilationFacts facts = CreateCompilationFacts(source);
         ExecutableMember member = CreateMethodMember(facts, "M");
 
-        return Analyze(member);
+        return Analyze(
+            member,
+            MethodSizeMetricTargets.Nloc | MethodSizeMetricTargets.StatementCount | MethodSizeMetricTargets.TokenCount);
     }
 
-    private static MethodSizeMetricsResult Analyze(ExecutableMember member)
+    private static MethodSizeMetricsResult Analyze(
+        ExecutableMember member,
+        MethodSizeMetricTargets targets)
     {
         bool analyzed = new MethodSizeMetricsAnalyzer().TryAnalyze(
             member,
+            targets,
             CancellationToken.None,
             out MethodSizeMetricsResult result);
 

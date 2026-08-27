@@ -146,6 +146,33 @@ public sealed class MethodSizeMetricsDiagnosticTests
     }
 
     [Fact]
+    public async Task Expression_bodied_member_returning_lambda_reports_parent_nloc_and_token_count()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            Parse(
+                """
+                public sealed class Sample
+                {
+                    System.Func<int> M() => () => 1;
+                }
+                """),
+            globalOptions: Options(
+                (ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "0"),
+                (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "0")));
+
+        _ = AssertThreshold(
+            diagnostics,
+            MethodNlocExceedsConfiguredThresholdId,
+            "M",
+            "Member 'M' has NLOC 1, exceeding configured maximum 0");
+        _ = AssertThreshold(
+            diagnostics,
+            TokenCountExceedsConfiguredThresholdId,
+            "M",
+            "Member 'M' has token count 3, exceeding configured maximum 0");
+    }
+
+    [Fact]
     public async Task Thresholds_are_independent_from_big_o_cyclomatic_and_nesting_thresholds()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(

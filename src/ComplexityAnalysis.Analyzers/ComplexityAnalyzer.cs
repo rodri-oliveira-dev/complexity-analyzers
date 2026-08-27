@@ -226,6 +226,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
 
         if (!new MethodSizeMetricsAnalyzer().TryAnalyze(
             member,
+            CreateMethodSizeMetricTargets(options),
             context.CancellationToken,
             out MethodSizeMetricsResult result))
         {
@@ -280,6 +281,27 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             member.DisplayName,
             actualText,
             thresholdText));
+    }
+
+    private static MethodSizeMetricTargets CreateMethodSizeMetricTargets(ComplexityAnalyzerOptions options)
+    {
+        MethodSizeMetricTargets targets = MethodSizeMetricTargets.None;
+        if (options.MaximumMethodNloc.HasValue)
+        {
+            targets |= MethodSizeMetricTargets.Nloc;
+        }
+
+        if (options.MaximumStatementCount.HasValue)
+        {
+            targets |= MethodSizeMetricTargets.StatementCount;
+        }
+
+        if (options.MaximumTokenCount.HasValue)
+        {
+            targets |= MethodSizeMetricTargets.TokenCount;
+        }
+
+        return targets;
     }
 
     private static void ReportThresholdDiagnosticIfNeeded(
