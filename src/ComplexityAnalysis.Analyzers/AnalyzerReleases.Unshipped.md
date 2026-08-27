@@ -14,6 +14,7 @@ BIG2002 | Complexity | Info | Maximum nesting depth exceeds configured threshold
 BIG2003 | Complexity | Info | Method NLOC exceeds configured threshold.
 BIG2004 | Complexity | Info | Statement count exceeds configured threshold.
 BIG2005 | Complexity | Info | Token count exceeds configured threshold.
+BIG2006 | Complexity | Info | Parameter count exceeds configured threshold.
 BIG9000 | Infrastructure | Info | Analyzer execution probe.
 
 ### Changed Rules
@@ -37,3 +38,4 @@ BIG2002 | Added configurable Maximum Control-Flow Nesting Depth threshold report
 BIG2003 | Added configurable NLOC threshold reporting with `methodNloc` and `threshold` diagnostic properties.
 BIG2004 | Added configurable statement-count threshold reporting with `statementCount` and `threshold` diagnostic properties.
 BIG2005 | Added configurable token-count threshold reporting with `tokenCount` and `threshold` diagnostic properties.
+BIG2006 | Added configurable source-declared parameter-count threshold reporting with `parameterCount` and `threshold` diagnostic properties.

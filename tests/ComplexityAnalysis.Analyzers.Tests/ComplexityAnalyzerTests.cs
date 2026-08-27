@@ -26,6 +26,7 @@ public sealed class ComplexityAnalyzerTests
     private const string MethodNlocExceedsConfiguredThresholdId = "BIG2003";
     private const string StatementCountExceedsConfiguredThresholdId = "BIG2004";
     private const string TokenCountExceedsConfiguredThresholdId = "BIG2005";
+    private const string ParameterCountExceedsConfiguredThresholdId = "BIG2006";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -56,6 +57,7 @@ public sealed class ComplexityAnalyzerTests
                 MethodNlocExceedsConfiguredThresholdId,
                 StatementCountExceedsConfiguredThresholdId,
                 TokenCountExceedsConfiguredThresholdId,
+                ParameterCountExceedsConfiguredThresholdId,
                 AnalyzerExecutionProbeId
             ],
             analyzer.SupportedDiagnostics.Select(descriptor => descriptor.Id));
@@ -87,6 +89,7 @@ public sealed class ComplexityAnalyzerTests
     [InlineData(MethodNlocExceedsConfiguredThresholdId, "Method NLOC exceeds configured threshold")]
     [InlineData(StatementCountExceedsConfiguredThresholdId, "Statement count exceeds configured threshold")]
     [InlineData(TokenCountExceedsConfiguredThresholdId, "Token count exceeds configured threshold")]
+    [InlineData(ParameterCountExceedsConfiguredThresholdId, "Parameter count exceeds configured threshold")]
     public void Actionable_diagnostics_have_expected_public_descriptor_metadata(
         string diagnosticId,
         string expectedTitle)

@@ -26,10 +26,11 @@ Invalid values are safe: they do not fail the build or report an analyzer failur
 | `complexity_analyzers.maximum_method_nloc` | Integer | unset | Non-negative base-10 integer | Enables `BIG2003` when a supported executable member's NLOC exceeds this threshold. |
 | `complexity_analyzers.maximum_statement_count` | Integer | unset | Non-negative base-10 integer | Enables `BIG2004` when a supported executable member's statement count exceeds this threshold. |
 | `complexity_analyzers.maximum_token_count` | Integer | unset | Non-negative base-10 integer | Enables `BIG2005` when a supported executable member's token count exceeds this threshold. |
+| `complexity_analyzers.maximum_parameters` | Integer | unset | Non-negative base-10 integer | Enables `BIG2006` when a supported executable member's source-declared parameter count exceeds this threshold. |
 
 Boolean values are case-insensitive after trimming surrounding whitespace. Integer values must be base-10 non-negative integers with no sign, decimal point, separators, or embedded whitespace. Threshold values are case-sensitive.
 
-Values outside the public budget limits fall back to the default: `max_call_depth = 5` and `max_methods_per_root = 32`. Invalid cyclomatic, nesting, NLOC, statement-count, and token-count thresholds fall back to unset. Invalid cyclomatic modes fall back to `standard`.
+Values outside the public budget limits fall back to the default: `max_call_depth = 5` and `max_methods_per_root = 32`. Invalid cyclomatic, nesting, NLOC, statement-count, token-count, and parameter-count thresholds fall back to unset. Invalid cyclomatic modes fall back to `standard`.
 
 ## Example
 
@@ -47,6 +48,7 @@ complexity_analyzers.maximum_nesting_depth = 3
 complexity_analyzers.maximum_method_nloc = 40
 complexity_analyzers.maximum_statement_count = 25
 complexity_analyzers.maximum_token_count = 300
+complexity_analyzers.maximum_parameters = 5
 
 dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG2001.severity = warning
@@ -54,6 +56,7 @@ dotnet_diagnostic.BIG2002.severity = warning
 dotnet_diagnostic.BIG2003.severity = warning
 dotnet_diagnostic.BIG2004.severity = warning
 dotnet_diagnostic.BIG2005.severity = warning
+dotnet_diagnostic.BIG2006.severity = warning
 ```
 
 ## Threshold behavior
@@ -170,6 +173,32 @@ Examples:
 | Statement count | `26` | `25` | Reports `BIG2004`. |
 | Token count | `301` | `300` | Reports `BIG2005`. |
 
+## Parameter count behavior
+
+`complexity_analyzers.maximum_parameters` is opt-in. When it is unset or
+invalid, `BIG2006` does not report. Valid values are non-negative base-10
+integers. Equality does not report; only a strictly greater actual value reports.
+
+Parameter Count counts source-declared parameters on supported executable
+members. Extension-method `this` receivers count because they are explicit
+source parameters. Optional/defaulted, `params`, `ref`, `in`, and `out`
+parameters each count once.
+
+Generic type parameters, generic constraints, captured variables, implicit
+instance `this`, compiler-generated parameters, and implicit accessor `value`
+parameters do not count. Supported indexer accessors count explicit indexer
+parameters and still exclude implicit setter/init `value`. Primary constructors
+are deferred by the current executable-member support matrix.
+
+Examples:
+
+| Actual value | Threshold | Result |
+| --- | --- | --- |
+| `4` | `5` | No report. |
+| `5` | `5` | No report. |
+| `6` | `5` | Reports `BIG2006`. |
+| `1` | `0` | Reports `BIG2006`. |
+
 ## Feature flags
 
 `complexity_analyzers.interprocedural_analysis = false` prevents expansion into supported source callees. Intraprocedural analysis and supported BCL/LINQ operation analysis remain active.
@@ -224,6 +253,7 @@ The compiler and SDK determine the exact build behavior for each severity.
 | `BIG2003` | `Info` | `true` |
 | `BIG2004` | `Info` | `true` |
 | `BIG2005` | `Info` | `true` |
+| `BIG2006` | `Info` | `true` |
 | `BIG9000` | `Info` | `false` |
 
 `BIG1006` is enabled by default as a descriptor, but it is functionally inactive until `complexity_analyzers.maximum_complexity` is set to a concrete threshold.
@@ -233,6 +263,8 @@ The compiler and SDK determine the exact build behavior for each severity.
 `BIG2002` is enabled by default as a descriptor, but it is functionally inactive until `complexity_analyzers.maximum_nesting_depth` is set to a concrete threshold.
 
 `BIG2003`, `BIG2004`, and `BIG2005` are enabled by default as descriptors, but each remains functionally inactive until its matching method-size threshold is set.
+
+`BIG2006` is enabled by default as a descriptor, but it remains functionally inactive until `complexity_analyzers.maximum_parameters` is set.
 
 ## Common settings
 
@@ -267,6 +299,8 @@ complexity_analyzers.maximum_statement_count = 25
 dotnet_diagnostic.BIG2004.severity = warning
 complexity_analyzers.maximum_token_count = 300
 dotnet_diagnostic.BIG2005.severity = warning
+complexity_analyzers.maximum_parameters = 5
+dotnet_diagnostic.BIG2006.severity = warning
 ```
 
 Temporarily prove package loading:
@@ -287,6 +321,6 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## What is not configurable
 
-The analyzer does not expose options for custom operation mappings, custom cyclomatic decision-point rules beyond the documented switch mode, custom method-size counting conventions, BCL/LINQ mapping behavior, recurrence-family selection, theorem tolerances, whole-solution analysis, code fixes, memory complexity, parallel complexity, or probabilistic complexity.
+The analyzer does not expose options for custom operation mappings, custom cyclomatic decision-point rules beyond the documented switch mode, custom method-size counting conventions, custom parameter-count conventions, BCL/LINQ mapping behavior, recurrence-family selection, theorem tolerances, whole-solution analysis, code fixes, memory complexity, parallel complexity, or probabilistic complexity.
 
 Unsupported or unresolved operations remain `Unknown`; there is no option that converts them into a known complexity class.

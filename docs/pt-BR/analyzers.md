@@ -28,6 +28,7 @@ inconclusivos ou não resolvidos permanecem `Unknown` em vez de serem estimados.
 | `BIG2003` | Method NLOC exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2004` | Statement count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2005` | Token count exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2006` | Parameter count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Executable Members Suportados
@@ -87,13 +88,14 @@ como um trace interno completo.
 | Propriedade | Significado |
 | --- | --- |
 | `complexity` | Estimativa conhecida emitida por `BIG0001`, `BIG1005` ou `BIG1006`. |
-| `threshold` | Threshold configurado emitido por `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004` ou `BIG2005`. |
+| `threshold` | Threshold configurado emitido por `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004`, `BIG2005` ou `BIG2006`. |
 | `cyclomaticComplexity` | Cyclomatic Complexity real emitida por `BIG2001`. |
 | `cyclomaticComplexityMode` | Modo de contabilização de `switch` emitido por `BIG2001`: `standard` ou `modified_mccabe`. |
 | `maximumNestingDepth` | Maximum Control-Flow Nesting Depth real emitida por `BIG2002`. |
 | `methodNloc` | NLOC real emitido por `BIG2003`. |
 | `statementCount` | Statement count estrutural real emitido por `BIG2004`. |
 | `tokenCount` | Token count real do corpo executável emitido por `BIG2005`. |
+| `parameterCount` | Parameter Count source-declared real emitido por `BIG2006`. |
 | `operation` | Nome estável da operação ou método responsável por um diagnóstico acionável. |
 | `operationComplexity` | Custo conhecido da operação ou callee no local do diagnóstico. |
 | `iterationComplexity` | Complexidade conhecida da iteração envolvente. |
@@ -915,6 +917,80 @@ independentemente; bodies executáveis aninhados não inflam o token count do pa
 Token count é uma métrica sintática de tamanho. Ela é independente de NLOC,
 statement count, Big-O, Cyclomatic Complexity, Maximum Nesting Depth, Cognitive
 Complexity e Halstead Metrics.
+
+## BIG2006 - Parameter Count Acima do Threshold Configurado
+
+| Propriedade | Valor |
+| --- | --- |
+| Categoria | `Complexity` |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Localização estável do executable member |
+| Mensagem | `Member '{member}' declares {actual} parameters, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `parameterCount`, `threshold` |
+
+### O Que Detecta
+
+`BIG2006` reporta um executable member suportado cujo Parameter Count
+source-declared é estritamente maior que
+`complexity_analyzers.maximum_parameters`.
+
+### Regras de Contagem
+
+Parameter Count é baseado na sintaxe de fonte, não em slots de argumento de
+runtime nem em parâmetros gerados pelo compilador. Ele conta parâmetros
+source-declared ordinários, parâmetros de construtor, operadores/conversões,
+local functions, lambdas, anonymous methods e o receiver `this` explícito de
+extension methods. Parâmetros opcionais/defaulted, `params`, `ref`, `in`, `out`
+e modificadores modernos de parâmetro continuam contando como um parâmetro
+declarado cada.
+
+Type parameters genéricos e constraints genéricas não contam. Variáveis
+capturadas não contam. O `this` implícito de instância não conta. O `value`
+implícito de property setter/init e event add/remove não conta porque é um
+parâmetro implícito da linguagem, não uma declaração de parâmetro na fonte.
+
+Para roots de accessor de indexer suportados, os parâmetros explícitos do
+indexer contam e o `value` implícito de setter/init continua sem contar.
+Propriedades expression-bodied contam como roots de getter com `0` parâmetros.
+Primary constructors permanecem deferred porque declarações de class, struct e
+record não são roots de executable member na matriz atual.
+
+### Exemplo Que Dispara
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_parameters = 2
+dotnet_diagnostic.BIG2006.severity = warning
+```
+
+```csharp
+void M(int id, string name, bool active)
+{
+}
+```
+
+O método declara três parâmetros, excedendo o máximo configurado de dois.
+
+### Exemplo Que Não Dispara
+
+```csharp
+T Convert<T, TResult>(T value)
+{
+    return value;
+}
+```
+
+Com `maximum_parameters = 1`, isso não reporta: `T` e `TResult` são type
+parameters, não parâmetros do método.
+
+### Limitações
+
+Parameter Count não é métrica de Big-O, fluxo de controle, linhas, statements,
+tokens, Cognitive Complexity, Halstead, quantidade de dependências ou design de
+API. Ele não infere se Parameter Object, redesign de injeção de dependência ou
+breaking API change são apropriados.
 
 ## BIG9000 - Probe de Execução do Analyzer
 

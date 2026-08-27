@@ -35,6 +35,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.MethodNlocExceedsConfiguredThreshold,
             DiagnosticDescriptors.StatementCountExceedsConfiguredThreshold,
             DiagnosticDescriptors.TokenCountExceedsConfiguredThreshold,
+            DiagnosticDescriptors.ParameterCountExceedsConfiguredThreshold,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)
@@ -97,6 +98,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
         ReportCyclomaticThresholdDiagnosticIfNeeded(context, member, options);
         ReportMaximumNestingDepthThresholdDiagnosticIfNeeded(context, member, options);
         ReportMethodSizeThresholdDiagnosticsIfNeeded(context, member, options);
+        ReportParameterCountThresholdDiagnosticIfNeeded(context, member, options);
 
         foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMember(
             member,
@@ -254,6 +256,33 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticPropertyNames.TokenCount,
             result.TokenCount,
             options.MaximumTokenCount);
+    }
+
+    private static void ReportParameterCountThresholdDiagnosticIfNeeded(
+        SyntaxNodeAnalysisContext context,
+        ExecutableMember member,
+        ComplexityAnalyzerOptions options)
+    {
+        if (!options.MaximumParameters.HasValue)
+        {
+            return;
+        }
+
+        if (!new ParameterCountCalculator().TryCalculate(
+            member,
+            context.CancellationToken,
+            out ParameterCount parameterCount))
+        {
+            return;
+        }
+
+        ReportIntegerThresholdDiagnosticIfNeeded(
+            context,
+            member,
+            DiagnosticDescriptors.ParameterCountExceedsConfiguredThreshold,
+            DiagnosticPropertyNames.ParameterCount,
+            parameterCount.Value,
+            options.MaximumParameters);
     }
 
     private static void ReportIntegerThresholdDiagnosticIfNeeded(
