@@ -51,6 +51,7 @@ DiagnosticAnalyzer
     +-- BIG2003 method NLOC threshold exceeded
     +-- BIG2004 statement-count threshold exceeded
     +-- BIG2005 token-count threshold exceeded
+    +-- BIG2006 parameter-count threshold exceeded
     `-- BIG9000 execution probe
 ```
 
@@ -245,7 +246,8 @@ Public behavior options are:
 - `complexity_analyzers.maximum_nesting_depth`;
 - `complexity_analyzers.maximum_method_nloc`;
 - `complexity_analyzers.maximum_statement_count`;
-- `complexity_analyzers.maximum_token_count`.
+- `complexity_analyzers.maximum_token_count`;
+- `complexity_analyzers.maximum_parameters`.
 
 Tree-specific analyzer config values override global values for that syntax tree. Invalid values fall back to documented defaults rather than producing analyzer failures.
 
@@ -267,6 +269,7 @@ See [Configuration](configuration.md) for details.
 - `BIG2003` for supported executable members above a configured NLOC threshold;
 - `BIG2004` for supported executable members above a configured statement-count threshold;
 - `BIG2005` for supported executable members above a configured token-count threshold;
+- `BIG2006` for supported executable members above a configured source-declared parameter threshold;
 - `BIG9000` as an opt-in execution probe.
 
 Generated-code analysis is disabled and concurrent analyzer execution is enabled.

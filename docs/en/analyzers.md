@@ -27,6 +27,7 @@ unresolved behavior remains `Unknown` rather than being guessed.
 | `BIG2003` | Method NLOC exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2004` | Statement count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2005` | Token count exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2006` | Parameter count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Supported Executable Members
@@ -85,13 +86,14 @@ internal trace.
 | Property | Meaning |
 | --- | --- |
 | `complexity` | Known method estimate emitted by `BIG0001`, `BIG1005`, or `BIG1006`. |
-| `threshold` | Configured threshold emitted by `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004`, or `BIG2005`. |
+| `threshold` | Configured threshold emitted by `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004`, `BIG2005`, or `BIG2006`. |
 | `cyclomaticComplexity` | Actual Cyclomatic Complexity emitted by `BIG2001`. |
 | `cyclomaticComplexityMode` | Switch accounting mode emitted by `BIG2001`, either `standard` or `modified_mccabe`. |
 | `maximumNestingDepth` | Actual Maximum Control-Flow Nesting Depth emitted by `BIG2002`. |
 | `methodNloc` | Actual NLOC emitted by `BIG2003`. |
 | `statementCount` | Actual structural statement count emitted by `BIG2004`. |
 | `tokenCount` | Actual executable-body token count emitted by `BIG2005`. |
+| `parameterCount` | Actual source-declared parameter count emitted by `BIG2006`. |
 | `operation` | Stable operation or method display name responsible for an actionable diagnostic. |
 | `operationComplexity` | Known cost of the operation or callee at the diagnostic location. |
 | `iterationComplexity` | Known enclosing iteration complexity. |
@@ -905,6 +907,80 @@ independently; nested executable bodies do not inflate the parent count.
 Token count is a syntactic size metric. It is independent from NLOC, statement
 count, Big-O, Cyclomatic Complexity, Maximum Nesting Depth, Cognitive
 Complexity, and Halstead metrics.
+
+## BIG2006 - Parameter Count Exceeds Configured Threshold
+
+| Property | Value |
+| --- | --- |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Stable executable-member location |
+| Message | `Member '{member}' declares {actual} parameters, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `parameterCount`, `threshold` |
+
+### What It Detects
+
+`BIG2006` reports a supported executable member whose source-declared parameter
+count is strictly greater than `complexity_analyzers.maximum_parameters`.
+
+### Counting Rules
+
+Parameter Count is based on source syntax, not runtime argument slots or
+compiler-generated parameters. It counts ordinary source-declared parameters,
+constructor parameters, operator/conversion parameters, local-function
+parameters, lambda parameters, anonymous-method parameters, and the explicit
+`this` receiver of extension methods. Optional/defaulted parameters, `params`,
+`ref`, `in`, `out`, and modern parameter modifiers still count as one declared
+parameter each.
+
+Generic type parameters and generic constraints do not count. Captured variables
+do not count. The implicit instance `this` does not count. Property setter/init
+and event add/remove `value` parameters do not count because they are implicit
+language parameters rather than source parameter declarations.
+
+For supported indexer accessor roots, explicit indexer parameters count and the
+implicit setter/init `value` still does not count. Expression-bodied properties
+count as getter roots with `0` parameters. Primary constructors are deferred
+because class, struct, and record declarations are not executable-member roots in
+the current support matrix.
+
+### Example That Triggers
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_parameters = 2
+dotnet_diagnostic.BIG2006.severity = warning
+```
+
+```csharp
+void M(int id, string name, bool active)
+{
+}
+```
+
+The method declares three parameters, which exceeds the configured maximum of
+two.
+
+### Example That Does Not Trigger
+
+```csharp
+T Convert<T, TResult>(T value)
+{
+    return value;
+}
+```
+
+With `maximum_parameters = 1`, this does not report: `T` and `TResult` are type
+parameters, not method parameters.
+
+### Limitations
+
+Parameter Count is not a Big-O, control-flow, line, statement, token, Cognitive
+Complexity, Halstead, dependency-count, or API-design metric. It does not infer
+whether a parameter object, dependency injection redesign, or breaking API
+change is appropriate.
 
 ## BIG9000 - Analyzer Execution Probe
 

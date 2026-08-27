@@ -26,10 +26,11 @@ Valores inválidos são tratados com segurança: não quebram o build nem geram 
 | `complexity_analyzers.maximum_method_nloc` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2003` quando o NLOC de um executable member suportado excede esse threshold. |
 | `complexity_analyzers.maximum_statement_count` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2004` quando o statement count de um executable member suportado excede esse threshold. |
 | `complexity_analyzers.maximum_token_count` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2005` quando o token count de um executable member suportado excede esse threshold. |
+| `complexity_analyzers.maximum_parameters` | Integer | sem valor | Inteiro decimal não negativo | Habilita `BIG2006` quando o Parameter Count source-declared de um executable member suportado excede esse threshold. |
 
 Valores booleanos ignoram diferenças entre maiúsculas e minúsculas depois da remoção de espaços nas extremidades. Valores inteiros devem ser números decimais não negativos, sem sinal, ponto decimal, separadores ou espaços internos. Valores de threshold são case-sensitive.
 
-Valores fora dos limites públicos de budget retornam ao padrão: `max_call_depth = 5` e `max_methods_per_root = 32`. Thresholds ciclomáticos, de nesting, NLOC, statement count e token count inválidos retornam para sem valor configurado. Modos ciclomáticos inválidos retornam para `standard`.
+Valores fora dos limites públicos de budget retornam ao padrão: `max_call_depth = 5` e `max_methods_per_root = 32`. Thresholds ciclomáticos, de nesting, NLOC, statement count, token count e Parameter Count inválidos retornam para sem valor configurado. Modos ciclomáticos inválidos retornam para `standard`.
 
 ## Exemplo
 
@@ -47,6 +48,7 @@ complexity_analyzers.maximum_nesting_depth = 3
 complexity_analyzers.maximum_method_nloc = 40
 complexity_analyzers.maximum_statement_count = 25
 complexity_analyzers.maximum_token_count = 300
+complexity_analyzers.maximum_parameters = 5
 
 dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG2001.severity = warning
@@ -54,6 +56,7 @@ dotnet_diagnostic.BIG2002.severity = warning
 dotnet_diagnostic.BIG2003.severity = warning
 dotnet_diagnostic.BIG2004.severity = warning
 dotnet_diagnostic.BIG2005.severity = warning
+dotnet_diagnostic.BIG2006.severity = warning
 ```
 
 ## Comportamento do threshold
@@ -174,6 +177,33 @@ Exemplos:
 | Statement count | `26` | `25` | Reporta `BIG2004`. |
 | Token count | `301` | `300` | Reporta `BIG2005`. |
 
+## Comportamento de Parameter Count
+
+`complexity_analyzers.maximum_parameters` é opt-in. Quando não está configurado
+ou é inválido, `BIG2006` não reporta. Valores válidos são inteiros decimais não
+negativos. Igualdade não reporta; apenas valor real estritamente maior gera
+diagnóstico.
+
+Parameter Count conta parâmetros source-declared em executable members
+suportados. O receiver `this` de extension methods conta porque é um parâmetro
+explícito na fonte. Parâmetros opcionais/defaulted, `params`, `ref`, `in` e
+`out` contam uma vez cada.
+
+Type parameters genéricos, constraints genéricas, variáveis capturadas, `this`
+implícito de instância, parâmetros gerados pelo compilador e `value` implícito de
+accessors não contam. Accessors de indexer suportados contam os parâmetros
+explícitos do indexer e continuam excluindo o `value` implícito de setter/init.
+Primary constructors permanecem deferred pela matriz atual de executable member.
+
+Exemplos:
+
+| Valor real | Threshold | Resultado |
+| --- | --- | --- |
+| `4` | `5` | Não reporta. |
+| `5` | `5` | Não reporta. |
+| `6` | `5` | Reporta `BIG2006`. |
+| `1` | `0` | Reporta `BIG2006`. |
+
 ## Feature flags
 
 `complexity_analyzers.interprocedural_analysis = false` impede expansão para callees fonte suportados. A análise intraprocedural e a análise de operações BCL/LINQ suportadas permanecem ativas.
@@ -228,6 +258,7 @@ O compilador e o SDK determinam o comportamento exato do build para cada severid
 | `BIG2003` | `Info` | `true` |
 | `BIG2004` | `Info` | `true` |
 | `BIG2005` | `Info` | `true` |
+| `BIG2006` | `Info` | `true` |
 | `BIG9000` | `Info` | `false` |
 
 `BIG1006` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_complexity` seja configurado com um threshold concreto.
@@ -237,6 +268,8 @@ O compilador e o SDK determinam o comportamento exato do build para cada severid
 `BIG2002` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_nesting_depth` seja configurado com um threshold concreto.
 
 `BIG2003`, `BIG2004` e `BIG2005` são habilitados por padrão como descriptors, mas cada um permanece funcionalmente inativo até que seu threshold de tamanho correspondente seja configurado.
+
+`BIG2006` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_parameters` seja configurado.
 
 ## Configurações comuns
 
@@ -271,6 +304,8 @@ complexity_analyzers.maximum_statement_count = 25
 dotnet_diagnostic.BIG2004.severity = warning
 complexity_analyzers.maximum_token_count = 300
 dotnet_diagnostic.BIG2005.severity = warning
+complexity_analyzers.maximum_parameters = 5
+dotnet_diagnostic.BIG2006.severity = warning
 ```
 
 Comprove temporariamente que o pacote carregou:
@@ -291,6 +326,6 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## O que não é configurável
 
-O analyzer não expõe opções para mappings customizados de operações, regras customizadas de decision points ciclomáticos além do modo de `switch` documentado, convenções customizadas para métricas de tamanho, comportamento dos mappings BCL/LINQ, seleção de famílias de recorrência, tolerâncias de teoremas, análise de solution inteira, code fixes, complexidade de memória, complexidade paralela ou complexidade probabilística.
+O analyzer não expõe opções para mappings customizados de operações, regras customizadas de decision points ciclomáticos além do modo de `switch` documentado, convenções customizadas para métricas de tamanho, convenções customizadas de Parameter Count, comportamento dos mappings BCL/LINQ, seleção de famílias de recorrência, tolerâncias de teoremas, análise de solution inteira, code fixes, complexidade de memória, complexidade paralela ou complexidade probabilística.
 
 Operações não suportadas ou não resolvidas permanecem `Unknown`; não existe opção para convertê-las em uma classe de complexidade conhecida.

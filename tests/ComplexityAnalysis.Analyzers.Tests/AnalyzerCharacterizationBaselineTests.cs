@@ -35,6 +35,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
     private const string MethodNlocExceedsConfiguredThresholdId = "BIG2003";
     private const string StatementCountExceedsConfiguredThresholdId = "BIG2004";
     private const string TokenCountExceedsConfiguredThresholdId = "BIG2005";
+    private const string ParameterCountExceedsConfiguredThresholdId = "BIG2006";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -56,6 +57,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
             new(MethodNlocExceedsConfiguredThresholdId, "Method NLOC exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(StatementCountExceedsConfiguredThresholdId, "Statement count exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(TokenCountExceedsConfiguredThresholdId, "Token count exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
+            new(ParameterCountExceedsConfiguredThresholdId, "Parameter count exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(AnalyzerExecutionProbeId, "Analyzer execution probe", "Infrastructure", DiagnosticSeverity.Info, false)
         ];
 
