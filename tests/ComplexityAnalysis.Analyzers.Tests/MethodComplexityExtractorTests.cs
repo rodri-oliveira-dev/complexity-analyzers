@@ -300,6 +300,32 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
+    public void Uninvoked_local_function_mutation_does_not_invalidate_parent_loop_bound()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int[] values)
+                {
+                    int limit = values.Length;
+
+                    void Reset()
+                    {
+                        limit = 0;
+                    }
+
+                    for (var i = 0; i < limit; i++)
+                    {
+                        var x = i;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
     public void Increment_and_decrement_are_constant()
     {
         AssertMethodComplexity(

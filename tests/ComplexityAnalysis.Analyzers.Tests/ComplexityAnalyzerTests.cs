@@ -572,6 +572,58 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_does_not_treat_direct_lambda_return_body_as_parent_actionable_body()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            using System;
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                public Action M(List<int> items, List<int> blocked) => () =>
+                {
+                    foreach (var item in items)
+                    {
+                        _ = blocked.Contains(item);
+                    }
+                };
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == LinearLookupInsideIterationId);
+    }
+
+    [Fact]
+    public async Task Big1003_does_not_use_consumer_outside_current_lambda_body()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                void M(IEnumerable<int> items)
+                {
+                    var callbacks = items
+                        .Select(_ => (Action<IEnumerable<int>, IEnumerable<int>>)((values, blocked) =>
+                        {
+                            foreach (var value in values)
+                            {
+                                var query = blocked.OrderBy(item => item);
+                            }
+                        }))
+                        .ToList();
+                }
+            }
+            """);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == OrderingInsideIterationId);
+    }
+
+    [Fact]
     public async Task Analyzer_does_not_treat_captured_variables_as_lambda_input_size_parameters()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(

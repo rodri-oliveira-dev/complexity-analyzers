@@ -123,7 +123,7 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
             ?? CallTargetResolution.Unsupported();
         if (resolution.Kind == CallTargetResolutionKind.KnownOperation)
         {
-            AnalyzeKnownOperationInvocation(invocation, context, iterationComplexity, resolution, diagnostics);
+            AnalyzeKnownOperationInvocation(invocation, member, context, iterationComplexity, resolution, diagnostics);
             return;
         }
 
@@ -136,6 +136,7 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
 
     private static void AnalyzeKnownOperationInvocation(
         InvocationExpressionSyntax invocation,
+        ExecutableMember member,
         MethodAnalysisContext context,
         ComplexityExpression iterationComplexity,
         CallTargetResolution resolution,
@@ -173,6 +174,7 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         if (IsActionableOrdering(
             invocation,
             mapping,
+            member,
             context,
             out InvocationExpressionSyntax? consumerInvocation,
             out IMethodSymbol? consumerMethodSymbol,
@@ -238,6 +240,7 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
     private static bool IsActionableOrdering(
         InvocationExpressionSyntax invocation,
         KnownOperationMapping mapping,
+        ExecutableMember member,
         MethodAnalysisContext context,
         out InvocationExpressionSyntax? consumerInvocation,
         out IMethodSymbol? consumerMethodSymbol,
@@ -258,7 +261,8 @@ internal sealed class ActionableComplexityDiagnosticAnalyzer
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            if (!KnownOperationInvocation.TryResolve(ancestor, context, Resolver, out IMethodSymbol? ancestorSymbol, out KnownOperationMapping? ancestorMapping)
+            if (!member.Body.Contains(ancestor.Span)
+                || !KnownOperationInvocation.TryResolve(ancestor, context, Resolver, out IMethodSymbol? ancestorSymbol, out KnownOperationMapping? ancestorMapping)
                 || ancestorSymbol is null
                 || ancestorMapping is null
                 || ancestorMapping.ExecutionKind != KnownOperationExecutionKind.Immediate

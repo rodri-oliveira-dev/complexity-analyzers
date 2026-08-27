@@ -24,6 +24,11 @@ internal static class ExecutableMemberSyntax
             yield return typedRoot;
         }
 
+        if (IsNestedExecutableBoundary(bodyRoot))
+        {
+            yield break;
+        }
+
         foreach (SyntaxNode node in bodyRoot.DescendantNodes(descendIntoChildren: ShouldDescendIntoChildren))
         {
             if (node is TNode typedNode)
@@ -41,6 +46,11 @@ internal static class ExecutableMemberSyntax
         if (node is TNode typedSelf)
         {
             yield return typedSelf;
+        }
+
+        if (IsNestedExecutableBoundary(node))
+        {
+            yield break;
         }
 
         foreach (SyntaxNode descendant in node.DescendantNodes(descendIntoChildren: ShouldDescendIntoChildren))
