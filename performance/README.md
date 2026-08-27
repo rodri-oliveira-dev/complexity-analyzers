@@ -1,5 +1,7 @@
 # Analyzer performance baseline
 
+English | [Português (Brasil)](README.pt-BR.md)
+
 This directory contains repeatable performance validation for
 `ComplexityAnalysis.Analyzers`.
 

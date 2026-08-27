@@ -1,5 +1,7 @@
 # Contributing
 
+English | [Português (Brasil)](CONTRIBUTING.pt-BR.md)
+
 Thank you for contributing to `ComplexityAnalysis.Analyzers`. Keep changes focused, reviewable, and aligned with the analyzer's public diagnostics, compatibility guarantees, and conservative analysis model.
 
 ## Code of Conduct
