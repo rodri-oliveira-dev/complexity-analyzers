@@ -559,81 +559,136 @@ internal sealed class RecursiveCallAnalyzer
         bool rightIsArgument = TryResolveArgumentRelation(right, context, localFacts, out ArgumentRelationInfo rightRelation);
         bool leftIsConstant = TryGetNumericConstant(left, context, out double leftConstant);
         bool rightIsConstant = TryGetNumericConstant(right, context, out double rightConstant);
+        BinaryArgumentOperands operands = new(
+            leftIsArgument,
+            leftRelation,
+            rightIsArgument,
+            rightRelation,
+            leftIsConstant,
+            leftConstant,
+            rightIsConstant,
+            rightConstant);
 
-        if (binary.IsKind(SyntaxKind.SubtractExpression)
-            && leftIsArgument
-            && IsSameSize(leftRelation)
-            && rightIsConstant)
+        if (binary.IsKind(SyntaxKind.SubtractExpression))
         {
-            if (rightConstant > 0)
-            {
-                relation = ArgumentRelationInfo.Reducing(
-                    leftRelation.Parameter,
-                    leftRelation.Variable,
-                    RecurrenceReduction.SubtractConstant(NormalizeConstant(rightConstant)));
-                return true;
-            }
-
-            relation = ArgumentRelationInfo.Increasing(leftRelation.Parameter, leftRelation.Variable);
-            return true;
+            return TryResolveSubtractionArgumentRelation(operands, out relation);
         }
 
         if (binary.IsKind(SyntaxKind.AddExpression))
         {
-            if (leftIsArgument
-                && IsSameSize(leftRelation)
-                && rightIsConstant)
-            {
-                relation = CreateAdditiveRelation(leftRelation, rightConstant);
-                return true;
-            }
-
-            if (rightIsArgument
-                && IsSameSize(rightRelation)
-                && leftIsConstant)
-            {
-                relation = CreateAdditiveRelation(rightRelation, leftConstant);
-                return true;
-            }
+            return TryResolveAdditionArgumentRelation(operands, out relation);
         }
 
-        if (binary.IsKind(SyntaxKind.DivideExpression)
-            && leftIsArgument
-            && IsSameSize(leftRelation)
-            && rightIsConstant)
+        if (binary.IsKind(SyntaxKind.DivideExpression))
         {
-            if (rightConstant > 1)
-            {
-                relation = ArgumentRelationInfo.Reducing(
-                    leftRelation.Parameter,
-                    leftRelation.Variable,
-                    RecurrenceReduction.Scale(1 / rightConstant));
-                return true;
-            }
-
-            relation = NearlyEquals(rightConstant, 1)
-                ? ArgumentRelationInfo.Unchanged(leftRelation.Parameter, leftRelation.Variable)
-                : ArgumentRelationInfo.Unknown(leftRelation.Parameter, leftRelation.Variable);
-            return true;
+            return TryResolveDivisionArgumentRelation(operands, out relation);
         }
 
         if (binary.IsKind(SyntaxKind.MultiplyExpression))
         {
-            if (leftIsArgument
-                && IsSameSize(leftRelation)
-                && rightIsConstant)
-            {
-                relation = CreateMultiplicativeRelation(leftRelation, rightConstant);
-                return true;
-            }
+            return TryResolveMultiplicationArgumentRelation(operands, out relation);
+        }
 
-            if (rightIsArgument
-                && IsSameSize(rightRelation)
-                && leftIsConstant)
-            {
-                relation = CreateMultiplicativeRelation(rightRelation, leftConstant);
-                return true;
-            }
+        relation = default;
+        return false;
+    }
+
+    private static bool TryResolveSubtractionArgumentRelation(
+        BinaryArgumentOperands operands,
+        out ArgumentRelationInfo relation)
+    {
+        if (!operands.LeftIsArgument
+            || !IsSameSize(operands.LeftRelation)
+            || !operands.RightIsConstant)
+        {
+            relation = default;
+            return false;
+        }
+
+        if (operands.RightConstant > 0)
+        {
+            relation = ArgumentRelationInfo.Reducing(
+                operands.LeftRelation.Parameter,
+                operands.LeftRelation.Variable,
+                RecurrenceReduction.SubtractConstant(NormalizeConstant(operands.RightConstant)));
+            return true;
+        }
+
+        relation = ArgumentRelationInfo.Increasing(
+            operands.LeftRelation.Parameter,
+            operands.LeftRelation.Variable);
+        return true;
+    }
+
+    private static bool TryResolveAdditionArgumentRelation(
+        BinaryArgumentOperands operands,
+        out ArgumentRelationInfo relation)
+    {
+        if (operands.LeftIsArgument
+            && IsSameSize(operands.LeftRelation)
+            && operands.RightIsConstant)
+        {
+            relation = CreateAdditiveRelation(operands.LeftRelation, operands.RightConstant);
+            return true;
+        }
+
+        if (operands.RightIsArgument
+            && IsSameSize(operands.RightRelation)
+            && operands.LeftIsConstant)
+        {
+            relation = CreateAdditiveRelation(operands.RightRelation, operands.LeftConstant);
+            return true;
+        }
+
+        relation = default;
+        return false;
+    }
+
+    private static bool TryResolveDivisionArgumentRelation(
+        BinaryArgumentOperands operands,
+        out ArgumentRelationInfo relation)
+    {
+        if (!operands.LeftIsArgument
+            || !IsSameSize(operands.LeftRelation)
+            || !operands.RightIsConstant)
+        {
+            relation = default;
+            return false;
+        }
+
+        if (operands.RightConstant > 1)
+        {
+            relation = ArgumentRelationInfo.Reducing(
+                operands.LeftRelation.Parameter,
+                operands.LeftRelation.Variable,
+                RecurrenceReduction.Scale(1 / operands.RightConstant));
+            return true;
+        }
+
+        relation = NearlyEquals(operands.RightConstant, 1)
+            ? ArgumentRelationInfo.Unchanged(operands.LeftRelation.Parameter, operands.LeftRelation.Variable)
+            : ArgumentRelationInfo.Unknown(operands.LeftRelation.Parameter, operands.LeftRelation.Variable);
+        return true;
+    }
+
+    private static bool TryResolveMultiplicationArgumentRelation(
+        BinaryArgumentOperands operands,
+        out ArgumentRelationInfo relation)
+    {
+        if (operands.LeftIsArgument
+            && IsSameSize(operands.LeftRelation)
+            && operands.RightIsConstant)
+        {
+            relation = CreateMultiplicativeRelation(operands.LeftRelation, operands.RightConstant);
+            return true;
+        }
+
+        if (operands.RightIsArgument
+            && IsSameSize(operands.RightRelation)
+            && operands.LeftIsConstant)
+        {
+            relation = CreateMultiplicativeRelation(operands.RightRelation, operands.LeftConstant);
+            return true;
         }
 
         relation = default;
@@ -903,6 +958,69 @@ internal sealed class RecursiveCallAnalyzer
         internal RecursiveArgumentRelation ToRecursiveArgumentRelation()
         {
             return new RecursiveArgumentRelation(Parameter, Variable, Kind, Reduction);
+        }
+    }
+
+    private readonly struct BinaryArgumentOperands
+    {
+        internal BinaryArgumentOperands(
+            bool leftIsArgument,
+            ArgumentRelationInfo leftRelation,
+            bool rightIsArgument,
+            ArgumentRelationInfo rightRelation,
+            bool leftIsConstant,
+            double leftConstant,
+            bool rightIsConstant,
+            double rightConstant)
+        {
+            LeftIsArgument = leftIsArgument;
+            LeftRelation = leftRelation;
+            RightIsArgument = rightIsArgument;
+            RightRelation = rightRelation;
+            LeftIsConstant = leftIsConstant;
+            LeftConstant = leftConstant;
+            RightIsConstant = rightIsConstant;
+            RightConstant = rightConstant;
+        }
+
+        internal bool LeftIsArgument
+        {
+            get;
+        }
+
+        internal ArgumentRelationInfo LeftRelation
+        {
+            get;
+        }
+
+        internal bool RightIsArgument
+        {
+            get;
+        }
+
+        internal ArgumentRelationInfo RightRelation
+        {
+            get;
+        }
+
+        internal bool LeftIsConstant
+        {
+            get;
+        }
+
+        internal double LeftConstant
+        {
+            get;
+        }
+
+        internal bool RightIsConstant
+        {
+            get;
+        }
+
+        internal double RightConstant
+        {
+            get;
         }
     }
 

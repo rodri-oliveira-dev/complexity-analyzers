@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
@@ -223,22 +224,28 @@ public sealed class KnownOperationRegistryTests
             KnownCollectionProbeIntIdentity(),
             ComplexityFactory.Linear(ComplexityVariable.N));
         KnownOperationResolver resolver = CreateResolver(expected);
+        ConcurrentQueue<KnownOperationMapping> results = new();
+        ConcurrentQueue<string> failures = new();
 
-        _ = Parallel.For(
+        ParallelLoopResult loopResult = Parallel.For(
             0,
             256,
             _ =>
             {
-                if (!resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out KnownOperationMapping actual))
+                if (resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out KnownOperationMapping actual))
                 {
-                    throw new InvalidOperationException("Expected known operation mapping.");
+                    results.Enqueue(actual);
                 }
-
-                if (!expected.Equals(actual))
+                else
                 {
-                    throw new InvalidOperationException("Concurrent read returned an unexpected mapping.");
+                    failures.Enqueue("Expected known operation mapping.");
                 }
             });
+
+        Assert.True(loopResult.IsCompleted);
+        Assert.Empty(failures);
+        Assert.Equal(256, results.Count);
+        Assert.All(results, actual => Assert.Equal(expected, actual));
     }
 
     [Fact]

@@ -131,43 +131,64 @@ internal sealed class RecurrenceExtractor
         {
             foreach (RecursiveCallShape call in path.RecursiveCalls)
             {
-                ImmutableArray<RecursiveArgumentRelation> reducingRelations =
-                    call.ReducingArgumentRelations;
-                if (reducingRelations.Length == 0)
+                if (!TryAcceptRecursiveCallDimension(call, ref dimension, out reason))
                 {
-                    reason = "The recursive argument is not reducing.";
-                    return false;
-                }
-
-                if (reducingRelations.Length > 1)
-                {
-                    reason = "The recursive argument dimensions are incompatible.";
-                    return false;
-                }
-
-                RecursiveArgumentRelation reducingRelation = reducingRelations[0];
-                RecursiveDimension current = new(
-                    reducingRelation.Parameter,
-                    reducingRelation.Variable);
-                if (dimension is null)
-                {
-                    dimension = current;
-                }
-                else if (!dimension.Equals(current))
-                {
-                    reason = "The recursive argument dimensions are incompatible.";
-                    return false;
-                }
-
-                if (!AllOtherInputDimensionsAreStable(call, current))
-                {
-                    reason = "The recursive argument dimensions are incompatible.";
                     return false;
                 }
             }
         }
 
         return dimension is not null;
+    }
+
+    private static bool TryAcceptRecursiveCallDimension(
+        RecursiveCallShape call,
+        ref RecursiveDimension? dimension,
+        out string? reason)
+    {
+        reason = null;
+        ImmutableArray<RecursiveArgumentRelation> reducingRelations =
+            call.ReducingArgumentRelations;
+
+        if (reducingRelations.Length == 0)
+        {
+            reason = "The recursive argument is not reducing.";
+            return false;
+        }
+
+        if (reducingRelations.Length > 1)
+        {
+            reason = "The recursive argument dimensions are incompatible.";
+            return false;
+        }
+
+        RecursiveDimension current = CreateRecursiveDimension(reducingRelations[0]);
+        if (!TryAcceptRecursiveDimension(current, ref dimension)
+            || !AllOtherInputDimensionsAreStable(call, current))
+        {
+            reason = "The recursive argument dimensions are incompatible.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static RecursiveDimension CreateRecursiveDimension(RecursiveArgumentRelation relation)
+    {
+        return new RecursiveDimension(relation.Parameter, relation.Variable);
+    }
+
+    private static bool TryAcceptRecursiveDimension(
+        RecursiveDimension current,
+        ref RecursiveDimension? dimension)
+    {
+        if (dimension is null)
+        {
+            dimension = current;
+            return true;
+        }
+
+        return dimension.Equals(current);
     }
 
     private static bool AllOtherInputDimensionsAreStable(

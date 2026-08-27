@@ -109,58 +109,103 @@ internal sealed class ArgumentComplexityBinder
             && rightVariable is not null;
         bool leftIsConstant = TryGetIntegerConstant(left, callerContext, cancellationToken, out long leftConstant);
         bool rightIsConstant = TryGetIntegerConstant(right, callerContext, cancellationToken, out long rightConstant);
+        BinaryTransformationOperands operands = new(
+            leftIsDimension,
+            leftVariable,
+            rightIsDimension,
+            rightVariable,
+            leftIsConstant,
+            leftConstant,
+            rightIsConstant,
+            rightConstant);
 
         if (binary.IsKind(SyntaxKind.AddExpression))
         {
-            if (leftIsDimension && rightIsConstant)
-            {
-                complexity = ComplexityFactory.Linear(leftVariable!);
-                return true;
-            }
-
-            if (rightIsDimension && leftIsConstant)
-            {
-                complexity = ComplexityFactory.Linear(rightVariable!);
-                return true;
-            }
+            return TryResolveAdditiveTransformation(operands, out complexity);
         }
 
-        if (binary.IsKind(SyntaxKind.SubtractExpression)
-            && leftIsDimension
-            && rightIsConstant)
+        if (binary.IsKind(SyntaxKind.SubtractExpression))
         {
-            complexity = ComplexityFactory.Linear(leftVariable!);
+            return TryResolveSubtractiveTransformation(operands, out complexity);
+        }
+
+        return binary.IsKind(SyntaxKind.MultiplyExpression)
+            ? TryResolveMultiplicativeTransformation(operands, out complexity)
+            : binary.IsKind(SyntaxKind.DivideExpression)
+                && TryResolveDivisionTransformation(operands, out complexity);
+    }
+
+    private static bool TryResolveAdditiveTransformation(
+        BinaryTransformationOperands operands,
+        out ComplexityExpression? complexity)
+    {
+        if (operands.LeftIsDimension && operands.RightIsConstant)
+        {
+            complexity = ComplexityFactory.Linear(operands.LeftVariable!);
             return true;
         }
 
-        if (binary.IsKind(SyntaxKind.MultiplyExpression))
+        if (operands.RightIsDimension && operands.LeftIsConstant)
         {
-            if (leftIsDimension && rightIsConstant)
-            {
-                complexity = rightConstant == 0
-                    ? ComplexityFactory.Constant()
-                    : ComplexityFactory.Linear(leftVariable!);
-                return true;
-            }
-
-            if (rightIsDimension && leftIsConstant)
-            {
-                complexity = leftConstant == 0
-                    ? ComplexityFactory.Constant()
-                    : ComplexityFactory.Linear(rightVariable!);
-                return true;
-            }
-        }
-
-        if (binary.IsKind(SyntaxKind.DivideExpression)
-            && leftIsDimension
-            && rightIsConstant
-            && rightConstant != 0)
-        {
-            complexity = ComplexityFactory.Linear(leftVariable!);
+            complexity = ComplexityFactory.Linear(operands.RightVariable!);
             return true;
         }
 
+        complexity = null;
+        return false;
+    }
+
+    private static bool TryResolveSubtractiveTransformation(
+        BinaryTransformationOperands operands,
+        out ComplexityExpression? complexity)
+    {
+        if (operands.LeftIsDimension && operands.RightIsConstant)
+        {
+            complexity = ComplexityFactory.Linear(operands.LeftVariable!);
+            return true;
+        }
+
+        complexity = null;
+        return false;
+    }
+
+    private static bool TryResolveMultiplicativeTransformation(
+        BinaryTransformationOperands operands,
+        out ComplexityExpression? complexity)
+    {
+        if (operands.LeftIsDimension && operands.RightIsConstant)
+        {
+            complexity = operands.RightConstant == 0
+                ? ComplexityFactory.Constant()
+                : ComplexityFactory.Linear(operands.LeftVariable!);
+            return true;
+        }
+
+        if (operands.RightIsDimension && operands.LeftIsConstant)
+        {
+            complexity = operands.LeftConstant == 0
+                ? ComplexityFactory.Constant()
+                : ComplexityFactory.Linear(operands.RightVariable!);
+            return true;
+        }
+
+        complexity = null;
+        return false;
+    }
+
+    private static bool TryResolveDivisionTransformation(
+        BinaryTransformationOperands operands,
+        out ComplexityExpression? complexity)
+    {
+        if (operands.LeftIsDimension
+            && operands.RightIsConstant
+            && operands.RightConstant != 0)
+        {
+            complexity = ComplexityFactory.Linear(operands.LeftVariable!);
+            return true;
+        }
+
+        complexity = null;
         return false;
     }
 
@@ -295,6 +340,69 @@ internal sealed class ArgumentComplexityBinder
         }
 
         return expression;
+    }
+
+    private readonly struct BinaryTransformationOperands
+    {
+        internal BinaryTransformationOperands(
+            bool leftIsDimension,
+            ComplexityVariable? leftVariable,
+            bool rightIsDimension,
+            ComplexityVariable? rightVariable,
+            bool leftIsConstant,
+            long leftConstant,
+            bool rightIsConstant,
+            long rightConstant)
+        {
+            LeftIsDimension = leftIsDimension;
+            LeftVariable = leftVariable;
+            RightIsDimension = rightIsDimension;
+            RightVariable = rightVariable;
+            LeftIsConstant = leftIsConstant;
+            LeftConstant = leftConstant;
+            RightIsConstant = rightIsConstant;
+            RightConstant = rightConstant;
+        }
+
+        internal bool LeftIsDimension
+        {
+            get;
+        }
+
+        internal ComplexityVariable? LeftVariable
+        {
+            get;
+        }
+
+        internal bool RightIsDimension
+        {
+            get;
+        }
+
+        internal ComplexityVariable? RightVariable
+        {
+            get;
+        }
+
+        internal bool LeftIsConstant
+        {
+            get;
+        }
+
+        internal long LeftConstant
+        {
+            get;
+        }
+
+        internal bool RightIsConstant
+        {
+            get;
+        }
+
+        internal long RightConstant
+        {
+            get;
+        }
     }
 
 }
