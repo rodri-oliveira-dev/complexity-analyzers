@@ -32,6 +32,9 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Null(options.MaximumCyclomaticComplexity);
         Assert.Equal(CyclomaticComplexityAnalysisMode.Standard, options.CyclomaticComplexityMode);
         Assert.Null(options.MaximumNestingDepth);
+        Assert.Null(options.MaximumMethodNloc);
+        Assert.Null(options.MaximumStatementCount);
+        Assert.Null(options.MaximumTokenCount);
     }
 
     [Theory]
@@ -201,6 +204,69 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
     }
 
     [Theory]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "0", 0)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "1", 1)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, " 42 ", 42)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "2147483647", int.MaxValue)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "0", 0)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "1", 1)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, " 42 ", 42)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "2147483647", int.MaxValue)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "0", 0)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "1", 1)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, " 42 ", 42)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "2147483647", int.MaxValue)]
+    public void Method_size_thresholds_accept_non_negative_integers(
+        string key,
+        string value,
+        int expected)
+    {
+        ComplexityAnalyzerOptions options = ReadOptions((key, value));
+
+        int? actual = key switch
+        {
+            ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey => options.MaximumMethodNloc,
+            ComplexityAnalyzerOptionsReader.MaximumStatementCountKey => options.MaximumStatementCount,
+            _ => options.MaximumTokenCount,
+        };
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "-1")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "+1")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "1.5")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "1 2")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "999999999999")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "ten")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "-1")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "+1")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "1.5")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "1 2")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "999999999999")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "ten")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "-1")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "+1")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "1.5")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "1 2")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "999999999999")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "ten")]
+    public void Invalid_method_size_thresholds_fall_back_to_unset(
+        string key,
+        string value)
+    {
+        ComplexityAnalyzerOptions options = ReadOptions((key, value));
+
+        Assert.Null(options.MaximumMethodNloc);
+        Assert.Null(options.MaximumStatementCount);
+        Assert.Null(options.MaximumTokenCount);
+    }
+
+    [Theory]
     [InlineData("standard", "Standard")]
     [InlineData("modified_mccabe", "ModifiedMcCabe")]
     [InlineData(" modified_mccabe ", "ModifiedMcCabe")]
@@ -236,7 +302,10 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
                 (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n"),
                 (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "5"),
                 (ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, "standard"),
-                (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "4")),
+                (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "4"),
+                (ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "40"),
+                (ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "41"),
+                (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "42")),
             ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>.Empty.Add(
                 syntaxTree,
                 Options(
@@ -245,7 +314,10 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
                     (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n2"),
                     (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "3"),
                     (ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, "modified_mccabe"),
-                    (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "2"))));
+                    (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "2"),
+                    (ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "20"),
+                    (ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "21"),
+                    (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "22"))));
 
         ComplexityAnalyzerOptions options = ComplexityAnalyzerOptionsReader.Read(provider, syntaxTree);
 
@@ -255,6 +327,9 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(3, options.MaximumCyclomaticComplexity);
         Assert.Equal(CyclomaticComplexityAnalysisMode.ModifiedMcCabe, options.CyclomaticComplexityMode);
         Assert.Equal(2, options.MaximumNestingDepth);
+        Assert.Equal(20, options.MaximumMethodNloc);
+        Assert.Equal(21, options.MaximumStatementCount);
+        Assert.Equal(22, options.MaximumTokenCount);
     }
 
     [Fact]
@@ -269,7 +344,10 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
                 .Add(secondTree, Options(
                     (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n3"),
                     (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "12"),
-                    (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "0"))));
+                    (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "0"),
+                    (ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "10"),
+                    (ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "11"),
+                    (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "12"))));
 
         ComplexityAnalyzerOptions firstOptions = ComplexityAnalyzerOptionsReader.Read(provider, firstTree);
         ComplexityAnalyzerOptions secondOptions = ComplexityAnalyzerOptionsReader.Read(provider, secondTree);
@@ -282,6 +360,12 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(12, secondOptions.MaximumCyclomaticComplexity);
         Assert.Null(firstOptions.MaximumNestingDepth);
         Assert.Equal(0, secondOptions.MaximumNestingDepth);
+        Assert.Null(firstOptions.MaximumMethodNloc);
+        Assert.Equal(10, secondOptions.MaximumMethodNloc);
+        Assert.Null(firstOptions.MaximumStatementCount);
+        Assert.Equal(11, secondOptions.MaximumStatementCount);
+        Assert.Null(firstOptions.MaximumTokenCount);
+        Assert.Equal(12, secondOptions.MaximumTokenCount);
     }
 
     [Fact]

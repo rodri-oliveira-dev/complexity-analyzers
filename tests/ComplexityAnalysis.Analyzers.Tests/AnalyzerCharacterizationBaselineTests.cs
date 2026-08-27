@@ -32,6 +32,9 @@ public sealed class AnalyzerCharacterizationBaselineTests
     private const string MethodComplexityExceedsConfiguredThresholdId = "BIG1006";
     private const string CyclomaticComplexityExceedsConfiguredThresholdId = "BIG2001";
     private const string MaximumNestingDepthExceedsConfiguredThresholdId = "BIG2002";
+    private const string MethodNlocExceedsConfiguredThresholdId = "BIG2003";
+    private const string StatementCountExceedsConfiguredThresholdId = "BIG2004";
+    private const string TokenCountExceedsConfiguredThresholdId = "BIG2005";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -50,6 +53,9 @@ public sealed class AnalyzerCharacterizationBaselineTests
             new(MethodComplexityExceedsConfiguredThresholdId, "Method complexity exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(CyclomaticComplexityExceedsConfiguredThresholdId, "Cyclomatic complexity exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(MaximumNestingDepthExceedsConfiguredThresholdId, "Maximum nesting depth exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
+            new(MethodNlocExceedsConfiguredThresholdId, "Method NLOC exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
+            new(StatementCountExceedsConfiguredThresholdId, "Statement count exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
+            new(TokenCountExceedsConfiguredThresholdId, "Token count exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(AnalyzerExecutionProbeId, "Analyzer execution probe", "Infrastructure", DiagnosticSeverity.Info, false)
         ];
 

@@ -18,6 +18,9 @@ internal static class ComplexityAnalyzerOptionsReader
     internal const string MaximumCyclomaticComplexityKey = "complexity_analyzers.maximum_cyclomatic_complexity";
     internal const string CyclomaticComplexityModeKey = "complexity_analyzers.cyclomatic_complexity_mode";
     internal const string MaximumNestingDepthKey = "complexity_analyzers.maximum_nesting_depth";
+    internal const string MaximumMethodNlocKey = "complexity_analyzers.maximum_method_nloc";
+    internal const string MaximumStatementCountKey = "complexity_analyzers.maximum_statement_count";
+    internal const string MaximumTokenCountKey = "complexity_analyzers.maximum_token_count";
 
     internal static ComplexityAnalyzerOptions Read(
         AnalyzerConfigOptionsProvider optionsProvider,
@@ -38,7 +41,10 @@ internal static class ComplexityAnalyzerOptionsReader
             ReadThreshold(treeOptions, globalOptions, MaximumComplexityKey, defaults.MaximumComplexity),
             ReadOptionalPositiveInteger(treeOptions, globalOptions, MaximumCyclomaticComplexityKey, defaults.MaximumCyclomaticComplexity),
             ReadCyclomaticComplexityMode(treeOptions, globalOptions, CyclomaticComplexityModeKey, defaults.CyclomaticComplexityMode),
-            ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumNestingDepthKey, defaults.MaximumNestingDepth));
+            ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumNestingDepthKey, defaults.MaximumNestingDepth),
+            ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumMethodNlocKey, defaults.MaximumMethodNloc),
+            ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumStatementCountKey, defaults.MaximumStatementCount),
+            ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumTokenCountKey, defaults.MaximumTokenCount));
     }
 
     private static bool ReadBoolean(

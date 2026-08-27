@@ -23,6 +23,9 @@ public sealed class ComplexityAnalyzerTests
     private const string MethodComplexityExceedsConfiguredThresholdId = "BIG1006";
     private const string CyclomaticComplexityExceedsConfiguredThresholdId = "BIG2001";
     private const string MaximumNestingDepthExceedsConfiguredThresholdId = "BIG2002";
+    private const string MethodNlocExceedsConfiguredThresholdId = "BIG2003";
+    private const string StatementCountExceedsConfiguredThresholdId = "BIG2004";
+    private const string TokenCountExceedsConfiguredThresholdId = "BIG2005";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -50,6 +53,9 @@ public sealed class ComplexityAnalyzerTests
                 MethodComplexityExceedsConfiguredThresholdId,
                 CyclomaticComplexityExceedsConfiguredThresholdId,
                 MaximumNestingDepthExceedsConfiguredThresholdId,
+                MethodNlocExceedsConfiguredThresholdId,
+                StatementCountExceedsConfiguredThresholdId,
+                TokenCountExceedsConfiguredThresholdId,
                 AnalyzerExecutionProbeId
             ],
             analyzer.SupportedDiagnostics.Select(descriptor => descriptor.Id));
@@ -78,6 +84,9 @@ public sealed class ComplexityAnalyzerTests
     [InlineData(MethodComplexityExceedsConfiguredThresholdId, "Method complexity exceeds configured threshold")]
     [InlineData(CyclomaticComplexityExceedsConfiguredThresholdId, "Cyclomatic complexity exceeds configured threshold")]
     [InlineData(MaximumNestingDepthExceedsConfiguredThresholdId, "Maximum nesting depth exceeds configured threshold")]
+    [InlineData(MethodNlocExceedsConfiguredThresholdId, "Method NLOC exceeds configured threshold")]
+    [InlineData(StatementCountExceedsConfiguredThresholdId, "Statement count exceeds configured threshold")]
+    [InlineData(TokenCountExceedsConfiguredThresholdId, "Token count exceeds configured threshold")]
     public void Actionable_diagnostics_have_expected_public_descriptor_metadata(
         string diagnosticId,
         string expectedTitle)

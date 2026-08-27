@@ -62,6 +62,51 @@ internal static class ExecutableMemberSyntax
         }
     }
 
+    internal static IEnumerable<SyntaxToken> DescendantTokensInOwnBody(ExecutableMember member)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+
+        SyntaxNode? bodyRoot = member.Body.Block ?? (SyntaxNode?)member.Body.Expression;
+        if (bodyRoot is null)
+        {
+            yield break;
+        }
+
+        foreach (SyntaxToken syntaxToken in DescendantTokensExcludingNestedExecutableBodies(bodyRoot))
+        {
+            yield return syntaxToken;
+        }
+    }
+
+    private static IEnumerable<SyntaxToken> DescendantTokensExcludingNestedExecutableBodies(SyntaxNode node)
+    {
+        if (node is AnonymousFunctionExpressionSyntax)
+        {
+            yield break;
+        }
+
+        foreach (SyntaxNodeOrToken child in node.ChildNodesAndTokens())
+        {
+            if (child.IsToken)
+            {
+                yield return child.AsToken();
+                continue;
+            }
+
+            SyntaxNode childNode = child.AsNode()!;
+            if (node is LocalFunctionStatementSyntax localFunction
+                && (childNode == localFunction.Body || childNode == localFunction.ExpressionBody))
+            {
+                continue;
+            }
+
+            foreach (SyntaxToken syntaxToken in DescendantTokensExcludingNestedExecutableBodies(childNode))
+            {
+                yield return syntaxToken;
+            }
+        }
+    }
+
     private static bool ShouldDescendIntoChildren(SyntaxNode node)
     {
         return !IsNestedExecutableBoundary(node);

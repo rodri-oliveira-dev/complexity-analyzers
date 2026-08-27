@@ -85,6 +85,33 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports supported executable members whose maximum control-flow nesting depth exceeds the configured maximum.");
 
+    internal static readonly DiagnosticDescriptor MethodNlocExceedsConfiguredThreshold = new(
+        id: "BIG2003",
+        title: "Method NLOC exceeds configured threshold",
+        messageFormat: "Member '{0}' has NLOC {1}, exceeding configured maximum {2}",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports supported executable members whose non-comment logical lines of code exceed the configured maximum.");
+
+    internal static readonly DiagnosticDescriptor StatementCountExceedsConfiguredThreshold = new(
+        id: "BIG2004",
+        title: "Statement count exceeds configured threshold",
+        messageFormat: "Member '{0}' has statement count {1}, exceeding configured maximum {2}",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports supported executable members whose structural C# statement count exceeds the configured maximum.");
+
+    internal static readonly DiagnosticDescriptor TokenCountExceedsConfiguredThreshold = new(
+        id: "BIG2005",
+        title: "Token count exceeds configured threshold",
+        messageFormat: "Member '{0}' has token count {1}, exceeding configured maximum {2}",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports supported executable members whose executable-body syntax token count exceeds the configured maximum.");
+
     internal static readonly DiagnosticDescriptor AnalyzerExecutionProbe = new(
         id: "BIG9000",
         title: "Analyzer execution probe",

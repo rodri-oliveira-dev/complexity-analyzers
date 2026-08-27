@@ -24,6 +24,7 @@ O analyzer é deliberadamente conservador: quando não consegue comprovar a comp
 - Resolve famílias selecionadas de recorrências de recursão direta, incluindo decremento, recursão exponencial simples, formas do Master Theorem e um subconjunto restrito de Akra-Bazzi.
 - Mede Cyclomatic Complexity estrutural independentemente do Big-O, com contabilização de `switch` em modo standard ou Modified McCabe.
 - Mede Maximum Control-Flow Nesting Depth independentemente de Big-O e Cyclomatic Complexity.
+- Mede NLOC, statement count e token count como métricas independentes de tamanho de executable member.
 - Permite configurar budgets de análise e um limite máximo de complexidade via `.editorconfig`/analyzer config.
 - Executa como um Roslyn Analyzer normal durante build e análise na IDE; o código consumidor não chama o analyzer em runtime.
 
@@ -40,6 +41,9 @@ O analyzer é deliberadamente conservador: quando não consegue comprovar a comp
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | Sim |
 | `BIG2001` | Cyclomatic complexity exceeds configured threshold | `Complexity` | `Info` | Sim |
 | `BIG2002` | Maximum nesting depth exceeds configured threshold | `Complexity` | `Info` | Sim |
+| `BIG2003` | Method NLOC exceeds configured threshold | `Complexity` | `Info` | Sim |
+| `BIG2004` | Statement count exceeds configured threshold | `Complexity` | `Info` | Sim |
+| `BIG2005` | Token count exceeds configured threshold | `Complexity` | `Info` | Sim |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | Não |
 
 `BIG0001` é um diagnóstico informativo opt-in que reporta uma estimativa conhecida de complexidade no identificador do método.
@@ -51,6 +55,8 @@ O analyzer é deliberadamente conservador: quando não consegue comprovar a comp
 `BIG2001` reporta quando `complexity_analyzers.maximum_cyclomatic_complexity` está configurado e a Cyclomatic Complexity estrutural de um executable member suportado excede esse máximo. Ela é independente do Big-O e pode usar contabilização de `switch` standard ou Modified McCabe.
 
 `BIG2002` reporta quando `complexity_analyzers.maximum_nesting_depth` está configurado e a Maximum Control-Flow Nesting Depth de um executable member suportado excede esse máximo. Código straight-line tem depth `0`; branches irmãos não acumulam; local functions, lambdas e anonymous methods aninhados são analisados independentemente.
+
+`BIG2003`, `BIG2004` e `BIG2005` reportam quando seus thresholds de tamanho correspondentes estão configurados e um executable member suportado excede a política de NLOC, statement count ou token count. Essas são métricas de tamanho, não métricas de Big-O ou fluxo de controle.
 
 `BIG9000` é um probe de infraestrutura usado para comprovar que o pacote do analyzer foi carregado e executado. Ele não representa uma recomendação de performance.
 
@@ -144,6 +150,9 @@ complexity_analyzers.maximum_complexity = n_log_n
 complexity_analyzers.maximum_cyclomatic_complexity = 10
 complexity_analyzers.cyclomatic_complexity_mode = standard
 complexity_analyzers.maximum_nesting_depth = 3
+complexity_analyzers.maximum_method_nloc = 40
+complexity_analyzers.maximum_statement_count = 25
+complexity_analyzers.maximum_token_count = 300
 
 dotnet_diagnostic.BIG0001.severity = suggestion
 dotnet_diagnostic.BIG1001.severity = warning
@@ -154,10 +163,13 @@ dotnet_diagnostic.BIG1005.severity = warning
 dotnet_diagnostic.BIG1006.severity = warning
 dotnet_diagnostic.BIG2001.severity = warning
 dotnet_diagnostic.BIG2002.severity = warning
+dotnet_diagnostic.BIG2003.severity = warning
+dotnet_diagnostic.BIG2004.severity = warning
+dotnet_diagnostic.BIG2005.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-Os valores padrão mantêm análise interprocedural e recursiva habilitadas, `max_call_depth` em `5`, `max_methods_per_root` em `32`, `maximum_complexity` como `none`, `maximum_cyclomatic_complexity` sem valor, `cyclomatic_complexity_mode` como `standard` e `maximum_nesting_depth` sem valor. O threshold só é aplicado à métrica configurada.
+Os valores padrão mantêm análise interprocedural e recursiva habilitadas, `max_call_depth` em `5`, `max_methods_per_root` em `32`, `maximum_complexity` como `none`, `maximum_cyclomatic_complexity` sem valor, `cyclomatic_complexity_mode` como `standard` e todos os thresholds de nesting/tamanho sem valor. O threshold só é aplicado à métrica configurada.
 
 Veja [Configuração](docs/pt-BR/configuration.md).
 
