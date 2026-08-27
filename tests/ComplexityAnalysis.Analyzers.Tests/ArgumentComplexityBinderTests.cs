@@ -229,6 +229,7 @@ public sealed class ArgumentComplexityBinderTests
     [Theory]
     [InlineData("count - 1")]
     [InlineData("count + 1")]
+    [InlineData("1 + count")]
     [InlineData("count / 2")]
     [InlineData("count * 2")]
     [InlineData("2 * count")]
@@ -256,6 +257,65 @@ public sealed class ArgumentComplexityBinderTests
             ComplexityFactory.Linear(ComplexityVariable.N));
 
         Assert.Equal("O(n)", result.ToBigONotation());
+    }
+
+    [Theory]
+    [InlineData("count * 0")]
+    [InlineData("0 * count")]
+    public void Zero_scaled_arguments_substitute_to_constant(string argument)
+    {
+        BindingFacts facts = CreateFacts(
+            """
+            public sealed class Sample
+            {
+                void Caller(int count)
+                {
+                    Helper(
+            """ + argument + """
+                    );
+                }
+
+                void Helper(int size)
+                {
+                }
+            }
+            """);
+
+        ComplexityExpression result = SubstituteCalleeTemplate(
+            facts,
+            ComplexityFactory.Linear(ComplexityVariable.N));
+
+        Assert.Equal("O(1)", result.ToBigONotation());
+    }
+
+    [Theory]
+    [InlineData("1 - count")]
+    [InlineData("count / 0")]
+    [InlineData("count + other")]
+    public void Unsupported_size_transformations_substitute_to_unknown(string argument)
+    {
+        BindingFacts facts = CreateFacts(
+            """
+            public sealed class Sample
+            {
+                void Caller(int count, int other)
+                {
+                    Helper(
+            """ + argument + """
+                    );
+                }
+
+                void Helper(int size)
+                {
+                }
+            }
+            """);
+
+        ComplexityExpression result = SubstituteCalleeTemplate(
+            facts,
+            ComplexityFactory.Linear(ComplexityVariable.N));
+
+        Assert.Equal("Unknown", result.ToBigONotation());
     }
 
     [Fact]
