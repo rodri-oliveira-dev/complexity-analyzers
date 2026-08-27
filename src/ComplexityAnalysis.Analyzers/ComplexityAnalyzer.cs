@@ -30,6 +30,7 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             DiagnosticDescriptors.InputDependentCallInsideIteration,
             DiagnosticDescriptors.ExponentialRecursiveGrowth,
             DiagnosticDescriptors.MethodComplexityExceedsConfiguredThreshold,
+            DiagnosticDescriptors.CyclomaticComplexityExceedsConfiguredThreshold,
             DiagnosticDescriptors.AnalyzerExecutionProbe);
 
     public override void Initialize(AnalysisContext context)
@@ -89,6 +90,8 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             member.SyntaxTree,
             context.CancellationToken);
 
+        ReportCyclomaticThresholdDiagnosticIfNeeded(context, member, options);
+
         foreach (Diagnostic diagnostic in new ActionableComplexityDiagnosticAnalyzer().AnalyzeMember(
             member,
             context.SemanticModel,
@@ -123,6 +126,48 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             complexity.ToBigONotation()));
     }
 
+    private static void ReportCyclomaticThresholdDiagnosticIfNeeded(
+        SyntaxNodeAnalysisContext context,
+        ExecutableMember member,
+        ComplexityAnalyzerOptions options)
+    {
+        if (!options.MaximumCyclomaticComplexity.HasValue)
+        {
+            return;
+        }
+
+        if (!new CyclomaticComplexityAnalyzer().TryAnalyze(
+            member,
+            options.CyclomaticComplexityMode,
+            context.CancellationToken,
+            out CyclomaticComplexityResult result))
+        {
+            return;
+        }
+
+        int threshold = options.MaximumCyclomaticComplexity.Value;
+        if (result.Value <= threshold)
+        {
+            return;
+        }
+
+        string actualText = result.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string thresholdText = threshold.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string modeText = FormatCyclomaticComplexityMode(options.CyclomaticComplexityMode);
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            DiagnosticDescriptors.CyclomaticComplexityExceedsConfiguredThreshold,
+            member.DiagnosticLocation,
+            ImmutableDictionary<string, string?>.Empty
+                .Add(DiagnosticPropertyNames.CyclomaticComplexity, actualText)
+                .Add(DiagnosticPropertyNames.Threshold, thresholdText)
+                .Add(DiagnosticPropertyNames.CyclomaticComplexityMode, modeText),
+            member.DisplayName,
+            actualText,
+            thresholdText,
+            modeText));
+    }
+
     private static void ReportThresholdDiagnosticIfNeeded(
         SyntaxNodeAnalysisContext context,
         ExecutableMember member,
@@ -148,6 +193,13 @@ public sealed class ComplexityAnalyzer : DiagnosticAnalyzer
             member.DisplayName,
             actualComplexity.ToBigONotation(),
             thresholdComplexity.ToBigONotation()));
+    }
+
+    private static string FormatCyclomaticComplexityMode(CyclomaticComplexityAnalysisMode mode)
+    {
+        return mode == CyclomaticComplexityAnalysisMode.ModifiedMcCabe
+            ? "modified_mccabe"
+            : "standard";
     }
 
     private static void AnalyzeCompilation(CompilationAnalysisContext context)

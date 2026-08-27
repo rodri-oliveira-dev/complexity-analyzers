@@ -22,6 +22,7 @@ O analyzer é deliberadamente conservador: quando não consegue comprovar a comp
 - Entende um subconjunto documentado de operações BCL e LINQ por identidade do símbolo resolvido, e não apenas pelo nome do método.
 - Executa análise interprocedural limitada e sob demanda para chamadas seguras a métodos-fonte dentro da mesma compilation.
 - Resolve famílias selecionadas de recorrências de recursão direta, incluindo decremento, recursão exponencial simples, formas do Master Theorem e um subconjunto restrito de Akra-Bazzi.
+- Mede Cyclomatic Complexity estrutural independentemente do Big-O, com contabilização de `switch` em modo standard ou Modified McCabe.
 - Permite configurar budgets de análise e um limite máximo de complexidade via `.editorconfig`/analyzer config.
 - Executa como um Roslyn Analyzer normal durante build e análise na IDE; o código consumidor não chama o analyzer em runtime.
 
@@ -36,6 +37,7 @@ O analyzer é deliberadamente conservador: quando não consegue comprovar a comp
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | Sim |
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | Sim |
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | Sim |
+| `BIG2001` | Cyclomatic complexity exceeds configured threshold | `Complexity` | `Info` | Sim |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | Não |
 
 `BIG0001` é um diagnóstico informativo opt-in que reporta uma estimativa conhecida de complexidade no identificador do método.
@@ -43,6 +45,8 @@ O analyzer é deliberadamente conservador: quando não consegue comprovar a comp
 `BIG1005` reporta métodos de recursão direta suportados cuja recorrência resolvida apresenta crescimento exponencial, como em implementações no estilo Fibonacci.
 
 `BIG1006` reporta quando `complexity_analyzers.maximum_complexity` está configurado e uma estimativa conhecida e comparável ultrapassa o limite definido. Estimativas `Unknown` e incomparáveis não são reportadas.
+
+`BIG2001` reporta quando `complexity_analyzers.maximum_cyclomatic_complexity` está configurado e a Cyclomatic Complexity estrutural de um executable member suportado excede esse máximo. Ela é independente do Big-O e pode usar contabilização de `switch` standard ou Modified McCabe.
 
 `BIG9000` é um probe de infraestrutura usado para comprovar que o pacote do analyzer foi carregado e executado. Ele não representa uma recomendação de performance.
 
@@ -133,6 +137,8 @@ complexity_analyzers.recursion_analysis = true
 complexity_analyzers.max_call_depth = 5
 complexity_analyzers.max_methods_per_root = 32
 complexity_analyzers.maximum_complexity = n_log_n
+complexity_analyzers.maximum_cyclomatic_complexity = 10
+complexity_analyzers.cyclomatic_complexity_mode = standard
 
 dotnet_diagnostic.BIG0001.severity = suggestion
 dotnet_diagnostic.BIG1001.severity = warning
@@ -141,10 +147,11 @@ dotnet_diagnostic.BIG1003.severity = warning
 dotnet_diagnostic.BIG1004.severity = warning
 dotnet_diagnostic.BIG1005.severity = warning
 dotnet_diagnostic.BIG1006.severity = warning
+dotnet_diagnostic.BIG2001.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-Os valores padrão mantêm análise interprocedural e recursiva habilitadas, `max_call_depth` em `5`, `max_methods_per_root` em `32` e `maximum_complexity` como `none`. O threshold só é aplicado a estimativas conhecidas e comparáveis.
+Os valores padrão mantêm análise interprocedural e recursiva habilitadas, `max_call_depth` em `5`, `max_methods_per_root` em `32`, `maximum_complexity` como `none`, `maximum_cyclomatic_complexity` sem valor e `cyclomatic_complexity_mode` como `standard`. O threshold só é aplicado à métrica configurada.
 
 Veja [Configuração](docs/pt-BR/configuration.md).
 

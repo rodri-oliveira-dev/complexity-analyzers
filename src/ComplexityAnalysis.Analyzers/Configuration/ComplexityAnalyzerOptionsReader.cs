@@ -1,6 +1,8 @@
 using System;
 using System.Globalization;
 
+using ComplexityAnalysis.Analyzers.Analysis;
+
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
@@ -13,6 +15,8 @@ internal static class ComplexityAnalyzerOptionsReader
     internal const string MaxCallDepthKey = "complexity_analyzers.max_call_depth";
     internal const string MaxMethodsPerRootKey = "complexity_analyzers.max_methods_per_root";
     internal const string MaximumComplexityKey = "complexity_analyzers.maximum_complexity";
+    internal const string MaximumCyclomaticComplexityKey = "complexity_analyzers.maximum_cyclomatic_complexity";
+    internal const string CyclomaticComplexityModeKey = "complexity_analyzers.cyclomatic_complexity_mode";
 
     internal static ComplexityAnalyzerOptions Read(
         AnalyzerConfigOptionsProvider optionsProvider,
@@ -30,7 +34,9 @@ internal static class ComplexityAnalyzerOptionsReader
             ReadBoolean(treeOptions, globalOptions, RecursionAnalysisKey, defaults.RecursionAnalysisEnabled),
             ReadInteger(treeOptions, globalOptions, MaxCallDepthKey, defaults.MaxCallDepth, ComplexityAnalyzerOptions.MaximumMaxCallDepth),
             ReadInteger(treeOptions, globalOptions, MaxMethodsPerRootKey, defaults.MaxMethodsPerRoot, ComplexityAnalyzerOptions.MaximumMaxMethodsPerRoot),
-            ReadThreshold(treeOptions, globalOptions, MaximumComplexityKey, defaults.MaximumComplexity));
+            ReadThreshold(treeOptions, globalOptions, MaximumComplexityKey, defaults.MaximumComplexity),
+            ReadOptionalPositiveInteger(treeOptions, globalOptions, MaximumCyclomaticComplexityKey, defaults.MaximumCyclomaticComplexity),
+            ReadCyclomaticComplexityMode(treeOptions, globalOptions, CyclomaticComplexityModeKey, defaults.CyclomaticComplexityMode));
     }
 
     private static bool ReadBoolean(
@@ -67,6 +73,28 @@ internal static class ComplexityAnalyzerOptionsReader
             : defaultValue;
     }
 
+    private static int? ReadOptionalPositiveInteger(
+        AnalyzerConfigOptions treeOptions,
+        AnalyzerConfigOptions globalOptions,
+        string key,
+        int? defaultValue)
+    {
+        return TryGetValue(treeOptions, globalOptions, key, out string value)
+            ? ParseOptionalPositiveIntegerOrDefault(value, defaultValue)
+            : defaultValue;
+    }
+
+    private static CyclomaticComplexityAnalysisMode ReadCyclomaticComplexityMode(
+        AnalyzerConfigOptions treeOptions,
+        AnalyzerConfigOptions globalOptions,
+        string key,
+        CyclomaticComplexityAnalysisMode defaultValue)
+    {
+        return TryGetValue(treeOptions, globalOptions, key, out string value)
+            ? ParseCyclomaticComplexityModeOrDefault(value, defaultValue)
+            : defaultValue;
+    }
+
     private static bool TryGetValue(
         AnalyzerConfigOptions treeOptions,
         AnalyzerConfigOptions globalOptions,
@@ -96,5 +124,27 @@ internal static class ComplexityAnalyzerOptionsReader
             && parsedValue <= maximumValue
             ? parsedValue
             : defaultValue;
+    }
+
+    private static int? ParseOptionalPositiveIntegerOrDefault(string value, int? defaultValue)
+    {
+        string trimmedValue = value.Trim();
+        return int.TryParse(trimmedValue, NumberStyles.None, CultureInfo.InvariantCulture, out int parsedValue)
+            && parsedValue >= 1
+            ? parsedValue
+            : defaultValue;
+    }
+
+    private static CyclomaticComplexityAnalysisMode ParseCyclomaticComplexityModeOrDefault(
+        string value,
+        CyclomaticComplexityAnalysisMode defaultValue)
+    {
+        string trimmedValue = value.Trim();
+        return trimmedValue switch
+        {
+            "standard" => CyclomaticComplexityAnalysisMode.Standard,
+            "modified_mccabe" => CyclomaticComplexityAnalysisMode.ModifiedMcCabe,
+            _ => defaultValue,
+        };
     }
 }

@@ -4,6 +4,8 @@ internal static class DiagnosticPropertyNames
 {
     internal const string Complexity = "complexity";
     internal const string Threshold = "threshold";
+    internal const string CyclomaticComplexity = "cyclomaticComplexity";
+    internal const string CyclomaticComplexityMode = "cyclomaticComplexityMode";
     internal const string Operation = "operation";
     internal const string OperationComplexity = "operationComplexity";
     internal const string IterationComplexity = "iterationComplexity";

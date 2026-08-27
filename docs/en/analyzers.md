@@ -22,6 +22,7 @@ unresolved behavior remains `Unknown` rather than being guessed.
 | `BIG1004` | Input-dependent method call inside iteration | `Complexity` | `Info` | `true` |
 | `BIG1005` | Exponential recursive growth | `Complexity` | `Info` | `true` |
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2001` | Cyclomatic complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Supported Executable Members
@@ -80,7 +81,9 @@ internal trace.
 | Property | Meaning |
 | --- | --- |
 | `complexity` | Known method estimate emitted by `BIG0001`, `BIG1005`, or `BIG1006`. |
-| `threshold` | Configured threshold expression emitted by `BIG1006`. |
+| `threshold` | Configured threshold emitted by `BIG1006` or `BIG2001`. |
+| `cyclomaticComplexity` | Actual Cyclomatic Complexity emitted by `BIG2001`. |
+| `cyclomaticComplexityMode` | Switch accounting mode emitted by `BIG2001`, either `standard` or `modified_mccabe`. |
 | `operation` | Stable operation or method display name responsible for an actionable diagnostic. |
 | `operationComplexity` | Known cost of the operation or callee at the diagnostic location. |
 | `iterationComplexity` | Known enclosing iteration complexity. |
@@ -559,6 +562,98 @@ project intentionally accepts the cost.
 `Unknown` and incomparable multivariate expressions do not produce threshold
 reports. `BIG1006` is a practical static-analysis signal, not a universal
 mathematical proof.
+
+## BIG2001 - Cyclomatic Complexity Exceeds Configured Threshold
+
+| Property | Value |
+| --- | --- |
+| Category | `Complexity` |
+| Default severity | `Info` |
+| Enabled by default | `true` |
+| Location | Stable executable-member location |
+| Message | `Member '{member}' has cyclomatic complexity {actual}, exceeding configured maximum {threshold} ({mode} mode)` |
+| Diagnostic properties | `cyclomaticComplexity`, `threshold`, `cyclomaticComplexityMode` |
+
+### What It Detects
+
+`BIG2001` reports a supported executable member whose structural Cyclomatic
+Complexity is strictly greater than
+`complexity_analyzers.maximum_cyclomatic_complexity`.
+
+### Why It Matters
+
+Cyclomatic Complexity measures control-flow path complexity. It is independent
+from algorithmic time complexity: a member can be `O(n)` and still have many
+branches, guards, and independent paths.
+
+### Example That Triggers
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_cyclomatic_complexity = 2
+dotnet_diagnostic.BIG2001.severity = warning
+```
+
+```csharp
+int M(int value)
+{
+    if (value > 0)
+    {
+        return 1;
+    }
+    else if (value < 0)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+```
+
+The method has baseline `1`, plus one decision for `if` and one for `else if`,
+so the actual value is `3`.
+
+### Example That Does Not Trigger
+
+```csharp
+int M(int value)
+{
+    if (value > 0)
+    {
+        return 1;
+    }
+
+    return 0;
+}
+```
+
+With `maximum_cyclomatic_complexity = 2`, equality does not report.
+
+### Complexity Reasoning
+
+The standard convention counts `1 + decision points`. Decision points include
+`if`, loops, `catch`, catch filters, conditional expressions, short-circuit
+`&&`/`||`, non-default switch cases or non-discard switch expression arms,
+`when` guards, and `or` patterns. `else`, `try`, `finally`, plain blocks,
+initializers, `??`, `?.`, pattern `and`, and pattern `not` do not add points by
+themselves.
+
+In `modified_mccabe` mode, each switch statement or switch expression
+contributes one decision for the switch family instead of one per non-default
+case or non-discard arm. Guards and `or` patterns still add points.
+
+### Guidance
+
+Consider splitting or simplifying control flow when a member accumulates many
+independent paths and the project threshold reflects the team's maintainability
+policy.
+
+### Limitations
+
+This diagnostic is not a Big-O estimate and does not claim the member is slow.
+Nested local functions, lambdas, and anonymous methods are analyzed as their own
+executable members rather than inflating their lexical parent.
 
 ## BIG9000 - Analyzer Execution Probe
 

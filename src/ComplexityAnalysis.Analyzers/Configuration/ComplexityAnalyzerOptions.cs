@@ -1,5 +1,6 @@
 using System;
 
+using ComplexityAnalysis.Analyzers.Analysis;
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 
 namespace ComplexityAnalysis.Analyzers.Configuration;
@@ -18,14 +19,18 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         DefaultRecursionAnalysisEnabled,
         DefaultMaxCallDepth,
         DefaultMaxMethodsPerRoot,
-        ComplexityThreshold.None);
+        ComplexityThreshold.None,
+        maximumCyclomaticComplexity: null,
+        CyclomaticComplexityAnalysisMode.Standard);
 
     internal ComplexityAnalyzerOptions(
         bool interproceduralAnalysisEnabled,
         bool recursionAnalysisEnabled,
         int maxCallDepth,
         int maxMethodsPerRoot,
-        ComplexityThreshold maximumComplexity)
+        ComplexityThreshold maximumComplexity,
+        int? maximumCyclomaticComplexity = null,
+        CyclomaticComplexityAnalysisMode cyclomaticComplexityMode = CyclomaticComplexityAnalysisMode.Standard)
     {
         if (maxCallDepth is < 0 or > MaximumMaxCallDepth)
         {
@@ -37,11 +42,18 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             throw new ArgumentOutOfRangeException(nameof(maxMethodsPerRoot), "Maximum methods per root must be within the supported public range.");
         }
 
+        if (maximumCyclomaticComplexity < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumCyclomaticComplexity), "Maximum cyclomatic complexity must be positive when configured.");
+        }
+
         InterproceduralAnalysisEnabled = interproceduralAnalysisEnabled;
         RecursionAnalysisEnabled = recursionAnalysisEnabled;
         MaxCallDepth = maxCallDepth;
         MaxMethodsPerRoot = maxMethodsPerRoot;
         MaximumComplexity = maximumComplexity ?? throw new ArgumentNullException(nameof(maximumComplexity));
+        MaximumCyclomaticComplexity = maximumCyclomaticComplexity;
+        CyclomaticComplexityMode = cyclomaticComplexityMode;
     }
 
     internal bool InterproceduralAnalysisEnabled
@@ -69,6 +81,16 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         get;
     }
 
+    internal int? MaximumCyclomaticComplexity
+    {
+        get;
+    }
+
+    internal CyclomaticComplexityAnalysisMode CyclomaticComplexityMode
+    {
+        get;
+    }
+
     internal ComplexityAnalyzerOptions WithAnalysisBudget(AnalysisBudget budget)
     {
         _ = budget ?? throw new ArgumentNullException(nameof(budget));
@@ -81,7 +103,9 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
                 RecursionAnalysisEnabled,
                 budget.MaximumCallDepth,
                 budget.MaximumMethodsPerRootAnalysis,
-                MaximumComplexity);
+                MaximumComplexity,
+                MaximumCyclomaticComplexity,
+                CyclomaticComplexityMode);
     }
 
     public bool Equals(ComplexityAnalyzerOptions? other)
@@ -91,7 +115,9 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             && RecursionAnalysisEnabled == other.RecursionAnalysisEnabled
             && MaxCallDepth == other.MaxCallDepth
             && MaxMethodsPerRoot == other.MaxMethodsPerRoot
-            && MaximumComplexity.Equals(other.MaximumComplexity);
+            && MaximumComplexity.Equals(other.MaximumComplexity)
+            && MaximumCyclomaticComplexity == other.MaximumCyclomaticComplexity
+            && CyclomaticComplexityMode == other.CyclomaticComplexityMode;
     }
 
     public override bool Equals(object? obj)
@@ -108,6 +134,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             hash = (hash * 397) ^ MaxCallDepth;
             hash = (hash * 397) ^ MaxMethodsPerRoot;
             hash = (hash * 397) ^ MaximumComplexity.GetHashCode();
+            hash = (hash * 397) ^ MaximumCyclomaticComplexity.GetHashCode();
+            hash = (hash * 397) ^ CyclomaticComplexityMode.GetHashCode();
             return hash;
         }
     }

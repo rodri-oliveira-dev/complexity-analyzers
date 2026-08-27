@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Threading;
 
+using ComplexityAnalysis.Analyzers.Analysis;
 using ComplexityAnalysis.Analyzers.Configuration;
 using ComplexityAnalysis.Analyzers.Model;
 
@@ -28,6 +29,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(5, options.MaxCallDepth);
         Assert.Equal(32, options.MaxMethodsPerRoot);
         Assert.Equal(ComplexityThreshold.None, options.MaximumComplexity);
+        Assert.Null(options.MaximumCyclomaticComplexity);
+        Assert.Equal(CyclomaticComplexityAnalysisMode.Standard, options.CyclomaticComplexityMode);
     }
 
     [Theory]
@@ -141,6 +144,58 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(ComplexityThreshold.None, options.MaximumComplexity);
     }
 
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData("10", 10)]
+    [InlineData(" 42 ", 42)]
+    [InlineData("2147483647", int.MaxValue)]
+    public void Maximum_cyclomatic_complexity_accepts_positive_integers(string value, int expected)
+    {
+        ComplexityAnalyzerOptions options = ReadOptions((ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, value));
+
+        Assert.Equal(expected, options.MaximumCyclomaticComplexity);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("+1")]
+    [InlineData("1.5")]
+    [InlineData("1 2")]
+    [InlineData("")]
+    [InlineData("ten")]
+    public void Invalid_maximum_cyclomatic_complexity_falls_back_to_unset(string value)
+    {
+        ComplexityAnalyzerOptions options = ReadOptions((ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, value));
+
+        Assert.Null(options.MaximumCyclomaticComplexity);
+    }
+
+    [Theory]
+    [InlineData("standard", "Standard")]
+    [InlineData("modified_mccabe", "ModifiedMcCabe")]
+    [InlineData(" modified_mccabe ", "ModifiedMcCabe")]
+    public void Cyclomatic_complexity_mode_accepts_documented_values(
+        string value,
+        string expected)
+    {
+        ComplexityAnalyzerOptions options = ReadOptions((ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, value));
+
+        Assert.Equal(expected, options.CyclomaticComplexityMode.ToString());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Standard")]
+    [InlineData("modified")]
+    [InlineData("mccabe")]
+    public void Invalid_cyclomatic_complexity_mode_falls_back_to_standard(string value)
+    {
+        ComplexityAnalyzerOptions options = ReadOptions((ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, value));
+
+        Assert.Equal(CyclomaticComplexityAnalysisMode.Standard, options.CyclomaticComplexityMode);
+    }
+
     [Fact]
     public void Tree_specific_configuration_wins_over_global_configuration()
     {
@@ -149,19 +204,25 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
             GlobalOptions(
                 (ComplexityAnalyzerOptionsReader.InterproceduralAnalysisKey, "true"),
                 (ComplexityAnalyzerOptionsReader.MaxCallDepthKey, "4"),
-                (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n")),
+                (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n"),
+                (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "5"),
+                (ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, "standard")),
             ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>.Empty.Add(
                 syntaxTree,
                 Options(
                     (ComplexityAnalyzerOptionsReader.InterproceduralAnalysisKey, "false"),
                     (ComplexityAnalyzerOptionsReader.MaxCallDepthKey, "9"),
-                    (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n2"))));
+                    (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n2"),
+                    (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "3"),
+                    (ComplexityAnalyzerOptionsReader.CyclomaticComplexityModeKey, "modified_mccabe"))));
 
         ComplexityAnalyzerOptions options = ComplexityAnalyzerOptionsReader.Read(provider, syntaxTree);
 
         Assert.False(options.InterproceduralAnalysisEnabled);
         Assert.Equal(9, options.MaxCallDepth);
         Assert.Equal(ComplexityThreshold.Quadratic, options.MaximumComplexity);
+        Assert.Equal(3, options.MaximumCyclomaticComplexity);
+        Assert.Equal(CyclomaticComplexityAnalysisMode.ModifiedMcCabe, options.CyclomaticComplexityMode);
     }
 
     [Fact]
@@ -173,7 +234,9 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
             GlobalOptions((ComplexityAnalyzerOptionsReader.MaxCallDepthKey, "3")),
             ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>.Empty
                 .Add(firstTree, Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n")))
-                .Add(secondTree, Options((ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n3"))));
+                .Add(secondTree, Options(
+                    (ComplexityAnalyzerOptionsReader.MaximumComplexityKey, "n3"),
+                    (ComplexityAnalyzerOptionsReader.MaximumCyclomaticComplexityKey, "12"))));
 
         ComplexityAnalyzerOptions firstOptions = ComplexityAnalyzerOptionsReader.Read(provider, firstTree);
         ComplexityAnalyzerOptions secondOptions = ComplexityAnalyzerOptionsReader.Read(provider, secondTree);
@@ -182,6 +245,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(3, secondOptions.MaxCallDepth);
         Assert.Equal(ComplexityThreshold.Linear, firstOptions.MaximumComplexity);
         Assert.Equal(ComplexityThreshold.Cubic, secondOptions.MaximumComplexity);
+        Assert.Null(firstOptions.MaximumCyclomaticComplexity);
+        Assert.Equal(12, secondOptions.MaximumCyclomaticComplexity);
     }
 
     [Fact]
