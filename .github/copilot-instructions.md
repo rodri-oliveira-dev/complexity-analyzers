@@ -58,5 +58,8 @@ Use the repository's focused compatibility, package-contract, coverage, and perf
 - Use Conventional Commits.
 - Keep pull requests focused and review the final diff before concluding.
 - Do not commit local `artifacts/`, packages, coverage output, or build output.
+- Never expose machine-specific absolute paths, local usernames, home directories, or resolved tool installation paths in PR descriptions, documentation, issues, or comments.
+- Report validation with portable commands such as `dotnet` and repository-relative paths, even when execution internally used an absolute executable path.
+- Before creating or updating a Pull Request, sanitize the final public text so machine-specific environment details are removed.
 - Do not create tags, GitHub Releases, publish NuGet packages, publish GitHub Packages, or otherwise perform a release unless explicitly requested by the user/maintainer.
 - Do not weaken CI, security, compatibility, or quality gates merely to make a change pass.
