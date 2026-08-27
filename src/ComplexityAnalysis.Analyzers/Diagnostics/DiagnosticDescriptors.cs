@@ -112,6 +112,15 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports supported executable members whose executable-body syntax token count exceeds the configured maximum.");
 
+    internal static readonly DiagnosticDescriptor ParameterCountExceedsConfiguredThreshold = new(
+        id: "BIG2006",
+        title: "Parameter count exceeds configured threshold",
+        messageFormat: "Member '{0}' declares {1} parameters, exceeding configured maximum {2}",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports supported executable members whose source-declared parameter count exceeds the configured maximum.");
+
     internal static readonly DiagnosticDescriptor AnalyzerExecutionProbe = new(
         id: "BIG9000",
         title: "Analyzer execution probe",

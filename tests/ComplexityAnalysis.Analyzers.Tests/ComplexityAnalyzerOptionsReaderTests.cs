@@ -35,6 +35,7 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Null(options.MaximumMethodNloc);
         Assert.Null(options.MaximumStatementCount);
         Assert.Null(options.MaximumTokenCount);
+        Assert.Null(options.MaximumParameters);
     }
 
     [Theory]
@@ -216,6 +217,10 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
     [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "1", 1)]
     [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, " 42 ", 42)]
     [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "2147483647", int.MaxValue)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "0", 0)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "1", 1)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, " 42 ", 42)]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "2147483647", int.MaxValue)]
     public void Method_size_thresholds_accept_non_negative_integers(
         string key,
         string value,
@@ -227,7 +232,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         {
             ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey => options.MaximumMethodNloc,
             ComplexityAnalyzerOptionsReader.MaximumStatementCountKey => options.MaximumStatementCount,
-            _ => options.MaximumTokenCount,
+            ComplexityAnalyzerOptionsReader.MaximumTokenCountKey => options.MaximumTokenCount,
+            _ => options.MaximumParameters,
         };
 
         Assert.Equal(expected, actual);
@@ -255,6 +261,13 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
     [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "999999999999")]
     [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "")]
     [InlineData(ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "ten")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "-1")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "+1")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "1.5")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "1 2")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "999999999999")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "")]
+    [InlineData(ComplexityAnalyzerOptionsReader.MaximumParametersKey, "ten")]
     public void Invalid_method_size_thresholds_fall_back_to_unset(
         string key,
         string value)
@@ -264,6 +277,7 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Null(options.MaximumMethodNloc);
         Assert.Null(options.MaximumStatementCount);
         Assert.Null(options.MaximumTokenCount);
+        Assert.Null(options.MaximumParameters);
     }
 
     [Theory]
@@ -305,7 +319,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
                 (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "4"),
                 (ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "40"),
                 (ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "41"),
-                (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "42")),
+                (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "42"),
+                (ComplexityAnalyzerOptionsReader.MaximumParametersKey, "43")),
             ImmutableDictionary<SyntaxTree, AnalyzerConfigOptions>.Empty.Add(
                 syntaxTree,
                 Options(
@@ -317,7 +332,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
                     (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "2"),
                     (ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "20"),
                     (ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "21"),
-                    (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "22"))));
+                    (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "22"),
+                    (ComplexityAnalyzerOptionsReader.MaximumParametersKey, "23"))));
 
         ComplexityAnalyzerOptions options = ComplexityAnalyzerOptionsReader.Read(provider, syntaxTree);
 
@@ -330,6 +346,7 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(20, options.MaximumMethodNloc);
         Assert.Equal(21, options.MaximumStatementCount);
         Assert.Equal(22, options.MaximumTokenCount);
+        Assert.Equal(23, options.MaximumParameters);
     }
 
     [Fact]
@@ -347,7 +364,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
                     (ComplexityAnalyzerOptionsReader.MaximumNestingDepthKey, "0"),
                     (ComplexityAnalyzerOptionsReader.MaximumMethodNlocKey, "10"),
                     (ComplexityAnalyzerOptionsReader.MaximumStatementCountKey, "11"),
-                    (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "12"))));
+                    (ComplexityAnalyzerOptionsReader.MaximumTokenCountKey, "12"),
+                    (ComplexityAnalyzerOptionsReader.MaximumParametersKey, "13"))));
 
         ComplexityAnalyzerOptions firstOptions = ComplexityAnalyzerOptionsReader.Read(provider, firstTree);
         ComplexityAnalyzerOptions secondOptions = ComplexityAnalyzerOptionsReader.Read(provider, secondTree);
@@ -366,6 +384,8 @@ public sealed class ComplexityAnalyzerOptionsReaderTests
         Assert.Equal(11, secondOptions.MaximumStatementCount);
         Assert.Null(firstOptions.MaximumTokenCount);
         Assert.Equal(12, secondOptions.MaximumTokenCount);
+        Assert.Null(firstOptions.MaximumParameters);
+        Assert.Equal(13, secondOptions.MaximumParameters);
     }
 
     [Fact]

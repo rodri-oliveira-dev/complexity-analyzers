@@ -25,7 +25,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         maximumNestingDepth: null,
         maximumMethodNloc: null,
         maximumStatementCount: null,
-        maximumTokenCount: null);
+        maximumTokenCount: null,
+        maximumParameters: null);
 
     internal ComplexityAnalyzerOptions(
         bool interproceduralAnalysisEnabled,
@@ -38,7 +39,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         int? maximumNestingDepth = null,
         int? maximumMethodNloc = null,
         int? maximumStatementCount = null,
-        int? maximumTokenCount = null)
+        int? maximumTokenCount = null,
+        int? maximumParameters = null)
     {
         if (maxCallDepth is < 0 or > MaximumMaxCallDepth)
         {
@@ -75,6 +77,11 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             throw new ArgumentOutOfRangeException(nameof(maximumTokenCount), "Maximum token count must be non-negative when configured.");
         }
 
+        if (maximumParameters < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumParameters), "Maximum parameters must be non-negative when configured.");
+        }
+
         InterproceduralAnalysisEnabled = interproceduralAnalysisEnabled;
         RecursionAnalysisEnabled = recursionAnalysisEnabled;
         MaxCallDepth = maxCallDepth;
@@ -86,6 +93,7 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         MaximumMethodNloc = maximumMethodNloc;
         MaximumStatementCount = maximumStatementCount;
         MaximumTokenCount = maximumTokenCount;
+        MaximumParameters = maximumParameters;
     }
 
     internal bool InterproceduralAnalysisEnabled
@@ -143,6 +151,11 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         get;
     }
 
+    internal int? MaximumParameters
+    {
+        get;
+    }
+
     internal ComplexityAnalyzerOptions WithAnalysisBudget(AnalysisBudget budget)
     {
         _ = budget ?? throw new ArgumentNullException(nameof(budget));
@@ -161,7 +174,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
                 MaximumNestingDepth,
                 MaximumMethodNloc,
                 MaximumStatementCount,
-                MaximumTokenCount);
+                MaximumTokenCount,
+                MaximumParameters);
     }
 
     public bool Equals(ComplexityAnalyzerOptions? other)
@@ -177,7 +191,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             && MaximumNestingDepth == other.MaximumNestingDepth
             && MaximumMethodNloc == other.MaximumMethodNloc
             && MaximumStatementCount == other.MaximumStatementCount
-            && MaximumTokenCount == other.MaximumTokenCount;
+            && MaximumTokenCount == other.MaximumTokenCount
+            && MaximumParameters == other.MaximumParameters;
     }
 
     public override bool Equals(object? obj)
@@ -200,6 +215,7 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             hash = (hash * 397) ^ MaximumMethodNloc.GetHashCode();
             hash = (hash * 397) ^ MaximumStatementCount.GetHashCode();
             hash = (hash * 397) ^ MaximumTokenCount.GetHashCode();
+            hash = (hash * 397) ^ MaximumParameters.GetHashCode();
             return hash;
         }
     }

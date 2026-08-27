@@ -21,6 +21,7 @@ internal static class ComplexityAnalyzerOptionsReader
     internal const string MaximumMethodNlocKey = "complexity_analyzers.maximum_method_nloc";
     internal const string MaximumStatementCountKey = "complexity_analyzers.maximum_statement_count";
     internal const string MaximumTokenCountKey = "complexity_analyzers.maximum_token_count";
+    internal const string MaximumParametersKey = "complexity_analyzers.maximum_parameters";
 
     internal static ComplexityAnalyzerOptions Read(
         AnalyzerConfigOptionsProvider optionsProvider,
@@ -44,7 +45,8 @@ internal static class ComplexityAnalyzerOptionsReader
             ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumNestingDepthKey, defaults.MaximumNestingDepth),
             ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumMethodNlocKey, defaults.MaximumMethodNloc),
             ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumStatementCountKey, defaults.MaximumStatementCount),
-            ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumTokenCountKey, defaults.MaximumTokenCount));
+            ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumTokenCountKey, defaults.MaximumTokenCount),
+            ReadOptionalNonNegativeInteger(treeOptions, globalOptions, MaximumParametersKey, defaults.MaximumParameters));
     }
 
     private static bool ReadBoolean(

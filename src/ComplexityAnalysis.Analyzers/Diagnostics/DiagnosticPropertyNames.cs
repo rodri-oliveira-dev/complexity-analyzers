@@ -10,6 +10,7 @@ internal static class DiagnosticPropertyNames
     internal const string MethodNloc = "methodNloc";
     internal const string StatementCount = "statementCount";
     internal const string TokenCount = "tokenCount";
+    internal const string ParameterCount = "parameterCount";
     internal const string Operation = "operation";
     internal const string OperationComplexity = "operationComplexity";
     internal const string IterationComplexity = "iterationComplexity";
