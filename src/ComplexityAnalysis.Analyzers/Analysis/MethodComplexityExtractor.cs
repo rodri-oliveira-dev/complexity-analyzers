@@ -199,6 +199,11 @@ internal sealed class MethodComplexityExtractor
             return false;
         }
 
+        if (!member.SupportsDirectRecursion)
+        {
+            return false;
+        }
+
         if (context.InterproceduralContext?.TryGetDirectRecurrenceSolution(
             context.MethodSymbol,
             context.Options,
@@ -415,6 +420,7 @@ internal sealed class MethodComplexityExtractor
             DoStatementSyntax doStatement => AnalyzeDoWhileStatement(doStatement, context),
             IfStatementSyntax ifStatement => AnalyzeIfStatement(ifStatement, context),
             SwitchStatementSyntax switchStatement => AnalyzeSwitchStatement(switchStatement, context),
+            LocalFunctionStatementSyntax => ComplexityFactory.Constant(),
             _ => new BasicOperationAnalyzer(context).AnalyzeStatement(statement),
         };
     }
@@ -627,7 +633,7 @@ internal sealed class MethodComplexityExtractor
 
         MethodAnalysisContext currentContext = context;
 
-        foreach (SyntaxNode node in statement.DescendantNodesAndSelf())
+        foreach (SyntaxNode node in ExecutableMemberSyntax.DescendantNodesAndSelfExcludingNestedExecutableBodies<SyntaxNode>(statement))
         {
             currentContext.CancellationToken.ThrowIfCancellationRequested();
 

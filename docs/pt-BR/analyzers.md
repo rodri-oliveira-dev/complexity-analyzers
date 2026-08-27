@@ -25,6 +25,34 @@ inconclusivos ou não resolvidos permanecem `Unknown` em vez de serem estimados.
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
+## Executable Members Suportados
+
+O analyzer normaliza constructs executáveis C# suportados para um único pipeline
+interno de executable member. Cada raiz suportada precisa ter identidade de
+símbolo Roslyn, body explícito, localização estável de diagnóstico e ownership
+isolado do body.
+
+| Executable member | Análise como raiz | Análise interprocedural como callee | Recursão direta |
+| --- | --- | --- | --- |
+| Método ordinário | Sim | Sim, quando o dispatch de fonte é seguro | Sim, para recorrências suportadas |
+| Construtor/static constructor | Sim | Deferred | Não aplicável |
+| Destructor/finalizer | Não | Não | Não |
+| Getter/setter/init accessor de propriedade | Sim, com body explícito | Deferred | Conservadora; reporta apenas se a prova de recorrência existente tiver sucesso |
+| Accessor add/remove de evento | Sim, com body explícito | Deferred | Conservadora; reporta apenas se a prova de recorrência existente tiver sucesso |
+| Operador | Sim | Deferred | Conservadora; reporta apenas se a prova de recorrência existente tiver sucesso |
+| Operador de conversão | Sim | Deferred | Conservadora; reporta apenas se a prova de recorrência existente tiver sucesso |
+| Local function | Sim | Sim, para chamadas diretas de local function | Sim, para recorrências suportadas |
+| Lambda simples/parenthesized | Sim | Deferred | Deferred |
+| Anonymous method | Sim | Deferred | Deferred |
+| Propriedade expression-bodied | Sim, como getter | Deferred | Deferred |
+| Membro method-like expression-bodied | Sim, conforme o tipo de membro | Igual ao tipo de membro | Igual ao tipo de membro |
+
+Bodies executáveis aninhados não são contados como parte do pai lexical apenas
+por aparecerem dentro dele. Por exemplo, uma local function ou lambda declarada
+dentro de um método é analisada separadamente; o pai só a inclui quando um
+caminho de invocação suportado comprova execução. Variáveis capturadas não são
+tratadas como parâmetros independentes de tamanho de entrada.
+
 ## Convenção de Explicabilidade
 
 Diagnósticos acionáveis seguem esta convenção quando há evidência disponível:
@@ -69,19 +97,19 @@ como um trace interno completo.
 | Categoria | `Complexity` |
 | Severidade padrão | `Info` |
 | Habilitado por padrão | `false` |
-| Localização | Identificador do método |
+| Localização | Localização estável do executable member |
 | Mensagem | `Estimated algorithmic complexity for '{method}' is {complexity}` |
 | Diagnostic properties | `complexity` |
 
 ### O Que Detecta
 
-`BIG0001` reporta a estimativa conhecida do analyzer para um método suportado,
-como `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`, `O(n^1.585)` ou
-`O(1.618^n)`.
+`BIG0001` reporta a estimativa conhecida do analyzer para um executable member
+suportado, como `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`,
+`O(n^1.585)` ou `O(1.618^n)`.
 
 ### Por Que Importa
 
-O diagnóstico expõe o resultado por método que serve de base para diagnostics
+O diagnóstico expõe o resultado por membro que serve de base para diagnostics
 acionáveis e de threshold. Ele é desabilitado por padrão porque pode gerar ruído
 em builds normais.
 
@@ -116,8 +144,8 @@ reporta.
 ### Raciocínio de Complexidade
 
 A estimativa pode incluir limites de loop suportados, operações BCL/LINQ
-conhecidas, callees de métodos-fonte seguros na mesma compilation e formatos
-selecionados de recursão direta resolvida.
+conhecidas, callees de métodos-fonte ou local functions seguros na mesma
+compilation e formatos selecionados de recursão direta resolvida.
 
 ### Orientação
 
@@ -128,7 +156,8 @@ thresholds ou revisar o comportamento da análise.
 
 `Unknown` não é convertido em uma classe de complexidade especulativa.
 Comportamentos não suportados, não resolvidos, inseguros, limitados por budget,
-cancelados ou incomparáveis podem suprimir o diagnóstico.
+cancelados, baseados apenas em variável capturada ou incomparáveis podem
+suprimir o diagnóstico.
 
 Habilite com:
 
@@ -468,7 +497,7 @@ público estável de texto de recorrência. Recursão não suportada permanece
 | Categoria | `Complexity` |
 | Severidade padrão | `Info` |
 | Habilitado por padrão | `true` |
-| Localização | Identificador do método |
+| Localização | Localização estável do executable member |
 | Mensagem | `Method '{method}' has estimated complexity {actual}, exceeding configured maximum {threshold}` |
 | Diagnostic properties | `complexity`, `threshold` |
 
@@ -621,10 +650,10 @@ nome não são mapeados automaticamente.
 A criação de uma pipeline deferred é tratada como trabalho de setup. O custo de
 enumeração ou ordenação só é cobrado quando consumo suportado é comprovado.
 
-## Escopo de Métodos-Fonte Suportados
+## Escopo de Chamadas-Fonte Suportadas
 
-A análise interprocedural é limitada a métodos-fonte ordinários na mesma Roslyn
-`Compilation` quando o dispatch é seguro.
+A análise interprocedural é limitada a métodos-fonte ordinários e local functions
+diretas na mesma Roslyn `Compilation` quando o dispatch é seguro.
 
 Formas suportadas incluem:
 
@@ -632,15 +661,16 @@ Formas suportadas incluem:
 - métodos private;
 - métodos ordinários não virtuais;
 - dispatch sealed quando o alvo de runtime pode ser comprovado.
+- invocações diretas de local functions.
 
 O traversal é sob demanda e limitado. A profundidade máxima padrão é `5`,
 configurável até `16`. O máximo padrão de expansões de métodos-fonte por raiz é
 `32`, configurável até `128`.
 
-Ficam fora do escopo suportado dispatch virtual/interface inseguro, dynamic
-dispatch, assemblies externos, construtores, propriedades, operadores, local
-functions, lambdas como alvos independentes, call graphs de compilation inteira e
-análise de solution inteira.
+Ficam fora do escopo de callee suportado dispatch virtual/interface inseguro,
+dynamic dispatch, assemblies externos, construtores, accessors de propriedade,
+accessors de evento, operadores, conversões, lambdas, anonymous methods, call
+graphs de compilation inteira e análise de solution inteira.
 
 Ciclos são detectados de forma conservadora. Recursão direta pode ser delegada ao
 pipeline de recorrências; recursão mútua continua sem suporte para resolução.

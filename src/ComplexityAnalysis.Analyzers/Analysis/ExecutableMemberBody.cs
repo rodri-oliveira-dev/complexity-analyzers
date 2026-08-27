@@ -1,5 +1,6 @@
 using System;
 
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ComplexityAnalysis.Analyzers.Analysis;
@@ -26,6 +27,14 @@ internal readonly struct ExecutableMemberBody
 
     internal bool HasBody
         => Block is not null || Expression is not null;
+
+    internal TextSpan Span
+        => Block?.Span ?? Expression?.Span ?? default;
+
+    internal bool Contains(TextSpan span)
+    {
+        return HasBody && Span.Contains(span);
+    }
 
     internal static ExecutableMemberBody FromBlock(BlockSyntax block)
     {

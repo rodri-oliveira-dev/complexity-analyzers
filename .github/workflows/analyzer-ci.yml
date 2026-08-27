@@ -115,7 +115,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
 
     steps:
       - name: Checkout
@@ -297,24 +297,50 @@ jobs:
             ] | join("\n")
           ')
 
-          {
-            echo "${marker}"
-            echo "### SonarQube Cloud failure"
-            echo
-            echo "The SonarQube Cloud Quality Gate failed for this PR."
-            echo
-            echo "Quality Gate status: **${status}**"
-            echo
-            if [ -n "${failed_conditions}" ]; then
-              echo "Failed conditions:"
-              echo "${failed_conditions}"
-            else
-              echo "No failing Quality Gate condition was returned by SonarCloud."
-            fi
-            echo
-            echo "- [Open workflow run](${run_url})"
-            echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
-          } > "${comment_file}"
+          condition_rows=$(echo "${response}" | jq -r '
+            [.projectStatus.conditions[]? |
+              "| `" + (.metricKey // "unknown") + "` | **" + (.status // "UNKNOWN") + "** | `" + (.actualValue // "n/a") + "` | `" + (.errorThreshold // "n/a") + "` |"
+            ] | join("\n")
+          ')
+
+          if [ "${status}" = "OK" ]; then
+            {
+              echo "${marker}"
+              echo "### SonarQube Cloud success"
+              echo
+              echo "The SonarQube Cloud Quality Gate passed for this PR."
+              echo
+              echo "Quality Gate status: **${status}**"
+              echo
+              if [ -n "${condition_rows}" ]; then
+                echo "| Metric | Status | Actual | Threshold |"
+                echo "| --- | --- | --- | --- |"
+                echo "${condition_rows}"
+                echo
+              fi
+              echo "- [Open workflow run](${run_url})"
+              echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+            } > "${comment_file}"
+          else
+            {
+              echo "${marker}"
+              echo "### SonarQube Cloud failure"
+              echo
+              echo "The SonarQube Cloud Quality Gate failed for this PR."
+              echo
+              echo "Quality Gate status: **${status}**"
+              echo
+              if [ -n "${failed_conditions}" ]; then
+                echo "Failed conditions:"
+                echo "${failed_conditions}"
+              else
+                echo "No failing Quality Gate condition was returned by SonarCloud."
+              fi
+              echo
+              echo "- [Open workflow run](${run_url})"
+              echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+            } > "${comment_file}"
+          fi
 
       - name: Comment Sonar failure on PR
         if: ${{ always() && failure() && github.event_name == 'pull_request' && ((steps.sonar_end.outcome == 'failure' && steps.sonar_quality_gate.outputs.status == 'ERROR') || steps.sonar_quality_gate.outputs.lookup_failed == 'true') }}
@@ -334,6 +360,50 @@ jobs:
             const body = fs.existsSync("sonar-quality-gate-comment.md")
               ? fs.readFileSync("sonar-quality-gate-comment.md", "utf8")
               : fallbackBody;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100
+            });
+            const existing = comments.find(comment =>
+              comment.user?.type === "Bot" && comment.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
+
+      - name: Comment Sonar success on PR
+        if: ${{ success() && github.event_name == 'pull_request' && steps.sonar_quality_gate.outputs.status == 'OK' && steps.sonar_quality_gate.outputs.lookup_failed == 'false' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- complexity-analyzers:sonar-quality-gate -->";
+            const body = fs.existsSync("sonar-quality-gate-comment.md")
+              ? fs.readFileSync("sonar-quality-gate-comment.md", "utf8")
+              : [
+                  marker,
+                  "### SonarQube Cloud success",
+                  "",
+                  "The SonarQube Cloud Quality Gate passed for this PR.",
+                  "",
+                  `- [Open workflow run](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})`
+                ].join("\n");
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
             const { data: comments } = await github.rest.issues.listComments({

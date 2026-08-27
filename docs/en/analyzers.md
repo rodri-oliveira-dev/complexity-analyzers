@@ -24,6 +24,33 @@ unresolved behavior remains `Unknown` rather than being guessed.
 | `BIG1006` | Method complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
+## Supported Executable Members
+
+The analyzer normalizes supported C# executable constructs into one internal
+executable-member pipeline. Each supported root must have Roslyn symbol identity,
+an explicit body, a stable diagnostic location, and isolated body ownership.
+
+| Executable member | Root analysis | Interprocedural callee analysis | Direct recursion |
+| --- | --- | --- | --- |
+| Ordinary method | Yes | Yes, when source dispatch is safe | Yes, for supported recurrence shapes |
+| Constructor/static constructor | Yes | Deferred | Not applicable |
+| Destructor/finalizer | No | No | No |
+| Property getter/setter/init accessor | Yes, with explicit body | Deferred | Conservative; reports only if existing recurrence proof succeeds |
+| Event add/remove accessor | Yes, with explicit body | Deferred | Conservative; reports only if existing recurrence proof succeeds |
+| Operator | Yes | Deferred | Conservative; reports only if existing recurrence proof succeeds |
+| Conversion operator | Yes | Deferred | Conservative; reports only if existing recurrence proof succeeds |
+| Local function | Yes | Yes, for direct local-function calls | Yes, for supported recurrence shapes |
+| Simple/parenthesized lambda | Yes | Deferred | Deferred |
+| Anonymous method | Yes | Deferred | Deferred |
+| Expression-bodied property | Yes, as the getter | Deferred | Deferred |
+| Expression-bodied method-like member | Yes, by member kind | Same as member kind | Same as member kind |
+
+Nested executable bodies are not counted as part of their lexical parent merely
+because they appear inside that parent. For example, a local function or lambda
+declared inside a method is analyzed separately; the parent includes it only when
+a supported invocation path proves execution. Captured variables are not treated
+as independent input-size parameters.
+
 ## Explainability Convention
 
 Actionable diagnostics follow this convention when evidence is available:
@@ -68,19 +95,19 @@ internal trace.
 | Category | `Complexity` |
 | Default severity | `Info` |
 | Enabled by default | `false` |
-| Location | Method identifier |
+| Location | Stable executable-member location |
 | Message | `Estimated algorithmic complexity for '{method}' is {complexity}` |
 | Diagnostic properties | `complexity` |
 
 ### What It Detects
 
-`BIG0001` reports the analyzer's known estimate for a supported method, such as
+`BIG0001` reports the analyzer's known estimate for a supported executable member, such as
 `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n^2)`, `O(n^1.585)`, or
 `O(1.618^n)`.
 
 ### Why It Matters
 
-The diagnostic exposes the method-level result that other threshold and
+The diagnostic exposes the member-level result that other threshold and
 actionable diagnostics are based on. It is disabled by default because it can be
 chatty in normal builds.
 
@@ -113,8 +140,8 @@ method, the method estimate remains `Unknown` and `BIG0001` does not report.
 ### Complexity Reasoning
 
 The estimate may include supported loop bounds, known BCL/LINQ operations, safe
-source-method callees in the same compilation, and selected solved direct
-recursion.
+source-method or local-function callees in the same compilation, and selected
+solved direct recursion.
 
 ### Guidance
 
@@ -124,8 +151,8 @@ thresholds or reviewing analysis behavior.
 ### Limitations
 
 `Unknown` is not converted into a guessed complexity class. Unsupported,
-unresolved, unsafe, budget-limited, cancelled, or incomparable paths can suppress
-the diagnostic.
+unresolved, unsafe, budget-limited, cancelled, captured-variable-only, or
+incomparable paths can suppress the diagnostic.
 
 Enable it with:
 
@@ -463,7 +490,7 @@ recurrence-text contract. Unsupported recursion remains `Unknown`.
 | Category | `Complexity` |
 | Default severity | `Info` |
 | Enabled by default | `true` |
-| Location | Method identifier |
+| Location | Stable executable-member location |
 | Message | `Method '{method}' has estimated complexity {actual}, exceeding configured maximum {threshold}` |
 | Diagnostic properties | `complexity`, `threshold` |
 
@@ -612,10 +639,10 @@ automatically.
 Deferred pipeline creation is treated as setup work. Enumeration or sorting cost
 is charged only when supported consumption is proven.
 
-## Supported Source-Method Scope
+## Supported Source-Callable Scope
 
-Interprocedural analysis is limited to ordinary source methods in the same
-Roslyn `Compilation` when dispatch is safe.
+Interprocedural analysis is limited to ordinary source methods and direct local
+functions in the same Roslyn `Compilation` when dispatch is safe.
 
 Supported forms include:
 
@@ -623,15 +650,16 @@ Supported forms include:
 - private methods;
 - ordinary non-virtual methods;
 - sealed dispatch when the runtime target is proven.
+- direct local-function invocations.
 
 Traversal is demand-driven and bounded. The default maximum call depth is `5`,
 configurable up to `16`. The default maximum source-method expansions per root is
 `32`, configurable up to `128`.
 
-Outside the supported scope are unsafe virtual/interface dispatch, dynamic
-dispatch, external assemblies, constructors, properties, operators, local
-functions, lambdas as independent targets, whole-compilation call graphs, and
-whole-solution analysis.
+Outside the supported callee scope are unsafe virtual/interface dispatch, dynamic
+dispatch, external assemblies, constructors, property accessors, event accessors,
+operators, conversions, lambdas, anonymous methods, whole-compilation call
+graphs, and whole-solution analysis.
 
 Cycles are detected conservatively. Direct recursion can be delegated to the
 recurrence pipeline; mutual recursion remains unsupported for solving.

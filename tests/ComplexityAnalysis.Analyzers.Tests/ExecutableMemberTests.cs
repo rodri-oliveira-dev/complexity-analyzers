@@ -75,6 +75,142 @@ public sealed class ExecutableMemberTests
         Assert.Equal("value + 1", member.Body.Expression.ToString());
     }
 
+    [Theory]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public Sample(int[] values)
+            {
+            }
+        }
+        """,
+        "Sample.ctor",
+        "Sample",
+        "Constructor")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public int Count
+            {
+                get
+                {
+                    return 42;
+                }
+            }
+        }
+        """,
+        "Count.get",
+        "get",
+        "Accessor")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public static Sample operator +(Sample left, int[] values)
+            {
+                return left;
+            }
+        }
+        """,
+        "operator +",
+        "operator",
+        "Operator")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public static implicit operator Sample(int[] values)
+            {
+                return null;
+            }
+        }
+        """,
+        "implicit operator Sample",
+        "implicit",
+        "ConversionOperator")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public void M()
+            {
+                int Local() => 42;
+            }
+        }
+        """,
+        "Local",
+        "Local",
+        "LocalFunction")]
+    [InlineData(
+        """
+        using System;
+
+        public sealed class Sample
+        {
+            public void M()
+            {
+                Func<int, int> f = value => value + 1;
+            }
+        }
+        """,
+        "lambda",
+        "=>",
+        "Lambda")]
+    [InlineData(
+        """
+        using System;
+
+        public sealed class Sample
+        {
+            public void M()
+            {
+                Func<int, int> f = delegate(int value)
+                {
+                    return value + 1;
+                };
+            }
+        }
+        """,
+        "anonymous method",
+        "delegate",
+        "AnonymousMethod")]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            public int Answer => 42;
+        }
+        """,
+        "Answer.get",
+        "Answer",
+        "ExpressionBodiedProperty")]
+    public void Supported_executable_members_capture_symbol_body_location_display_and_kind(
+        string source,
+        string expectedDisplayName,
+        string expectedLocationText,
+        string expectedKind)
+    {
+        CompilationFacts facts = CreateCompilationFacts(source);
+        SyntaxNode node = GetSupportedNode(facts);
+
+        bool created = ExecutableMember.TryCreate(
+            node,
+            facts.SemanticModel,
+            CancellationToken.None,
+            out ExecutableMember? member);
+
+        Assert.True(created);
+        Assert.NotNull(member);
+        Assert.Same(node, member.Declaration);
+        Assert.Equal(expectedDisplayName, member.DisplayName);
+        Assert.Equal(expectedKind, member.Kind.ToString());
+        Assert.True(member.Body.HasBody);
+        Assert.NotNull(member.Symbol);
+        Assert.Equal(expectedLocationText, GetLocationText(member));
+    }
+
     [Fact]
     public void Ordinary_method_member_without_body_is_represented_without_executable_body()
     {
@@ -242,6 +378,26 @@ public sealed class ExecutableMemberTests
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single(method => StringComparer.Ordinal.Equals(method.Identifier.ValueText, methodName));
+    }
+
+    private static SyntaxNode GetSupportedNode(CompilationFacts facts)
+    {
+        SyntaxNode root = facts.SyntaxTree.GetRoot();
+        return root.DescendantNodes()
+            .Where(node => node is not MethodDeclarationSyntax)
+            .Single(node => ExecutableMember.TryCreate(
+                node,
+                facts.SemanticModel,
+                CancellationToken.None,
+                out _));
+    }
+
+    private static string GetLocationText(ExecutableMember member)
+    {
+        return member.DiagnosticLocation.SourceTree!
+            .GetText()
+            .GetSubText(member.DiagnosticLocation.SourceSpan)
+            .ToString();
     }
 
     private static ExecutableMember CreateMember(
