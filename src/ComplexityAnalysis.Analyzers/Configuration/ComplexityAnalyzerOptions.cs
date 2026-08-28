@@ -26,7 +26,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         maximumMethodNloc: null,
         maximumStatementCount: null,
         maximumTokenCount: null,
-        maximumParameters: null);
+        maximumParameters: null,
+        maximumCognitiveComplexity: null);
 
     internal ComplexityAnalyzerOptions(
         bool interproceduralAnalysisEnabled,
@@ -40,7 +41,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         int? maximumMethodNloc = null,
         int? maximumStatementCount = null,
         int? maximumTokenCount = null,
-        int? maximumParameters = null)
+        int? maximumParameters = null,
+        int? maximumCognitiveComplexity = null)
     {
         if (maxCallDepth is < 0 or > MaximumMaxCallDepth)
         {
@@ -82,6 +84,11 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             throw new ArgumentOutOfRangeException(nameof(maximumParameters), "Maximum parameters must be non-negative when configured.");
         }
 
+        if (maximumCognitiveComplexity < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumCognitiveComplexity), "Maximum cognitive complexity must be non-negative when configured.");
+        }
+
         InterproceduralAnalysisEnabled = interproceduralAnalysisEnabled;
         RecursionAnalysisEnabled = recursionAnalysisEnabled;
         MaxCallDepth = maxCallDepth;
@@ -94,6 +101,7 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         MaximumStatementCount = maximumStatementCount;
         MaximumTokenCount = maximumTokenCount;
         MaximumParameters = maximumParameters;
+        MaximumCognitiveComplexity = maximumCognitiveComplexity;
     }
 
     internal bool InterproceduralAnalysisEnabled
@@ -156,6 +164,11 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
         get;
     }
 
+    internal int? MaximumCognitiveComplexity
+    {
+        get;
+    }
+
     internal ComplexityAnalyzerOptions WithAnalysisBudget(AnalysisBudget budget)
     {
         _ = budget ?? throw new ArgumentNullException(nameof(budget));
@@ -175,7 +188,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
                 MaximumMethodNloc,
                 MaximumStatementCount,
                 MaximumTokenCount,
-                MaximumParameters);
+                MaximumParameters,
+                MaximumCognitiveComplexity);
     }
 
     public bool Equals(ComplexityAnalyzerOptions? other)
@@ -192,7 +206,8 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             && MaximumMethodNloc == other.MaximumMethodNloc
             && MaximumStatementCount == other.MaximumStatementCount
             && MaximumTokenCount == other.MaximumTokenCount
-            && MaximumParameters == other.MaximumParameters;
+            && MaximumParameters == other.MaximumParameters
+            && MaximumCognitiveComplexity == other.MaximumCognitiveComplexity;
     }
 
     public override bool Equals(object? obj)
@@ -216,6 +231,7 @@ internal sealed class ComplexityAnalyzerOptions : IEquatable<ComplexityAnalyzerO
             hash = (hash * 397) ^ MaximumStatementCount.GetHashCode();
             hash = (hash * 397) ^ MaximumTokenCount.GetHashCode();
             hash = (hash * 397) ^ MaximumParameters.GetHashCode();
+            hash = (hash * 397) ^ MaximumCognitiveComplexity.GetHashCode();
             return hash;
         }
     }

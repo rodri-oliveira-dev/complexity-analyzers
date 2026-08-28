@@ -36,6 +36,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
     private const string StatementCountExceedsConfiguredThresholdId = "BIG2004";
     private const string TokenCountExceedsConfiguredThresholdId = "BIG2005";
     private const string ParameterCountExceedsConfiguredThresholdId = "BIG2006";
+    private const string CognitiveComplexityExceedsConfiguredThresholdId = "BIG2007";
     private const string AnalyzerExecutionProbeId = "BIG9000";
 
     [Fact]
@@ -58,6 +59,7 @@ public sealed class AnalyzerCharacterizationBaselineTests
             new(StatementCountExceedsConfiguredThresholdId, "Statement count exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(TokenCountExceedsConfiguredThresholdId, "Token count exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(ParameterCountExceedsConfiguredThresholdId, "Parameter count exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
+            new(CognitiveComplexityExceedsConfiguredThresholdId, "Cognitive complexity exceeds configured threshold", "Complexity", DiagnosticSeverity.Info, true),
             new(AnalyzerExecutionProbeId, "Analyzer execution probe", "Infrastructure", DiagnosticSeverity.Info, false)
         ];
 

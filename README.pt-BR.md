@@ -56,6 +56,7 @@ Quer ver o analyzer em ação? Consulte o [sample executável](samples/Complexit
 - Mede Maximum Control-Flow Nesting Depth independentemente de Big-O e Cyclomatic Complexity.
 - Mede NLOC, statement count e token count como métricas independentes de tamanho de executable member.
 - Mede Parameter Count source-declared independentemente das métricas de complexidade e tamanho.
+- Mede Cognitive Complexity como métrica C# documentada e independente de compreensão de fluxo de controle.
 - Permite configurar budgets de análise e um limite máximo de complexidade via `.editorconfig`/analyzer config.
 - Executa como um Roslyn Analyzer normal durante build e análise na IDE; o código consumidor não chama o analyzer em runtime.
 
@@ -76,6 +77,7 @@ Quer ver o analyzer em ação? Consulte o [sample executável](samples/Complexit
 | `BIG2004` | Statement count exceeds configured threshold | `Complexity` | `Info` | Sim |
 | `BIG2005` | Token count exceeds configured threshold | `Complexity` | `Info` | Sim |
 | `BIG2006` | Parameter count exceeds configured threshold | `Complexity` | `Info` | Sim |
+| `BIG2007` | Cognitive complexity exceeds configured threshold | `Complexity` | `Info` | Sim |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | Não |
 
 `BIG0001` é um diagnóstico informativo opt-in que reporta uma estimativa conhecida de complexidade no identificador do método.
@@ -91,6 +93,8 @@ Quer ver o analyzer em ação? Consulte o [sample executável](samples/Complexit
 `BIG2003`, `BIG2004` e `BIG2005` reportam quando seus thresholds de tamanho correspondentes estão configurados e um executable member suportado excede a política de NLOC, statement count ou token count. Essas são métricas de tamanho, não métricas de Big-O ou fluxo de controle.
 
 `BIG2006` reporta quando `complexity_analyzers.maximum_parameters` está configurado e um executable member suportado declara mais parâmetros de fonte do que o permitido. Ele conta parâmetros declarados, incluindo o receiver `this` de extension methods, mas não type parameters, variáveis capturadas, `this` implícito de instância ou `value` implícito de accessors.
+
+`BIG2007` reporta quando `complexity_analyzers.maximum_cognitive_complexity` está configurado e um executable member suportado excede a convenção C# documentada de Cognitive Complexity deste projeto. Código straight-line possui score `0`; quebras estruturais de fluxo de controle e nesting local aumentam o score.
 
 `BIG9000` é um probe de infraestrutura usado para comprovar que o pacote do analyzer foi carregado e executado. Ele não representa uma recomendação de performance.
 
@@ -188,6 +192,7 @@ complexity_analyzers.maximum_method_nloc = 40
 complexity_analyzers.maximum_statement_count = 25
 complexity_analyzers.maximum_token_count = 300
 complexity_analyzers.maximum_parameters = 5
+complexity_analyzers.maximum_cognitive_complexity = 15
 
 dotnet_diagnostic.BIG0001.severity = suggestion
 dotnet_diagnostic.BIG1001.severity = warning
@@ -202,10 +207,11 @@ dotnet_diagnostic.BIG2003.severity = warning
 dotnet_diagnostic.BIG2004.severity = warning
 dotnet_diagnostic.BIG2005.severity = warning
 dotnet_diagnostic.BIG2006.severity = warning
+dotnet_diagnostic.BIG2007.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-Os valores padrão mantêm análise interprocedural e recursiva habilitadas, `max_call_depth` em `5`, `max_methods_per_root` em `32`, `maximum_complexity` como `none`, `maximum_cyclomatic_complexity` sem valor, `cyclomatic_complexity_mode` como `standard` e todos os thresholds de nesting/tamanho/parâmetros sem valor. O threshold só é aplicado à métrica configurada.
+Os valores padrão mantêm análise interprocedural e recursiva habilitadas, `max_call_depth` em `5`, `max_methods_per_root` em `32`, `maximum_complexity` como `none`, `maximum_cyclomatic_complexity` sem valor, `cyclomatic_complexity_mode` como `standard` e todos os thresholds de nesting/tamanho/parâmetros/cognitive sem valor. O threshold só é aplicado à métrica configurada.
 
 Veja [Configuração](docs/pt-BR/configuration.md).
 

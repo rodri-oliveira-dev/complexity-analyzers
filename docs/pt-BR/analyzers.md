@@ -29,6 +29,7 @@ inconclusivos ou não resolvidos permanecem `Unknown` em vez de serem estimados.
 | `BIG2004` | Statement count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2005` | Token count exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG2006` | Parameter count exceeds configured threshold | `Complexity` | `Info` | `true` |
+| `BIG2007` | Cognitive complexity exceeds configured threshold | `Complexity` | `Info` | `true` |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | `false` |
 
 ## Executable Members Suportados
@@ -88,10 +89,11 @@ como um trace interno completo.
 | Propriedade | Significado |
 | --- | --- |
 | `complexity` | Estimativa conhecida emitida por `BIG0001`, `BIG1005` ou `BIG1006`. |
-| `threshold` | Threshold configurado emitido por `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004`, `BIG2005` ou `BIG2006`. |
+| `threshold` | Threshold configurado emitido por `BIG1006`, `BIG2001`, `BIG2002`, `BIG2003`, `BIG2004`, `BIG2005`, `BIG2006` ou `BIG2007`. |
 | `cyclomaticComplexity` | Cyclomatic Complexity real emitida por `BIG2001`. |
 | `cyclomaticComplexityMode` | Modo de contabilização de `switch` emitido por `BIG2001`: `standard` ou `modified_mccabe`. |
 | `maximumNestingDepth` | Maximum Control-Flow Nesting Depth real emitida por `BIG2002`. |
+| `cognitiveComplexity` | Cognitive Complexity real emitida por `BIG2007`. |
 | `methodNloc` | NLOC real emitido por `BIG2003`. |
 | `statementCount` | Statement count estrutural real emitido por `BIG2004`. |
 | `tokenCount` | Token count real do corpo executável emitido por `BIG2005`. |
@@ -991,6 +993,94 @@ Parameter Count não é métrica de Big-O, fluxo de controle, linhas, statements
 tokens, Cognitive Complexity, Halstead, quantidade de dependências ou design de
 API. Ele não infere se Parameter Object, redesign de injeção de dependência ou
 breaking API change são apropriados.
+
+## BIG2007 - Cognitive Complexity Acima do Threshold Configurado
+
+| Propriedade | Valor |
+| --- | --- |
+| Categoria | `Complexity` |
+| Severidade padrão | `Info` |
+| Habilitado por padrão | `true` |
+| Localização | Localização estável do executable member |
+| Mensagem | `Member '{member}' has cognitive complexity {actual}, exceeding configured maximum {threshold}` |
+| Diagnostic properties | `cognitiveComplexity`, `threshold` |
+
+### O Que Detecta
+
+`BIG2007` reporta um executable member suportado cuja Cognitive Complexity é
+estritamente maior que `complexity_analyzers.maximum_cognitive_complexity`.
+
+A métrica implementada é a convenção C# de Cognitive Complexity documentada
+deste projeto. Não há alegação de equivalência exata com ferramentas externas. A
+convenção completa e reproduzível está documentada em [Convenção de Cognitive
+Complexity](cognitive-complexity.md).
+
+### Por Que Importa
+
+Cognitive Complexity mede custo de compreensão estrutural a partir de quebras de
+fluxo de controle e nesting local. Ela complementa Cyclomatic Complexity e
+Maximum Nesting Depth sem substituir ou combinar essas métricas.
+
+### Exemplo Que Dispara
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_cognitive_complexity = 5
+dotnet_diagnostic.BIG2007.severity = warning
+```
+
+```csharp
+void M(bool a, bool b, bool c)
+{
+    if (a)
+    {
+        while (b)
+        {
+            if (c)
+            {
+            }
+        }
+    }
+}
+```
+
+O score é `6`: o `if` externo contribui `1`, o `while` contribui `2`, e o `if`
+interno contribui `3`.
+
+### Exemplo Que Não Dispara
+
+```csharp
+void M(bool a, bool b, bool c)
+{
+    if (a) {}
+    if (b) {}
+    if (c) {}
+}
+```
+
+Os três `if` irmãos executam no nesting `0`, então o score é `3`. Com
+`maximum_cognitive_complexity = 3`, igualdade não reporta.
+
+### Regras de Score
+
+Código straight-line começa em `0`. Constructs estruturais como `if`, loops,
+famílias de switch, `catch`, `when` e `?:` adicionam `1 + nesting atual` conforme
+a convenção. `else` adiciona `1` sem penalidade de nesting. Sequências lógicas
+booleanas e de pattern adicionam um ponto pela sequência e mais um ponto por
+mudança de operador. Recursão direta a si mesmo adiciona um ponto uma vez por
+membro quando comprovada por identidade de símbolo. `break`, `continue` e `goto`
+adicionam um ponto cada.
+
+Local functions, lambdas e anonymous methods aninhados são analisados como
+executable members separados em vez de inflarem o pai lexical.
+
+### Limitações
+
+Este diagnóstico não é estimativa Big-O, contagem de caminhos, valor de
+profundidade máxima, contagem de linhas, token count, Parameter Count, métrica
+Halstead, score subjetivo de legibilidade ou recomendação automática de
+refatoração.
 
 ## BIG9000 - Probe de Execução do Analyzer
 

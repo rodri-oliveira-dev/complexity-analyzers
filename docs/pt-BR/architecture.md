@@ -52,6 +52,7 @@ DiagnosticAnalyzer
     +-- BIG2004 threshold de statement count excedido
     +-- BIG2005 threshold de token count excedido
     +-- BIG2006 threshold de Parameter Count excedido
+    +-- BIG2007 threshold de Cognitive Complexity excedido
     `-- BIG9000 probe de execução
 ```
 
@@ -135,10 +136,10 @@ O modelo suporta:
 
 Quando o analyzer não consegue comprovar um resultado seguro, o modelo preserva `Unknown` em vez de forçar uma classe de complexidade estimada.
 
-Cyclomatic Complexity e Maximum Control-Flow Nesting Depth são métricas
-estruturais inteiras separadas. Elas são calculadas a partir do fluxo de controle
-do executable member e não são combinadas com o modelo de complexidade Big-O nem
-entre si.
+Cyclomatic Complexity, Maximum Control-Flow Nesting Depth e Cognitive Complexity
+são métricas estruturais inteiras separadas. Elas são calculadas a partir do
+fluxo de controle do executable member e não são combinadas com o modelo de
+complexidade Big-O nem entre si.
 
 ## Análise com Roslyn
 
@@ -162,6 +163,7 @@ Alguns componentes representativos são:
 - `KnownOperationComplexityAnalyzer` para custos BCL/LINQ suportados.
 - `CyclomaticComplexityAnalyzer` para pontuação estrutural de complexidade de caminhos, independente do Big-O.
 - `MaximumNestingDepthAnalyzer` para pontuação de profundidade máxima de nesting de fluxo de controle, independente de Big-O e Cyclomatic Complexity.
+- `CognitiveComplexityCalculator` para o score documentado de compreensão estrutural, independente de Big-O, Cyclomatic Complexity e Maximum Nesting Depth.
 
 O analyzer não exige um call graph completo da compilation ou da solution.
 Constructs executáveis aninhados são analisados como raízes próprias. Um membro
@@ -249,7 +251,8 @@ As opções públicas de comportamento são:
 - `complexity_analyzers.maximum_method_nloc`;
 - `complexity_analyzers.maximum_statement_count`;
 - `complexity_analyzers.maximum_token_count`;
-- `complexity_analyzers.maximum_parameters`.
+- `complexity_analyzers.maximum_parameters`;
+- `complexity_analyzers.maximum_cognitive_complexity`.
 
 Valores específicos por syntax tree sobrescrevem valores globais para aquela árvore. Valores inválidos retornam aos defaults documentados em vez de gerar falhas do analyzer.
 
@@ -272,6 +275,7 @@ Veja [Configuração](configuration.md) para detalhes.
 - `BIG2004` para executable members suportados acima de um threshold configurado de statement count;
 - `BIG2005` para executable members suportados acima de um threshold configurado de token count;
 - `BIG2006` para executable members suportados acima de um threshold configurado de Parameter Count source-declared;
+- `BIG2007` para executable members suportados acima de um threshold configurado de Cognitive Complexity;
 - `BIG9000` como probe de execução opt-in.
 
 A análise de código gerado é desabilitada e a execução concorrente do analyzer é habilitada.

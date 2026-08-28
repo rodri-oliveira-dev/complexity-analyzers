@@ -110,7 +110,7 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## Try the diagnostics
 
-`BIG1001` through `BIG1005` are enabled by default with `Info` severity. `BIG1006` and `BIG2001` through `BIG2006` are also enabled as descriptors, but they only report after concrete thresholds are configured. Build visibility for informational diagnostics depends on the consuming project and SDK settings.
+`BIG1001` through `BIG1005` are enabled by default with `Info` severity. `BIG1006` and `BIG2001` through `BIG2007` are also enabled as descriptors, but they only report after concrete thresholds are configured. Build visibility for informational diagnostics depends on the consuming project and SDK settings.
 
 Promote an actionable diagnostic locally:
 
@@ -177,6 +177,15 @@ dotnet_diagnostic.BIG2003.severity = warning
 dotnet_diagnostic.BIG2004.severity = warning
 dotnet_diagnostic.BIG2005.severity = warning
 dotnet_diagnostic.BIG2006.severity = warning
+```
+
+Promote the Cognitive Complexity threshold diagnostic:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_cognitive_complexity = 15
+dotnet_diagnostic.BIG2007.severity = warning
 ```
 
 `BIG0001` is disabled by default. Enable it when you want method-level complexity estimates:

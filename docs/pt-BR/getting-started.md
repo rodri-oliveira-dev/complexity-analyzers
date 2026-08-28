@@ -110,7 +110,7 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## Experimentar os diagnósticos
 
-`BIG1001` até `BIG1005` são habilitados por padrão com severidade `Info`. `BIG1006` e `BIG2001` até `BIG2006` também são habilitados como descriptors, mas só reportam quando thresholds concretos são configurados. A visibilidade de diagnósticos informativos no build depende do projeto consumidor e das configurações do SDK.
+`BIG1001` até `BIG1005` são habilitados por padrão com severidade `Info`. `BIG1006` e `BIG2001` até `BIG2007` também são habilitados como descriptors, mas só reportam quando thresholds concretos são configurados. A visibilidade de diagnósticos informativos no build depende do projeto consumidor e das configurações do SDK.
 
 Promova um diagnóstico acionável localmente:
 
@@ -177,6 +177,15 @@ dotnet_diagnostic.BIG2003.severity = warning
 dotnet_diagnostic.BIG2004.severity = warning
 dotnet_diagnostic.BIG2005.severity = warning
 dotnet_diagnostic.BIG2006.severity = warning
+```
+
+Promova o diagnóstico de threshold de Cognitive Complexity:
+
+```ini
+[*.cs]
+
+complexity_analyzers.maximum_cognitive_complexity = 15
+dotnet_diagnostic.BIG2007.severity = warning
 ```
 
 `BIG0001` é desabilitado por padrão. Habilite-o quando quiser estimativas de complexidade por método:

@@ -121,6 +121,15 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Reports supported executable members whose source-declared parameter count exceeds the configured maximum.");
 
+    internal static readonly DiagnosticDescriptor CognitiveComplexityExceedsConfiguredThreshold = new(
+        id: "BIG2007",
+        title: "Cognitive complexity exceeds configured threshold",
+        messageFormat: "Member '{0}' has cognitive complexity {1}, exceeding configured maximum {2}",
+        category: "Complexity",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reports supported executable members whose documented C# Cognitive Complexity exceeds the configured maximum.");
+
     internal static readonly DiagnosticDescriptor AnalyzerExecutionProbe = new(
         id: "BIG9000",
         title: "Analyzer execution probe",

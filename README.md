@@ -56,6 +56,7 @@ Want to see the analyzer in action? See the [runnable sample](samples/Complexity
 - Measures Maximum Control-Flow Nesting Depth independently from Big-O and Cyclomatic Complexity.
 - Measures NLOC, statement count, and token count as independent executable-member size metrics.
 - Measures source-declared Parameter Count independently from all complexity and size metrics.
+- Measures Cognitive Complexity as an independent documented C# control-flow comprehension metric.
 - Supports configurable analysis budgets and a maximum-complexity threshold through `.editorconfig`/analyzer config.
 - Runs as a normal Roslyn analyzer during builds and IDE analysis; consumer code does not call the analyzer at runtime.
 
@@ -76,6 +77,7 @@ Want to see the analyzer in action? See the [runnable sample](samples/Complexity
 | `BIG2004` | Statement count exceeds configured threshold | `Complexity` | `Info` | Yes |
 | `BIG2005` | Token count exceeds configured threshold | `Complexity` | `Info` | Yes |
 | `BIG2006` | Parameter count exceeds configured threshold | `Complexity` | `Info` | Yes |
+| `BIG2007` | Cognitive complexity exceeds configured threshold | `Complexity` | `Info` | Yes |
 | `BIG9000` | Analyzer execution probe | `Infrastructure` | `Info` | No |
 
 `BIG0001` is an opt-in informational diagnostic that reports a known method-complexity estimate at the method identifier.
@@ -91,6 +93,8 @@ Want to see the analyzer in action? See the [runnable sample](samples/Complexity
 `BIG2003`, `BIG2004`, and `BIG2005` report when their matching method-size thresholds are configured and a supported executable member exceeds NLOC, statement-count, or token-count policy. These are size metrics, not Big-O or control-flow metrics.
 
 `BIG2006` reports when `complexity_analyzers.maximum_parameters` is configured and a supported executable member declares more source parameters than allowed. It counts declared parameters, including extension-method `this` receivers, but not type parameters, captured variables, implicit instance `this`, or implicit accessor `value`.
+
+`BIG2007` reports when `complexity_analyzers.maximum_cognitive_complexity` is configured and a supported executable member exceeds this project's documented C# Cognitive Complexity convention. Straight-line code has score `0`; structural control-flow breaks and local nesting increase the score.
 
 `BIG9000` is an infrastructure probe used to prove that the analyzer package loaded and executed. It is not a performance recommendation.
 
@@ -188,6 +192,7 @@ complexity_analyzers.maximum_method_nloc = 40
 complexity_analyzers.maximum_statement_count = 25
 complexity_analyzers.maximum_token_count = 300
 complexity_analyzers.maximum_parameters = 5
+complexity_analyzers.maximum_cognitive_complexity = 15
 
 dotnet_diagnostic.BIG0001.severity = suggestion
 dotnet_diagnostic.BIG1001.severity = warning
@@ -202,10 +207,11 @@ dotnet_diagnostic.BIG2003.severity = warning
 dotnet_diagnostic.BIG2004.severity = warning
 dotnet_diagnostic.BIG2005.severity = warning
 dotnet_diagnostic.BIG2006.severity = warning
+dotnet_diagnostic.BIG2007.severity = warning
 dotnet_diagnostic.BIG9000.severity = none
 ```
 
-Defaults keep interprocedural and recursion analysis enabled, `max_call_depth` at `5`, `max_methods_per_root` at `32`, `maximum_complexity` at `none`, `maximum_cyclomatic_complexity` unset, `cyclomatic_complexity_mode` at `standard`, and all nesting/method-size/parameter thresholds unset. Threshold reporting only applies to the configured metric.
+Defaults keep interprocedural and recursion analysis enabled, `max_call_depth` at `5`, `max_methods_per_root` at `32`, `maximum_complexity` at `none`, `maximum_cyclomatic_complexity` unset, `cyclomatic_complexity_mode` at `standard`, and all nesting/method-size/parameter/cognitive thresholds unset. Threshold reporting only applies to the configured metric.
 
 See [Configuration](docs/en/configuration.md).
 

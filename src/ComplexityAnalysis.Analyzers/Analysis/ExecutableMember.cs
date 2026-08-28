@@ -60,8 +60,7 @@ internal sealed class ExecutableMember
 
     internal bool SupportsDirectRecursion
         => Kind is not ExecutableMemberKind.Lambda
-            and not ExecutableMemberKind.AnonymousMethod
-            and not ExecutableMemberKind.ExpressionBodiedProperty;
+            and not ExecutableMemberKind.AnonymousMethod;
 
     internal static bool TryCreate(
         SyntaxNode node,
