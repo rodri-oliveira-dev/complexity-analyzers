@@ -9,10 +9,8 @@ internal sealed class HalsteadClassificationResult
     private HalsteadClassificationResult()
     {
         Elements = ImmutableArray<HalsteadElement>.Empty;
-        DistinctOperatorCount = 0;
-        DistinctOperandCount = 0;
-        TotalOperatorCount = 0;
-        TotalOperandCount = 0;
+        PrimitiveCounts = default;
+        Metrics = new HalsteadMetrics(PrimitiveCounts);
     }
 
     internal HalsteadClassificationResult(IEnumerable<HalsteadElement> elements)
@@ -40,10 +38,12 @@ internal sealed class HalsteadClassificationResult
         }
 
         Elements = immutableElements;
-        DistinctOperatorCount = operatorIdentities.Count;
-        DistinctOperandCount = operandIdentities.Count;
-        TotalOperatorCount = totalOperators;
-        TotalOperandCount = totalOperands;
+        PrimitiveCounts = new HalsteadPrimitiveCounts(
+            operatorIdentities.Count,
+            operandIdentities.Count,
+            totalOperators,
+            totalOperands);
+        Metrics = new HalsteadMetrics(PrimitiveCounts);
     }
 
     internal static HalsteadClassificationResult Empty
@@ -55,21 +55,23 @@ internal sealed class HalsteadClassificationResult
     }
 
     internal int DistinctOperatorCount
-    {
-        get;
-    }
+        => PrimitiveCounts.DistinctOperatorCount;
 
     internal int DistinctOperandCount
-    {
-        get;
-    }
+        => PrimitiveCounts.DistinctOperandCount;
 
     internal int TotalOperatorCount
+        => PrimitiveCounts.TotalOperatorCount;
+
+    internal int TotalOperandCount
+        => PrimitiveCounts.TotalOperandCount;
+
+    internal HalsteadPrimitiveCounts PrimitiveCounts
     {
         get;
     }
 
-    internal int TotalOperandCount
+    internal HalsteadMetrics Metrics
     {
         get;
     }

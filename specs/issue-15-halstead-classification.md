@@ -21,6 +21,41 @@ N1 = total operators
 N2 = total operands
 ```
 
+Derived metrics use the following project convention:
+
+```text
+vocabulary                  n = n1 + n2
+length                      N = N1 + N2
+calculated length           N^ = n1 * log2(n1) + n2 * log2(n2)
+volume                      V = N * log2(n)
+difficulty                  D = (n1 / 2) * (N2 / n2)
+effort                      E = D * V
+estimated implementation time T = E / 18
+estimated delivered bugs    B = V / 3000
+```
+
+The implementation uses `double` for derived formulas and does not round
+intermediate values. Text formatting of internal Halstead metric values uses
+the invariant culture and the round-trip `G17` format so the same value has the
+same representation regardless of machine locale. Future diagnostics may choose
+their own centralized display precision without changing these internal values.
+
+Primitive counts must be non-negative, and a distinct count cannot exceed its
+matching total count. Degenerate formulas have explicit deterministic values:
+
+- the `x * log2(x)` contribution used by calculated length is `0` when `x` is
+  `0` or `1`; this preserves the limiting behavior for `0` and the exact
+  logarithmic result for `1`;
+- volume is `0` when vocabulary is `0` or `1`, because empty and single-symbol
+  vocabularies carry no logarithmic information under this convention;
+- difficulty is `0` when `n1 = 0` or `n2 = 0`, because there is no operator
+  vocabulary or no operand vocabulary from which to compute the operand ratio;
+- effort, implementation time, and delivered bugs are derived from those safe
+  values and therefore remain finite and non-negative.
+
+No public Halstead result may expose `NaN`, positive infinity, or negative
+infinity.
+
 The metric is source-based, deterministic, and C#-specific. Comments,
 preprocessor directives, whitespace, formatting, and syntax trivia do not
 contribute to any count.
