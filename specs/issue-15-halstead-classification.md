@@ -2,10 +2,10 @@
 
 ## Specification
 
-This slice defines the `ComplexityAnalysis.Analyzers` C# Halstead
-classification convention and the internal domain model used to represent
-classified elements. It does not add diagnostics, configuration, formulas,
-thresholds, maintainability index calculation, or project-level aggregation.
+This specification defines the `ComplexityAnalysis.Analyzers` C# Halstead
+classification convention, primitive-count model, derived metric model, and
+internal executable-member integration. It does not add public diagnostics,
+configuration, maintainability index calculation, or project-level aggregation.
 
 Halstead metrics are independent from Big-O, Cyclomatic Complexity, Maximum
 Control-Flow Nesting Depth, NLOC, statement count, token count, Parameter Count,
@@ -352,21 +352,31 @@ exposes the four primitive counts:
 - `TotalOperatorCount` (`N1`);
 - `TotalOperandCount` (`N2`).
 
-The model does not own Roslyn traversal, diagnostics, configuration, thresholds,
-derived formulas, package metadata, release tracking, or public analyzer
-behavior.
+The model owns primitive counts and derived formulas. `HalsteadClassificationAnalyzer`
+owns executable-member Roslyn classification. `HalsteadMetricsAnalyzer` is the
+small integration layer that combines classification with formulas for callers
+that need the final metric object.
 
-## Prompt 2 Deferrals
+## Public Threshold Decision
 
-The executable Roslyn classifier is intentionally deferred. Prompt 2 should map
-Roslyn syntax nodes/tokens to this domain model, preserve cancellation support,
-reuse `ExecutableMemberSyntax`, and add representative classifier tests proving
-the documented operator and operand treatment against real C# syntax.
+No public Halstead threshold diagnostic is introduced for issue #15.
 
-Derived Halstead formulas, numeric formatting, threshold diagnostics,
-configuration keys, release notes, analyzer catalog entries, and public
-English/Portuguese user documentation remain deferred until their respective
-implementation slices.
+The existing diagnostic philosophy requires actionable, evidence-backed rules.
+Halstead values are useful as reproducible metric data, but common derived
+values such as volume, difficulty, effort, implementation time, and estimated
+bugs are sensitive to classification conventions and do not provide one
+project-independent maintainability boundary that is clear enough for a public
+diagnostic. A diagnostic added only for symmetry with other metrics would create
+a noisy public contract without defensible guidance.
+
+Consequences:
+
+- no `BIG2xxx` ID is allocated for Halstead;
+- no `complexity_analyzers.maximum_halstead_*` configuration key is added;
+- `AnalyzerReleases.Unshipped.md` is unchanged for Halstead because no public
+  diagnostic/configuration contract changed;
+- Halstead remains an internal metric capability for future reporting or
+  project-level tooling.
 
 ## Validation Plan
 

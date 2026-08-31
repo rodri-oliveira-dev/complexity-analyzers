@@ -27,6 +27,7 @@ análise de executable member
     +-- extração de recursão direta
     +-- resolução de recorrências
     +-- métricas estruturais de fluxo de controle
+    +-- métricas Halstead C# primitivas e derivadas
     |
     v
 modelo de complexidade
@@ -137,9 +138,10 @@ O modelo suporta:
 Quando o analyzer não consegue comprovar um resultado seguro, o modelo preserva `Unknown` em vez de forçar uma classe de complexidade estimada.
 
 Cyclomatic Complexity, Maximum Control-Flow Nesting Depth e Cognitive Complexity
-são métricas estruturais inteiras separadas. Elas são calculadas a partir do
-fluxo de controle do executable member e não são combinadas com o modelo de
-complexidade Big-O nem entre si.
+são métricas estruturais inteiras separadas. Métricas Halstead são uma
+capacidade separada de classificação de tokens de fonte, com valores primitivos
+e derivados. Essas métricas são calculadas a partir da sintaxe do executable
+member e não são combinadas com o modelo de complexidade Big-O nem entre si.
 
 ## Análise com Roslyn
 
@@ -164,6 +166,7 @@ Alguns componentes representativos são:
 - `CyclomaticComplexityAnalyzer` para pontuação estrutural de complexidade de caminhos, independente do Big-O.
 - `MaximumNestingDepthAnalyzer` para pontuação de profundidade máxima de nesting de fluxo de controle, independente de Big-O e Cyclomatic Complexity.
 - `CognitiveComplexityCalculator` para o score documentado de compreensão estrutural, independente de Big-O, Cyclomatic Complexity e Maximum Nesting Depth.
+- `HalsteadMetricsAnalyzer` para contagens primitivas C# específicas e valores Halstead derivados, independentes de Big-O e dos diagnósticos públicos de threshold.
 
 O analyzer não exige um call graph completo da compilation ou da solution.
 Constructs executáveis aninhados são analisados como raízes próprias. Um membro
@@ -279,6 +282,10 @@ Veja [Configuração](configuration.md) para detalhes.
 - `BIG9000` como probe de execução opt-in.
 
 A análise de código gerado é desabilitada e a execução concorrente do analyzer é habilitada.
+Métricas Halstead são, por enquanto, apenas uma capacidade interna de análise;
+nenhum ID de diagnóstico Halstead público nem chave de configuração é exposto
+porque o projeto ainda não adotou um threshold de manutenibilidade defensável
+para uma única métrica Halstead derivada.
 
 Veja o [Catálogo de Analyzers](analyzers.md) para o comportamento de cada regra.
 
