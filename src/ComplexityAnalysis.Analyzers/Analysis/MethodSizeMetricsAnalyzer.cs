@@ -34,50 +34,85 @@ internal sealed class MethodSizeMetricsAnalyzer
             ? member.SyntaxTree.GetText(cancellationToken)
             : null;
         HashSet<int>? nlocLines = countNloc ? [] : null;
-        int statementCount = countStatements && member.Body.Expression is not null ? 1 : 0;
-        int tokenCount = 0;
-
-        if (countStatements)
-        {
-            foreach (StatementSyntax statement in ExecutableMemberSyntax.DescendantNodesInOwnBody<StatementSyntax>(member))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (statement is not BlockSyntax)
-                {
-                    statementCount = AddSaturating(statementCount, 1);
-                }
-            }
-        }
-
-        if (countNloc || countTokens)
-        {
-            foreach (SyntaxToken syntaxToken in ExecutableMemberSyntax.DescendantTokensInOwnBody(member))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (syntaxToken.IsMissing || syntaxToken.IsKind(SyntaxKind.EndOfFileToken))
-                {
-                    continue;
-                }
-
-                if (countTokens)
-                {
-                    tokenCount = AddSaturating(tokenCount, 1);
-                }
-
-                if (countNloc && IsNlocRelevantToken(syntaxToken))
-                {
-                    AddTokenLines(nlocLines!, sourceText!, syntaxToken);
-                }
-            }
-        }
+        int statementCount = CountStatements(member, countStatements, cancellationToken);
+        int tokenCount = CountTokensAndNloc(
+            member,
+            countTokens,
+            nlocLines,
+            sourceText,
+            cancellationToken);
 
         result = new MethodSizeMetricsResult(
             nlocLines?.Count ?? 0,
             statementCount,
             tokenCount);
         return true;
+    }
+
+    private static int CountStatements(
+        ExecutableMember member,
+        bool countStatements,
+        CancellationToken cancellationToken)
+    {
+        if (!countStatements)
+        {
+            return 0;
+        }
+
+        int statementCount = member.Body.Expression is not null ? 1 : 0;
+        foreach (StatementSyntax statement in ExecutableMemberSyntax.DescendantNodesInOwnBody<StatementSyntax>(member))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (statement is not BlockSyntax)
+            {
+                statementCount = AddSaturating(statementCount, 1);
+            }
+        }
+
+        return statementCount;
+    }
+
+    private static int CountTokensAndNloc(
+        ExecutableMember member,
+        bool countTokens,
+        HashSet<int>? nlocLines,
+        SourceText? sourceText,
+        CancellationToken cancellationToken)
+    {
+        bool countNloc = nlocLines is not null;
+        if (!countTokens && !countNloc)
+        {
+            return 0;
+        }
+
+        int tokenCount = 0;
+        foreach (SyntaxToken syntaxToken in ExecutableMemberSyntax.DescendantTokensInOwnBody(member))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (ShouldIgnoreToken(syntaxToken))
+            {
+                continue;
+            }
+
+            if (countTokens)
+            {
+                tokenCount = AddSaturating(tokenCount, 1);
+            }
+
+            if (countNloc && IsNlocRelevantToken(syntaxToken))
+            {
+                AddTokenLines(nlocLines!, sourceText!, syntaxToken);
+            }
+        }
+
+        return tokenCount;
+    }
+
+    private static bool ShouldIgnoreToken(SyntaxToken syntaxToken)
+    {
+        return syntaxToken.IsMissing || syntaxToken.IsKind(SyntaxKind.EndOfFileToken);
     }
 
     private static void AddTokenLines(
