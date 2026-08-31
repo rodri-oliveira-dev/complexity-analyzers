@@ -139,7 +139,7 @@ jobs:
           global-json-file: global.json
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -344,7 +344,7 @@ jobs:
 
       - name: Comment Sonar failure on PR
         if: ${{ always() && failure() && github.event_name == 'pull_request' && ((steps.sonar_end.outcome == 'failure' && steps.sonar_quality_gate.outputs.status == 'ERROR') || steps.sonar_quality_gate.outputs.lookup_failed == 'true') }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require("fs");
@@ -389,7 +389,7 @@ jobs:
 
       - name: Comment Sonar success on PR
         if: ${{ success() && github.event_name == 'pull_request' && steps.sonar_quality_gate.outputs.status == 'OK' && steps.sonar_quality_gate.outputs.lookup_failed == 'false' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require("fs");
