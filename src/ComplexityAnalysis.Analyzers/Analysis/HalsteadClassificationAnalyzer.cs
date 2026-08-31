@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using System.Threading;
 
 using Microsoft.CodeAnalysis;
@@ -11,10 +12,11 @@ namespace ComplexityAnalysis.Analyzers.Analysis;
 
 #pragma warning disable IDE0010, IDE0072 // The classifier deliberately maps only supported SyntaxKind subsets.
 #pragma warning disable IDE0046 // Explicit branches keep literal type canonicalization easy to scan.
+#pragma warning disable S1479 // The wide switch is the explicit SyntaxKind-to-Halstead classification table.
 
-internal sealed class HalsteadClassificationAnalyzer
+internal static class HalsteadClassificationAnalyzer
 {
-    internal bool TryAnalyze(
+    internal static bool TryAnalyze(
         ExecutableMember member,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -690,16 +692,16 @@ internal sealed class HalsteadClassificationAnalyzer
         InterpolatedStringExpressionSyntax interpolatedString,
         List<HalsteadElement> elements)
     {
-        string literalText = string.Empty;
+        StringBuilder literalText = new();
         foreach (InterpolatedStringContentSyntax content in interpolatedString.Contents)
         {
             if (content is InterpolatedStringTextSyntax text)
             {
-                literalText += text.TextToken.ValueText;
+                _ = literalText.Append(text.TextToken.ValueText);
             }
         }
 
-        AddOperand(elements, HalsteadOperandKind.StringLiteral, "string:" + literalText);
+        AddOperand(elements, HalsteadOperandKind.StringLiteral, "string:" + literalText.ToString());
     }
 
     private static void AddTypeOperand(

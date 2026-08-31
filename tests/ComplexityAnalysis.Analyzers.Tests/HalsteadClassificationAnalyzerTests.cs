@@ -301,6 +301,362 @@ public sealed class HalsteadClassificationAnalyzerTests
     }
 
     [Fact]
+    public void Expression_operator_families_are_classified()
+    {
+        HalsteadClassificationResult result = AnalyzeMethod(
+            """
+            public sealed class Sample
+            {
+                private event System.Action? Changed;
+
+                void M(int[] values, bool flag)
+                {
+                    int value = 8;
+                    int other = 2;
+                    int add = value + other;
+                    int subtract = value - other;
+                    int multiply = value * other;
+                    int divide = value / other;
+                    int modulo = value % other;
+                    bool comparisons = value == other || value != other || value < other || value <= other || value > other || value >= other;
+                    bool logical = flag && comparisons || !flag;
+                    int bitwise = (value & other) | (value ^ other);
+                    int shifted = (value << 1) + (value >> 1) + (value >>> 1);
+                    value += 1;
+                    value -= 1;
+                    value *= 2;
+                    value /= 2;
+                    value %= 2;
+                    value &= 3;
+                    value |= 4;
+                    value ^= 5;
+                    value <<= 1;
+                    value >>= 1;
+                    value >>>= 1;
+                    string? text = null;
+                    text ??= "fallback";
+                    int positive = +value;
+                    int negative = -value;
+                    int complement = ~value;
+                    ++value;
+                    --value;
+                    value++;
+                    value--;
+                    int conditional = flag ? value : other;
+                    Helper implicitObject = new();
+                    Helper explicitObject = new Helper();
+                    int[] array = new int[] { 1, 2 };
+                    int[] implicitArray = new[] { 1, 2 };
+                    int member = explicitObject.Value;
+                    int? maybeMember = explicitObject?.Value;
+                    int element = values[0];
+                    int fromEnd = values[^1];
+                    System.Func<int, int, int> combine = (left, right) => left + right;
+                    Publisher publisher = new Publisher();
+                    publisher.Changed += Handler;
+                    publisher.Changed -= Handler;
+                    Changed += Handler;
+                    Changed -= Handler;
+                    Changed?.Invoke();
+                    Consume(add, subtract, multiply, divide, modulo, logical, bitwise, shifted, text, positive, negative, complement, conditional, implicitObject, array, implicitArray, member, maybeMember, element, fromEnd, combine, publisher);
+                }
+
+                void Handler()
+                {
+                }
+
+                void Consume(params object?[] values)
+                {
+                }
+
+                private sealed class Helper
+                {
+                    public int Value { get; set; }
+                }
+
+                private sealed class Publisher
+                {
+                    public event System.Action? Changed;
+                }
+            }
+            """);
+
+        HalsteadOperatorKind[] expectedOperators =
+        [
+            HalsteadOperatorKind.Add,
+            HalsteadOperatorKind.Subtract,
+            HalsteadOperatorKind.Multiply,
+            HalsteadOperatorKind.Divide,
+            HalsteadOperatorKind.Modulo,
+            HalsteadOperatorKind.Equal,
+            HalsteadOperatorKind.NotEqual,
+            HalsteadOperatorKind.LessThan,
+            HalsteadOperatorKind.LessThanOrEqual,
+            HalsteadOperatorKind.GreaterThan,
+            HalsteadOperatorKind.GreaterThanOrEqual,
+            HalsteadOperatorKind.LogicalAnd,
+            HalsteadOperatorKind.LogicalOr,
+            HalsteadOperatorKind.LogicalNot,
+            HalsteadOperatorKind.BitwiseAnd,
+            HalsteadOperatorKind.BitwiseOr,
+            HalsteadOperatorKind.ExclusiveOr,
+            HalsteadOperatorKind.LeftShift,
+            HalsteadOperatorKind.RightShift,
+            HalsteadOperatorKind.UnsignedRightShift,
+            HalsteadOperatorKind.AddAssignment,
+            HalsteadOperatorKind.SubtractAssignment,
+            HalsteadOperatorKind.MultiplyAssignment,
+            HalsteadOperatorKind.DivideAssignment,
+            HalsteadOperatorKind.ModuloAssignment,
+            HalsteadOperatorKind.AndAssignment,
+            HalsteadOperatorKind.OrAssignment,
+            HalsteadOperatorKind.ExclusiveOrAssignment,
+            HalsteadOperatorKind.LeftShiftAssignment,
+            HalsteadOperatorKind.RightShiftAssignment,
+            HalsteadOperatorKind.UnsignedRightShiftAssignment,
+            HalsteadOperatorKind.NullCoalescingAssignment,
+            HalsteadOperatorKind.UnaryPlus,
+            HalsteadOperatorKind.UnaryMinus,
+            HalsteadOperatorKind.BitwiseNot,
+            HalsteadOperatorKind.PreIncrement,
+            HalsteadOperatorKind.PreDecrement,
+            HalsteadOperatorKind.PostIncrement,
+            HalsteadOperatorKind.PostDecrement,
+            HalsteadOperatorKind.Conditional,
+            HalsteadOperatorKind.ImplicitObjectCreation,
+            HalsteadOperatorKind.ObjectCreation,
+            HalsteadOperatorKind.ArrayCreation,
+            HalsteadOperatorKind.MemberAccess,
+            HalsteadOperatorKind.ConditionalAccess,
+            HalsteadOperatorKind.ElementAccess,
+            HalsteadOperatorKind.Index,
+            HalsteadOperatorKind.Invocation,
+            HalsteadOperatorKind.LambdaOrExpressionBody,
+        ];
+
+        foreach (HalsteadOperatorKind expectedOperator in expectedOperators)
+        {
+            Assert.True(
+                CountOperator(result, expectedOperator) > 0,
+                $"Expected operator '{expectedOperator}' to be classified.");
+        }
+
+        Assert.True(CountOperandKind(result, HalsteadOperandKind.Event) > 0);
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.Parameter, "parameter:left"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.Parameter, "parameter:right"));
+    }
+
+    [Fact]
+    public void Control_flow_statement_families_are_classified()
+    {
+        HalsteadClassificationResult result = AnalyzeMethod(
+            """
+            public sealed class Sample
+            {
+                int M(int[] values, object input)
+                {
+                    int total = 0;
+                    if (values.Length > 0)
+                    {
+                        total++;
+                    }
+                    else
+                    {
+                        total--;
+                    }
+
+                    for (int i = 0; i < values.Length; i++)
+                    {
+                        if (i == 2)
+                        {
+                            continue;
+                        }
+
+                        total += i;
+                    }
+
+                    foreach (int item in values)
+                    {
+                        total += item;
+                        break;
+                    }
+
+                    while (total < 10)
+                    {
+                        total++;
+                    }
+
+                    do
+                    {
+                        total--;
+                    }
+                    while (total > 5);
+
+                    switch (total)
+                    {
+                        case 0 when values.Length == 0:
+                            goto done;
+                        case 1:
+                            total += 2;
+                            break;
+                        default:
+                            total += 1;
+                            break;
+                    }
+
+                    try
+                    {
+                        using (Disposable disposable = new Disposable())
+                        {
+                            lock (disposable)
+                            {
+                                checked
+                                {
+                                    total += checked(total + 1);
+                                }
+                            }
+                        }
+
+                        using Disposable another = new Disposable();
+                        object required = input ?? throw new System.ArgumentNullException(nameof(input));
+                        if (required is string)
+                        {
+                            throw new System.InvalidOperationException();
+                        }
+                    }
+                    catch (System.InvalidOperationException ex)
+                    {
+                        total += ex.Message.Length;
+                    }
+                    finally
+                    {
+                        total += 1;
+                    }
+
+                done:
+                    return total;
+                }
+
+                private sealed class Disposable : System.IDisposable
+                {
+                    public void Dispose()
+                    {
+                    }
+                }
+            }
+            """);
+
+        HalsteadOperatorKind[] expectedOperators =
+        [
+            HalsteadOperatorKind.If,
+            HalsteadOperatorKind.Else,
+            HalsteadOperatorKind.For,
+            HalsteadOperatorKind.Foreach,
+            HalsteadOperatorKind.While,
+            HalsteadOperatorKind.Do,
+            HalsteadOperatorKind.Switch,
+            HalsteadOperatorKind.Case,
+            HalsteadOperatorKind.Default,
+            HalsteadOperatorKind.When,
+            HalsteadOperatorKind.Try,
+            HalsteadOperatorKind.Catch,
+            HalsteadOperatorKind.Finally,
+            HalsteadOperatorKind.Break,
+            HalsteadOperatorKind.Continue,
+            HalsteadOperatorKind.Goto,
+            HalsteadOperatorKind.Using,
+            HalsteadOperatorKind.Lock,
+            HalsteadOperatorKind.Checked,
+            HalsteadOperatorKind.Throw,
+            HalsteadOperatorKind.Return,
+        ];
+
+        foreach (HalsteadOperatorKind expectedOperator in expectedOperators)
+        {
+            Assert.True(
+                CountOperator(result, expectedOperator) > 0,
+                $"Expected operator '{expectedOperator}' to be classified.");
+        }
+
+        Assert.True(CountOperand(result, HalsteadOperandKind.Local, "local:item") > 0);
+        Assert.True(CountOperand(result, HalsteadOperandKind.Local, "local:ex") > 0);
+    }
+
+    [Fact]
+    public void Literal_pattern_and_type_expression_families_are_classified()
+    {
+        HalsteadClassificationResult result = AnalyzeMethod(
+            """
+            public sealed class Sample
+            {
+                int M(object input)
+                {
+                    byte b = 1;
+                    sbyte sb = 2;
+                    short s = 3;
+                    ushort us = 4;
+                    uint ui = 5u;
+                    long l = 6L;
+                    ulong ul = 7UL;
+                    float f = 8.5f;
+                    double d = 9.5d;
+                    decimal m = 10.5m;
+                    char c = 'c';
+                    bool t = true;
+                    bool ff = false;
+                    object? n = null;
+                    Consume("utf8"u8);
+                    _ = typeof(string);
+                    _ = sizeof(int);
+                    _ = default(decimal);
+                    _ = (long)42;
+                    bool isString = input is string;
+                    return input switch
+                    {
+                        int number when number is < 0 or <= 1 or >= 3 => number,
+                        string { Length: > 0 } => 1,
+                        null => 0,
+                        _ => -1
+                    };
+                }
+
+                void Consume(System.ReadOnlySpan<byte> value)
+                {
+                }
+            }
+            """);
+
+        Assert.True(CountOperator(result, HalsteadOperatorKind.Switch) > 0);
+        Assert.True(CountOperator(result, HalsteadOperatorKind.SwitchArm) > 0);
+        Assert.True(CountOperator(result, HalsteadOperatorKind.When) > 0);
+        Assert.True(CountOperator(result, HalsteadOperatorKind.Is) > 0);
+        Assert.True(CountOperator(result, HalsteadOperatorKind.PatternOr) > 0);
+        Assert.True(CountOperator(result, HalsteadOperatorKind.LessThan) > 0);
+        Assert.True(CountOperator(result, HalsteadOperatorKind.LessThanOrEqual) > 0);
+        Assert.True(CountOperator(result, HalsteadOperatorKind.GreaterThan) > 0);
+        Assert.True(CountOperator(result, HalsteadOperatorKind.GreaterThanOrEqual) > 0);
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.CharacterLiteral, "char:c"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.BooleanLiteral, "bool:true"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.BooleanLiteral, "bool:false"));
+        Assert.True(CountOperand(result, HalsteadOperandKind.NullLiteral, "null") > 0);
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.StringLiteral, "string:utf8"));
+        Assert.True(CountOperand(result, HalsteadOperandKind.Discard, "discard:_") > 0);
+        Assert.True(CountOperand(result, HalsteadOperandKind.Property, "property:Length") > 0);
+        Assert.True(CountOperand(result, HalsteadOperandKind.PatternVariable, "pattern:number") > 0);
+        Assert.True(CountOperand(result, HalsteadOperandKind.TypeName, "type:string") > 0);
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "byte:1"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "sbyte:2"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "short:3"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "ushort:4"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "uint:5"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "long:6"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "ulong:7"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "float:8.5"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "double:9.5"));
+        Assert.Equal(1, CountOperand(result, HalsteadOperandKind.NumericLiteral, "decimal:10.5"));
+    }
+
+    [Fact]
     public void Empty_executable_member_reports_zero_primitive_counts()
     {
         HalsteadClassificationResult result = AnalyzeMethod(
@@ -328,7 +684,7 @@ public sealed class HalsteadClassificationAnalyzerTests
             """);
         ExecutableMember member = CreateMembers(facts).Single();
 
-        bool analyzed = new HalsteadClassificationAnalyzer().TryAnalyze(
+        bool analyzed = HalsteadClassificationAnalyzer.TryAnalyze(
             member,
             facts.SemanticModel,
             CancellationToken.None,
@@ -355,7 +711,7 @@ public sealed class HalsteadClassificationAnalyzerTests
         cancellation.Cancel();
 
         OperationCanceledException exception = Assert.Throws<OperationCanceledException>(() =>
-            new HalsteadClassificationAnalyzer().TryAnalyze(
+            HalsteadClassificationAnalyzer.TryAnalyze(
                 member,
                 facts.SemanticModel,
                 cancellation.Token,
@@ -376,7 +732,7 @@ public sealed class HalsteadClassificationAnalyzerTests
         ExecutableMember member,
         CompilationFacts facts)
     {
-        bool analyzed = new HalsteadClassificationAnalyzer().TryAnalyze(
+        bool analyzed = HalsteadClassificationAnalyzer.TryAnalyze(
             member,
             facts.SemanticModel,
             CancellationToken.None,
@@ -453,6 +809,15 @@ public sealed class HalsteadClassificationAnalyzerTests
         string canonicalValue)
     {
         return result.Elements.Count(element => EqualsOperand(element, kind, canonicalValue));
+    }
+
+    private static int CountOperandKind(
+        HalsteadClassificationResult result,
+        HalsteadOperandKind kind)
+    {
+        return result.Elements.Count(element =>
+            element.Role == HalsteadElementRole.Operand
+            && element.Identity.Kind == kind.ToString());
     }
 
     private static bool EqualsOperand(

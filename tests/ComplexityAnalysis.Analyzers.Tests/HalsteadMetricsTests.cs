@@ -232,6 +232,36 @@ public sealed class HalsteadMetricsTests
                 totalOperandCount));
     }
 
+    [Fact]
+    public void Primitive_counts_use_value_equality_and_hash_codes()
+    {
+        HalsteadPrimitiveCounts first = new(2, 3, 4, 5);
+        HalsteadPrimitiveCounts second = new(2, 3, 4, 5);
+        HalsteadPrimitiveCounts different = new(2, 3, 4, 6);
+
+        Assert.Equal(first, second);
+        Assert.True(first.Equals((object)second));
+        Assert.NotEqual(first, different);
+        Assert.False(first.Equals((object)different));
+        Assert.False(first.Equals("not counts"));
+        Assert.Equal(first.GetHashCode(), second.GetHashCode());
+    }
+
+    [Fact]
+    public void Metrics_use_value_equality_and_hash_codes_from_primitive_counts()
+    {
+        HalsteadMetrics first = HalsteadMetrics.FromPrimitiveCounts(2, 3, 4, 5);
+        HalsteadMetrics second = HalsteadMetrics.FromPrimitiveCounts(2, 3, 4, 5);
+        HalsteadMetrics different = HalsteadMetrics.FromPrimitiveCounts(2, 3, 4, 6);
+
+        Assert.Equal(first, second);
+        Assert.True(first.Equals((object)second));
+        Assert.NotEqual(first, different);
+        Assert.False(first.Equals((object)different));
+        Assert.False(first.Equals("not metrics"));
+        Assert.Equal(first.GetHashCode(), second.GetHashCode());
+    }
+
     private static void AssertZeroDerivedMetrics(HalsteadMetrics metrics)
     {
         Assert.Equal(0, metrics.Vocabulary);
@@ -281,7 +311,7 @@ public sealed class HalsteadMetricsTests
             .Single(method => method.Identifier.ValueText == "M")
             .PipeToExecutableMember(semanticModel);
 
-        bool analyzed = new HalsteadClassificationAnalyzer().TryAnalyze(
+        bool analyzed = HalsteadClassificationAnalyzer.TryAnalyze(
             member,
             semanticModel,
             CancellationToken.None,

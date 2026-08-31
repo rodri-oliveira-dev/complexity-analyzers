@@ -90,15 +90,7 @@ internal readonly struct HalsteadMetrics : IEquatable<HalsteadMetrics>
 
     public bool Equals(HalsteadMetrics other)
     {
-        return PrimitiveCounts.Equals(other.PrimitiveCounts)
-            && Vocabulary == other.Vocabulary
-            && Length == other.Length
-            && CalculatedLength.Equals(other.CalculatedLength)
-            && Volume.Equals(other.Volume)
-            && Difficulty.Equals(other.Difficulty)
-            && Effort.Equals(other.Effort)
-            && EstimatedImplementationTime.Equals(other.EstimatedImplementationTime)
-            && EstimatedDeliveredBugs.Equals(other.EstimatedDeliveredBugs);
+        return PrimitiveCounts.Equals(other.PrimitiveCounts);
     }
 
     public override bool Equals(object? obj)
@@ -108,19 +100,7 @@ internal readonly struct HalsteadMetrics : IEquatable<HalsteadMetrics>
 
     public override int GetHashCode()
     {
-        unchecked
-        {
-            int hash = PrimitiveCounts.GetHashCode();
-            hash = (hash * 397) ^ Vocabulary.GetHashCode();
-            hash = (hash * 397) ^ Length.GetHashCode();
-            hash = (hash * 397) ^ CalculatedLength.GetHashCode();
-            hash = (hash * 397) ^ Volume.GetHashCode();
-            hash = (hash * 397) ^ Difficulty.GetHashCode();
-            hash = (hash * 397) ^ Effort.GetHashCode();
-            hash = (hash * 397) ^ EstimatedImplementationTime.GetHashCode();
-            hash = (hash * 397) ^ EstimatedDeliveredBugs.GetHashCode();
-            return hash;
-        }
+        return PrimitiveCounts.GetHashCode();
     }
 
     public override string ToString()

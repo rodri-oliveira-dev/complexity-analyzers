@@ -79,7 +79,7 @@ public sealed class HalsteadMetricsAnalyzerTests
             """);
         ExecutableMember member = CreateMembers(facts).Single();
 
-        bool analyzed = new HalsteadMetricsAnalyzer().TryAnalyze(
+        bool analyzed = HalsteadMetricsAnalyzer.TryAnalyze(
             member,
             facts.SemanticModel,
             CancellationToken.None,
@@ -107,7 +107,7 @@ public sealed class HalsteadMetricsAnalyzerTests
         cancellation.Cancel();
 
         OperationCanceledException exception = Assert.Throws<OperationCanceledException>(() =>
-            new HalsteadMetricsAnalyzer().TryAnalyze(
+            HalsteadMetricsAnalyzer.TryAnalyze(
                 member,
                 facts.SemanticModel,
                 cancellation.Token,
@@ -398,7 +398,7 @@ public sealed class HalsteadMetricsAnalyzerTests
         ExecutableMember member,
         CompilationFacts facts)
     {
-        bool analyzed = new HalsteadMetricsAnalyzer().TryAnalyze(
+        bool analyzed = HalsteadMetricsAnalyzer.TryAnalyze(
             member,
             facts.SemanticModel,
             CancellationToken.None,

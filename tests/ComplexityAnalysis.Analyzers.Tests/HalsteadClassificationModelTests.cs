@@ -131,4 +131,13 @@ public sealed class HalsteadClassificationModelTests
         _ = Assert.Throws<ArgumentException>(() =>
             HalsteadElementIdentity.ForOperand(HalsteadOperandKind.Identifier, string.Empty));
     }
+
+    [Fact]
+    public void Identity_object_equality_handles_non_identity_instances()
+    {
+        HalsteadElementIdentity identity = HalsteadElementIdentity.ForOperator(HalsteadOperatorKind.Return);
+
+        Assert.False(identity.Equals(null));
+        Assert.False(identity.Equals("return"));
+    }
 }

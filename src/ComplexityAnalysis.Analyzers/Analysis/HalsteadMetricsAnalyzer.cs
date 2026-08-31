@@ -5,9 +5,9 @@ using Microsoft.CodeAnalysis;
 
 namespace ComplexityAnalysis.Analyzers.Analysis;
 
-internal sealed class HalsteadMetricsAnalyzer
+internal static class HalsteadMetricsAnalyzer
 {
-    internal bool TryAnalyze(
+    internal static bool TryAnalyze(
         ExecutableMember member,
         SemanticModel semanticModel,
         CancellationToken cancellationToken,
@@ -18,7 +18,7 @@ internal sealed class HalsteadMetricsAnalyzer
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        bool analyzed = new HalsteadClassificationAnalyzer().TryAnalyze(
+        bool analyzed = HalsteadClassificationAnalyzer.TryAnalyze(
             member,
             semanticModel,
             cancellationToken,
