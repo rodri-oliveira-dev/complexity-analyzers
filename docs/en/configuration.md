@@ -297,6 +297,10 @@ The compiler and SDK determine the exact build behavior for each severity.
 
 `BIG2007` is enabled by default as a descriptor, but it remains functionally inactive until `complexity_analyzers.maximum_cognitive_complexity` is set.
 
+There is no public Halstead threshold option. Halstead metrics are currently an
+internal capability for future reporting/tooling, and no single derived
+Halstead value has been adopted as an evidence-backed maintainability threshold.
+
 ## Common settings
 
 Enable method estimates:
@@ -354,6 +358,6 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## What is not configurable
 
-The analyzer does not expose options for custom operation mappings, custom cyclomatic decision-point rules beyond the documented switch mode, custom method-size counting conventions, custom parameter-count conventions, custom Cognitive Complexity scoring conventions, BCL/LINQ mapping behavior, recurrence-family selection, theorem tolerances, whole-solution analysis, code fixes, memory complexity, parallel complexity, or probabilistic complexity.
+The analyzer does not expose options for custom operation mappings, custom cyclomatic decision-point rules beyond the documented switch mode, custom method-size counting conventions, custom parameter-count conventions, custom Cognitive Complexity scoring conventions, custom Halstead classification or Halstead thresholds, BCL/LINQ mapping behavior, recurrence-family selection, theorem tolerances, whole-solution analysis, code fixes, memory complexity, parallel complexity, or probabilistic complexity.
 
 Unsupported or unresolved operations remain `Unknown`; there is no option that converts them into a known complexity class.

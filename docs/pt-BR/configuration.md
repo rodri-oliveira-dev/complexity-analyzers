@@ -304,6 +304,11 @@ O compilador e o SDK determinam o comportamento exato do build para cada severid
 
 `BIG2007` é habilitado por padrão como descriptor, mas permanece funcionalmente inativo até que `complexity_analyzers.maximum_cognitive_complexity` seja configurado.
 
+Não há opção pública de threshold Halstead. As métricas Halstead são atualmente
+uma capacidade interna para reporting/tooling futuros, e nenhum valor Halstead
+derivado único foi adotado como threshold de manutenibilidade sustentado por
+evidência.
+
 ## Configurações comuns
 
 Habilite estimativas por método:
@@ -361,6 +366,6 @@ dotnet_diagnostic.BIG9000.severity = none
 
 ## O que não é configurável
 
-O analyzer não expõe opções para mappings customizados de operações, regras customizadas de decision points ciclomáticos além do modo de `switch` documentado, convenções customizadas para métricas de tamanho, convenções customizadas de Parameter Count, convenções customizadas de Cognitive Complexity, comportamento dos mappings BCL/LINQ, seleção de famílias de recorrência, tolerâncias de teoremas, análise de solution inteira, code fixes, complexidade de memória, complexidade paralela ou complexidade probabilística.
+O analyzer não expõe opções para mappings customizados de operações, regras customizadas de decision points ciclomáticos além do modo de `switch` documentado, convenções customizadas para métricas de tamanho, convenções customizadas de Parameter Count, convenções customizadas de Cognitive Complexity, classificação Halstead customizada ou thresholds Halstead, comportamento dos mappings BCL/LINQ, seleção de famílias de recorrência, tolerâncias de teoremas, análise de solution inteira, code fixes, complexidade de memória, complexidade paralela ou complexidade probabilística.
 
 Operações não suportadas ou não resolvidas permanecem `Unknown`; não existe opção para convertê-las em uma classe de complexidade conhecida.

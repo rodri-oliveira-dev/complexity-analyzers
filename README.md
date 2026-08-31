@@ -57,6 +57,7 @@ Want to see the analyzer in action? See the [runnable sample](samples/Complexity
 - Measures NLOC, statement count, and token count as independent executable-member size metrics.
 - Measures source-declared Parameter Count independently from all complexity and size metrics.
 - Measures Cognitive Complexity as an independent documented C# control-flow comprehension metric.
+- Defines internal C# Halstead metrics for future reporting/tooling without emitting a public Halstead threshold diagnostic yet.
 - Supports configurable analysis budgets and a maximum-complexity threshold through `.editorconfig`/analyzer config.
 - Runs as a normal Roslyn analyzer during builds and IDE analysis; consumer code does not call the analyzer at runtime.
 
@@ -253,6 +254,7 @@ See [Architecture](docs/en/architecture.md).
 - [Analyzer Catalog](docs/en/analyzers.md)
 - [Architecture](docs/en/architecture.md)
 - [Configuration](docs/en/configuration.md)
+- [C# Halstead Metrics](docs/en/halstead-metrics.md)
 - [Runnable sample](samples/ComplexityAnalysis.Sample/README.md)
 - [Release Quality Governance](docs/en/development/quality-gates.md)
 - [Documentação em português](README.pt-BR.md)

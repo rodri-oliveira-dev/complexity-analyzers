@@ -57,6 +57,7 @@ Quer ver o analyzer em ação? Consulte o [sample executável](samples/Complexit
 - Mede NLOC, statement count e token count como métricas independentes de tamanho de executable member.
 - Mede Parameter Count source-declared independentemente das métricas de complexidade e tamanho.
 - Mede Cognitive Complexity como métrica C# documentada e independente de compreensão de fluxo de controle.
+- Define métricas Halstead C# internas para reporting/tooling futuros sem emitir ainda um diagnóstico público de threshold Halstead.
 - Permite configurar budgets de análise e um limite máximo de complexidade via `.editorconfig`/analyzer config.
 - Executa como um Roslyn Analyzer normal durante build e análise na IDE; o código consumidor não chama o analyzer em runtime.
 
@@ -253,6 +254,7 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 - [Catálogo de Analyzers](docs/pt-BR/analyzers.md)
 - [Arquitetura](docs/pt-BR/architecture.md)
 - [Configuração](docs/pt-BR/configuration.md)
+- [Métricas Halstead para C#](docs/pt-BR/halstead-metrics.md)
 - [Sample executável](samples/ComplexityAnalysis.Sample/README.md)
 - [Governança de Qualidade de Release](docs/pt-BR/development/quality-gates.md)
 - [Documentation in English](README.md)

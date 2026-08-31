@@ -60,6 +60,29 @@ dentro de um método é analisada separadamente; o pai só a inclui quando um
 caminho de invocação suportado comprova execução. Variáveis capturadas não são
 tratadas como parâmetros independentes de tamanho de entrada.
 
+## Métricas Halstead C# Internas
+
+O projeto define uma capacidade interna de métricas Halstead C# para executable
+members suportados. Ela registra as contagens primitivas `n1`, `n2`, `N1` e
+`N2` e deriva vocabulário, comprimento, comprimento calculado, volume,
+dificuldade, esforço, tempo estimado de implementação e bugs entregues estimados
+pela convenção documentada do projeto.
+
+Métricas Halstead são independentes de Big-O, Cyclomatic Complexity, Maximum
+Nesting Depth, métricas de tamanho, Parameter Count e Cognitive Complexity.
+Bodies executáveis aninhados são isolados pelas mesmas regras de ownership
+descritas acima, e comentários/trivia não contribuem.
+
+Ainda não há diagnóstico público de threshold Halstead. O projeto não adotou uma
+única métrica Halstead derivada cujo threshold seja suficientemente claro e
+defensável como guidance de manutenibilidade para projetos C# em geral.
+Portanto, nenhum ID `BIG2xxx`, propriedade de diagnóstico ou chave de
+configuração do analyzer é reservado para Halstead nesta fatia de release.
+
+Veja [Métricas Halstead para C#](halstead-metrics.md) para a convenção
+reproduzível de classificação e fórmulas. Nenhuma equivalência numérica exata é
+alegada com Lizard, Visual Studio ou outra implementação.
+
 ## Convenção de Explicabilidade
 
 Diagnósticos acionáveis seguem esta convenção quando há evidência disponível:

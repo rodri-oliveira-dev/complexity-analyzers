@@ -58,6 +58,29 @@ declared inside a method is analyzed separately; the parent includes it only whe
 a supported invocation path proves execution. Captured variables are not treated
 as independent input-size parameters.
 
+## Internal C# Halstead Metrics
+
+The project defines an internal C# Halstead metric capability for supported
+executable members. It records `n1`, `n2`, `N1`, and `N2` primitive counts and
+derives vocabulary, length, calculated length, volume, difficulty, effort,
+estimated implementation time, and estimated delivered bugs using the documented
+project convention.
+
+Halstead metrics are independent from Big-O, Cyclomatic Complexity, Maximum
+Nesting Depth, method-size metrics, Parameter Count, and Cognitive Complexity.
+Nested executable bodies are isolated by the same ownership rules described
+above, and comments/trivia do not contribute.
+
+No public Halstead threshold diagnostic is exposed yet. The project has not
+adopted a single derived Halstead metric whose threshold is sufficiently clear
+and defensible as maintainability guidance across C# projects. Therefore no
+`BIG2xxx` ID, diagnostic property, or analyzer configuration key is reserved for
+Halstead in this release slice.
+
+See [C# Halstead Metrics](halstead-metrics.md) for the reproducible
+classification and formula convention. No exact numerical equivalence is claimed
+with Lizard, Visual Studio, or another implementation.
+
 ## Explainability Convention
 
 Actionable diagnostics follow this convention when evidence is available:

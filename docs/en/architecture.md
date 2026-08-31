@@ -27,6 +27,7 @@ Executable-member analysis
     +-- direct-recursion extraction
     +-- recurrence solving
     +-- structural control-flow metrics
+    +-- C# Halstead primitive and derived metrics
     |
     v
 Complexity model
@@ -137,9 +138,10 @@ The model supports:
 When the analyzer cannot prove a safe result, the model preserves `Unknown` rather than coercing the operation to a guessed complexity class.
 
 Cyclomatic Complexity, Maximum Control-Flow Nesting Depth, and Cognitive
-Complexity are separate integer structural metrics. They are computed from
-executable-member control flow and are not combined with the Big-O complexity
-model or with each other.
+Complexity are separate integer structural metrics. Halstead metrics are a
+separate source-token classification capability with primitive and derived
+values. These metrics are computed from executable-member syntax and are not
+combined with the Big-O complexity model or with each other.
 
 ## Roslyn analysis
 
@@ -164,6 +166,7 @@ Representative components include:
 - `CyclomaticComplexityAnalyzer` for structural path-complexity scoring that stays independent from Big-O.
 - `MaximumNestingDepthAnalyzer` for maximum control-flow nesting depth scoring that stays independent from Big-O and Cyclomatic Complexity.
 - `CognitiveComplexityCalculator` for the documented structural comprehension score that stays independent from Big-O, Cyclomatic Complexity, and Maximum Nesting Depth.
+- `HalsteadMetricsAnalyzer` for C#-specific primitive counts and derived Halstead values that stay independent from Big-O and the public threshold diagnostics.
 
 The analyzer does not require a whole-compilation or whole-solution call graph.
 Nested executable constructs are analyzed as their own roots. A parent member does
@@ -278,6 +281,10 @@ See [Configuration](configuration.md) for details.
 - `BIG9000` as an opt-in execution probe.
 
 Generated-code analysis is disabled and concurrent analyzer execution is enabled.
+Halstead metrics are currently internal analysis capability only; no public
+Halstead diagnostic ID or configuration key is exposed because the project has
+not adopted a defensible maintainability threshold for a single derived
+Halstead metric.
 
 See the [Analyzer Catalog](analyzers.md) for rule-level behavior.
 
