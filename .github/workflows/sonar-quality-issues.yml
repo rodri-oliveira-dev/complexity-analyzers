@@ -38,7 +38,7 @@ jobs:
           fi
 
       - name: Sync Sonar findings to GitHub issues
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
