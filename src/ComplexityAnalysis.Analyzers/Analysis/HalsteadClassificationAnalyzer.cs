@@ -108,6 +108,9 @@ internal static class HalsteadClassificationAnalyzer
             case MemberBindingExpressionSyntax memberBinding:
                 AddSymbolOrIdentifierOperand(memberBinding.Name, semanticModel, elements, cancellationToken);
                 break;
+            case GenericNameSyntax genericName when !IsSimpleNameInTypeSyntax(genericName):
+                ClassifyGenericName(genericName, semanticModel, elements, cancellationToken);
+                break;
             case ObjectCreationExpressionSyntax objectCreation:
                 AddOperator(elements, HalsteadOperatorKind.ObjectCreation);
                 AddTypeOperand(objectCreation.Type, semanticModel, elements, cancellationToken);
@@ -120,6 +123,12 @@ internal static class HalsteadClassificationAnalyzer
                 AddTypeOperand(arrayCreation.Type.ElementType, semanticModel, elements, cancellationToken);
                 break;
             case ImplicitArrayCreationExpressionSyntax:
+                AddOperator(elements, HalsteadOperatorKind.ArrayCreation);
+                break;
+            case StackAllocArrayCreationExpressionSyntax stackAllocArrayCreation:
+                ClassifyStackAllocArrayCreation(stackAllocArrayCreation, semanticModel, elements, cancellationToken);
+                break;
+            case ImplicitStackAllocArrayCreationExpressionSyntax:
                 AddOperator(elements, HalsteadOperatorKind.ArrayCreation);
                 break;
             case EqualsValueClauseSyntax equalsValue when equalsValue.Parent is VariableDeclaratorSyntax:
@@ -169,6 +178,9 @@ internal static class HalsteadClassificationAnalyzer
             case ForEachStatementSyntax forEachStatement:
                 AddOperator(elements, HalsteadOperatorKind.Foreach);
                 AddDeclaredSymbolOperand(forEachStatement, semanticModel, elements, cancellationToken);
+                break;
+            case ForEachVariableStatementSyntax:
+                AddOperator(elements, HalsteadOperatorKind.Foreach);
                 break;
             case WhileStatementSyntax:
                 AddOperator(elements, HalsteadOperatorKind.While);
@@ -225,9 +237,11 @@ internal static class HalsteadClassificationAnalyzer
             case FixedStatementSyntax:
                 AddOperator(elements, HalsteadOperatorKind.Fixed);
                 break;
-            case CheckedStatementSyntax:
-            case CheckedExpressionSyntax:
-                AddOperator(elements, HalsteadOperatorKind.Checked);
+            case CheckedStatementSyntax checkedStatement:
+                ClassifyCheckedOrUnchecked(checkedStatement, elements);
+                break;
+            case CheckedExpressionSyntax checkedExpression:
+                ClassifyCheckedOrUnchecked(checkedExpression, elements);
                 break;
             case VariableDeclarationSyntax variableDeclaration:
                 ClassifyVariableDeclaration(variableDeclaration, semanticModel, elements, cancellationToken);
@@ -254,7 +268,7 @@ internal static class HalsteadClassificationAnalyzer
             case InterpolatedStringExpressionSyntax interpolatedString:
                 ClassifyInterpolatedString(interpolatedString, elements);
                 break;
-            case IdentifierNameSyntax identifierName when !IsIdentifierNameInTypeSyntax(identifierName):
+            case IdentifierNameSyntax identifierName when !IsSimpleNameInTypeSyntax(identifierName):
                 AddSymbolOrIdentifierOperand(identifierName, semanticModel, elements, cancellationToken);
                 break;
             case NameColonSyntax nameColon:
@@ -293,6 +307,20 @@ internal static class HalsteadClassificationAnalyzer
                 break;
             default:
                 break;
+        }
+    }
+
+    private static void ClassifyGenericName(
+        GenericNameSyntax genericName,
+        SemanticModel semanticModel,
+        List<HalsteadElement> elements,
+        CancellationToken cancellationToken)
+    {
+        AddSymbolOrIdentifierOperand(genericName, semanticModel, elements, cancellationToken);
+        foreach (TypeSyntax typeArgument in genericName.TypeArgumentList.Arguments)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            AddTypeOperand(typeArgument, semanticModel, elements, cancellationToken);
         }
     }
 
@@ -514,6 +542,17 @@ internal static class HalsteadClassificationAnalyzer
         }
     }
 
+    private static void ClassifyCheckedOrUnchecked(
+        SyntaxNode node,
+        List<HalsteadElement> elements)
+    {
+        AddOperator(
+            elements,
+            node.IsKind(SyntaxKind.UncheckedStatement) || node.IsKind(SyntaxKind.UncheckedExpression)
+                ? HalsteadOperatorKind.Unchecked
+                : HalsteadOperatorKind.Checked);
+    }
+
     private static void ClassifyVariableDeclaration(
         VariableDeclarationSyntax variableDeclaration,
         SemanticModel semanticModel,
@@ -524,6 +563,22 @@ internal static class HalsteadClassificationAnalyzer
         {
             AddTypeOperand(variableDeclaration.Type, semanticModel, elements, cancellationToken);
         }
+    }
+
+    private static void ClassifyStackAllocArrayCreation(
+        StackAllocArrayCreationExpressionSyntax stackAllocArrayCreation,
+        SemanticModel semanticModel,
+        List<HalsteadElement> elements,
+        CancellationToken cancellationToken)
+    {
+        AddOperator(elements, HalsteadOperatorKind.ArrayCreation);
+        if (stackAllocArrayCreation.Type is ArrayTypeSyntax arrayType)
+        {
+            AddTypeOperand(arrayType.ElementType, semanticModel, elements, cancellationToken);
+            return;
+        }
+
+        AddTypeOperand(stackAllocArrayCreation.Type, semanticModel, elements, cancellationToken);
     }
 
     private static void ClassifyCatchDeclaration(
@@ -811,9 +866,9 @@ internal static class HalsteadClassificationAnalyzer
         }
     }
 
-    private static bool IsIdentifierNameInTypeSyntax(IdentifierNameSyntax identifierName)
+    private static bool IsSimpleNameInTypeSyntax(SimpleNameSyntax simpleName)
     {
-        for (SyntaxNode? current = identifierName.Parent; current is not null; current = current.Parent)
+        for (SyntaxNode? current = simpleName.Parent; current is not null; current = current.Parent)
         {
             if (current is TypeSyntax)
             {

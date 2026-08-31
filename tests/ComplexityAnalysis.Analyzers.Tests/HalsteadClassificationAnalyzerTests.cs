@@ -514,6 +514,11 @@ public sealed class HalsteadClassificationAnalyzerTests
                                 {
                                     total += checked(total + 1);
                                 }
+
+                                unchecked
+                                {
+                                    total += unchecked(total + int.MaxValue);
+                                }
                             }
                         }
 
@@ -567,6 +572,7 @@ public sealed class HalsteadClassificationAnalyzerTests
             HalsteadOperatorKind.Using,
             HalsteadOperatorKind.Lock,
             HalsteadOperatorKind.Checked,
+            HalsteadOperatorKind.Unchecked,
             HalsteadOperatorKind.Throw,
             HalsteadOperatorKind.Return,
         ];
@@ -580,6 +586,85 @@ public sealed class HalsteadClassificationAnalyzerTests
 
         Assert.True(CountOperand(result, HalsteadOperandKind.Local, "local:item") > 0);
         Assert.True(CountOperand(result, HalsteadOperandKind.Local, "local:ex") > 0);
+    }
+
+    [Fact]
+    public void Foreach_with_deconstruction_variable_counts_foreach_operator_and_variables()
+    {
+        HalsteadClassificationResult result = AnalyzeMethod(
+            """
+            public sealed class Sample
+            {
+                int M((int Key, int Value)[] entries)
+                {
+                    int total = 0;
+                    foreach (var (key, value) in entries)
+                    {
+                        total += key + value;
+                    }
+
+                    return total;
+                }
+            }
+            """);
+
+        Assert.True(CountOperator(result, HalsteadOperatorKind.Foreach) > 0);
+        Assert.True(CountOperand(result, HalsteadOperandKind.Local, "local:key") > 0);
+        Assert.True(CountOperand(result, HalsteadOperandKind.Local, "local:value") > 0);
+    }
+
+    [Fact]
+    public void Generic_invocation_names_and_explicit_type_arguments_are_classified()
+    {
+        HalsteadClassificationResult result = AnalyzeMethod(
+            """
+            public sealed class Sample
+            {
+                int M(Service service)
+                {
+                    int parsed = Parse<int>("1");
+                    string mapped = service.Map<string>(parsed);
+                    return parsed + mapped.Length;
+                }
+
+                static T Parse<T>(string value)
+                {
+                    return default!;
+                }
+
+                sealed class Service
+                {
+                    public T Map<T>(int value)
+                    {
+                        return default!;
+                    }
+                }
+            }
+            """);
+
+        Assert.True(CountOperator(result, HalsteadOperatorKind.Invocation) >= 2);
+        Assert.True(CountOperandKind(result, HalsteadOperandKind.Method) >= 2);
+        Assert.True(CountOperand(result, HalsteadOperandKind.TypeName, "type:int") > 0);
+        Assert.True(CountOperand(result, HalsteadOperandKind.TypeName, "type:string") > 0);
+    }
+
+    [Fact]
+    public void Stackalloc_array_creation_counts_array_operator_and_element_type()
+    {
+        HalsteadClassificationResult result = AnalyzeMethod(
+            """
+            public sealed class Sample
+            {
+                int M()
+                {
+                    System.Span<int> buffer = stackalloc int[32];
+                    return buffer[0];
+                }
+            }
+            """);
+
+        Assert.True(CountOperator(result, HalsteadOperatorKind.ArrayCreation) > 0);
+        Assert.True(CountOperand(result, HalsteadOperandKind.TypeName, "type:int") > 0);
     }
 
     [Fact]
