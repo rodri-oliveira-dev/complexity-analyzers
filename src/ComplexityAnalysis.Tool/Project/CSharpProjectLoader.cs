@@ -14,6 +14,8 @@ namespace ComplexityAnalysis.Tool.Project;
 
 internal static class CSharpProjectLoader
 {
+    private static readonly TimeSpan GlobRegexTimeout = TimeSpan.FromMilliseconds(200);
+
     private static readonly string[] BuildOutputDirectories =
     [
         "bin",
@@ -160,7 +162,10 @@ internal static class CSharpProjectLoader
         string relativePattern = lastSeparatorBeforeWildcard >= 0
             ? pattern[(lastSeparatorBeforeWildcard + 1)..]
             : pattern;
-        Regex regex = new("^" + GlobToRegex(relativePattern) + "$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        Regex regex = new(
+            "^" + GlobToRegex(relativePattern) + "$",
+            RegexOptions.CultureInvariant | RegexOptions.IgnoreCase,
+            GlobRegexTimeout);
         return Directory.EnumerateFiles(searchRoot, "*.cs", SearchOption.AllDirectories)
             .Where(path => regex.IsMatch(PathUtilities.Normalize(Path.GetRelativePath(searchRoot, path))));
     }

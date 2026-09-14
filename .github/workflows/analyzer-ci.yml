@@ -90,9 +90,15 @@ jobs:
             throw "OpenCover report does not contain production assembly ComplexityAnalysis.Analyzers."
           }
 
+          if ($moduleNames -notcontains "ComplexityAnalysis.Tool") {
+            throw "OpenCover report does not contain production assembly ComplexityAnalysis.Tool."
+          }
+
           $productionSourceFound = @($sourceFiles | Where-Object {
             $_ -like "*src/ComplexityAnalysis.Analyzers*" -or
-            $_ -like "*src\\ComplexityAnalysis.Analyzers*"
+            $_ -like "*src\\ComplexityAnalysis.Analyzers*" -or
+            $_ -like "*src/ComplexityAnalysis.Tool*" -or
+            $_ -like "*src\\ComplexityAnalysis.Tool*"
           }).Count -gt 0
 
           if (-not $productionSourceFound) {
@@ -207,9 +213,15 @@ jobs:
             throw "OpenCover report does not contain production assembly ComplexityAnalysis.Analyzers."
           }
 
+          if ($moduleNames -notcontains "ComplexityAnalysis.Tool") {
+            throw "OpenCover report does not contain production assembly ComplexityAnalysis.Tool."
+          }
+
           $productionSourceFound = @($sourceFiles | Where-Object {
             $_ -like "*src/ComplexityAnalysis.Analyzers*" -or
-            $_ -like "*src\\ComplexityAnalysis.Analyzers*"
+            $_ -like "*src\\ComplexityAnalysis.Analyzers*" -or
+            $_ -like "*src/ComplexityAnalysis.Tool*" -or
+            $_ -like "*src\\ComplexityAnalysis.Tool*"
           }).Count -gt 0
 
           if (-not $productionSourceFound) {

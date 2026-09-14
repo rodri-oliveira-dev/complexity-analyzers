@@ -5,7 +5,7 @@
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
           <Format>opencover</Format>
-          <Include>[ComplexityAnalysis.Analyzers]*</Include>
+          <Include>[ComplexityAnalysis.Analyzers]*,[ComplexityAnalysis.Tool]*</Include>
           <Exclude>[ComplexityAnalysis.Analyzers.Tests]*</Exclude>
           <IncludeTestAssembly>false</IncludeTestAssembly>
           <UseSourceLink>false</UseSourceLink>
