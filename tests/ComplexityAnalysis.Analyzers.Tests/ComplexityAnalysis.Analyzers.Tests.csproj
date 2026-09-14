@@ -16,5 +16,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ComplexityAnalysis.Analyzers\ComplexityAnalysis.Analyzers.csproj" />
+    <ProjectReference Include="..\..\src\ComplexityAnalysis.Tool\ComplexityAnalysis.Tool.csproj" />
   </ItemGroup>
 </Project>

@@ -23,6 +23,16 @@ O analyzer deve permanecer:
 
 Código gerado permanece excluído da análise de syntax nodes.
 
+A análise em nível de projeto de `ComplexityAnalysis.Tool` é medida
+separadamente dos hot paths do compiler analyzer. Relatórios agregados e
+detecção de duplicados podem escanear arquivos de projeto porque rodam como um
+comando CLI explícito, não dentro de callbacks do Roslyn analyzer. A detecção
+de duplicados usa janelas fixas de tokens normalizados, índice por fingerprint,
+verificação de sequência para candidatos de hash e supressão determinística de
+overlap. O armazenamento esperado é linear na quantidade de tokens
+normalizados, e a verificação de candidatos fica limitada aos buckets de
+fingerprints repetidos em vez de todas as substrings.
+
 ## Workloads
 
 A baseline usa quatro grupos de workload.

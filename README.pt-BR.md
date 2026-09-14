@@ -58,6 +58,7 @@ Quer ver o analyzer em ação? Consulte o [sample executável](samples/Complexit
 - Mede Parameter Count source-declared independentemente das métricas de complexidade e tamanho.
 - Mede Cognitive Complexity como métrica C# documentada e independente de compreensão de fluxo de controle.
 - Define métricas Halstead C# internas para reporting/tooling futuros sem emitir ainda um diagnóstico público de threshold Halstead.
+- Fornece uma CLI separada em nível de projeto para relatórios console/JSON determinísticos, quality gates opt-in e detecção normalizada de código duplicado fora dos hot paths do analyzer.
 - Permite configurar budgets de análise e um limite máximo de complexidade via `.editorconfig`/analyzer config.
 - Executa como um Roslyn Analyzer normal durante build e análise na IDE; o código consumidor não chama o analyzer em runtime.
 
@@ -174,6 +175,23 @@ O repositório também documenta criação e consumo local do pacote. Se você e
 
 Veja [Primeiros Passos](docs/pt-BR/getting-started.md).
 
+## CLI em nível de projeto
+
+O repositório inclui `ComplexityAnalysis.Tool` para relatórios em nível de projeto:
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze ComplexityAnalysis.Analyzers.slnx --format json --detect-duplicates
+```
+
+A CLI suporta entradas `.csproj`, `.slnx` e `.sln`, relatórios console e JSON
+determinísticos, quality gates opt-in, exclusão de código gerado/outputs de
+build e detecção normalizada de código duplicado. Ela é separada do pacote
+Roslyn analyzer; nenhum scan de projeto é adicionado aos hot paths de
+`DiagnosticAnalyzer`.
+
+Veja [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md).
+
 ## Configuração
 
 O comportamento do analyzer pode ser configurado pelo Roslyn analyzer config. As severidades dos diagnósticos continuam usando as entradas padrão `dotnet_diagnostic.<RULE_ID>.severity`.
@@ -255,6 +273,7 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 - [Arquitetura](docs/pt-BR/architecture.md)
 - [Configuração](docs/pt-BR/configuration.md)
 - [Métricas Halstead para C#](docs/pt-BR/halstead-metrics.md)
+- [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md)
 - [Sample executável](samples/ComplexityAnalysis.Sample/README.md)
 - [Governança de Qualidade de Release](docs/pt-BR/development/quality-gates.md)
 - [Documentation in English](README.md)
