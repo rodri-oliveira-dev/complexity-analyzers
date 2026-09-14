@@ -395,6 +395,7 @@ internal sealed class ToolOptions
         }
 
         if (!double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
+            || !double.IsFinite(value)
             || value < 0)
         {
             error = option + " must be a non-negative number.";

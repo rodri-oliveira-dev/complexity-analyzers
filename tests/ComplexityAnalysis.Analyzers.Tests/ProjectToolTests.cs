@@ -191,6 +191,237 @@ public sealed class ProjectToolTests
     }
 
     [Fact]
+    public void Tool_options_parse_all_supported_switches()
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), "complexity-tool-output.json");
+
+        bool parsed = ToolOptions.TryParse(
+            [
+                "analyze",
+                "Fixture.csproj",
+                "--format",
+                "console",
+                "--output",
+                outputPath,
+                "--include-generated",
+                "--include-build-output",
+                "--detect-duplicates",
+                "--min-duplicate-tokens",
+                "12",
+                "--min-duplicate-lines",
+                "3",
+                "--max-complexity",
+                "quadratic",
+                "--max-cyclomatic-complexity",
+                "4",
+                "--max-nesting-depth",
+                "2",
+                "--max-method-nloc",
+                "20",
+                "--max-statement-count",
+                "30",
+                "--max-token-count",
+                "100",
+                "--max-parameters",
+                "5",
+                "--max-cognitive-complexity",
+                "8",
+                "--max-duplicate-rate",
+                "12.5",
+                "--max-duplicate-tokens",
+                "50",
+            ],
+            out ToolOptions? options,
+            out string? error);
+
+        Assert.True(parsed);
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.Equal(ReportFormat.Console, options.Format);
+        Assert.Equal(Path.GetFullPath(outputPath), options.OutputPath);
+        Assert.True(options.IncludeGenerated);
+        Assert.True(options.IncludeBuildOutput);
+        Assert.True(options.DetectDuplicates);
+        Assert.Equal(12, options.MinimumDuplicateTokens);
+        Assert.Equal(3, options.MinimumDuplicateLines);
+        Assert.Equal("n2", options.MaximumComplexity);
+        Assert.Equal(4, options.MaximumCyclomaticComplexity);
+        Assert.Equal(2, options.MaximumNestingDepth);
+        Assert.Equal(20, options.MaximumMethodNloc);
+        Assert.Equal(30, options.MaximumStatementCount);
+        Assert.Equal(100, options.MaximumTokenCount);
+        Assert.Equal(5, options.MaximumParameters);
+        Assert.Equal(8, options.MaximumCognitiveComplexity);
+        Assert.Equal(12.5, options.MaximumDuplicateRate);
+        Assert.Equal(50, options.MaximumDuplicateTokens);
+    }
+
+    [Theory]
+    [InlineData()]
+    [InlineData("inspect", "Fixture.csproj")]
+    [InlineData("analyze", "Fixture.csproj", "--format", "xml")]
+    [InlineData("analyze", "Fixture.csproj", "--format")]
+    [InlineData("analyze", "Fixture.csproj", "--unknown")]
+    [InlineData("analyze", "Fixture.csproj", "--min-duplicate-tokens", "0")]
+    [InlineData("analyze", "Fixture.csproj", "--max-nesting-depth", "-1")]
+    [InlineData("analyze", "Fixture.csproj", "--max-duplicate-rate", "NaN")]
+    public void Tool_options_reject_invalid_command_lines(params string[] args)
+    {
+        bool parsed = ToolOptions.TryParse(args, out ToolOptions? options, out string? error);
+
+        Assert.False(parsed);
+        Assert.Null(options);
+        Assert.False(string.IsNullOrWhiteSpace(error));
+    }
+
+    [Fact]
+    public void Quality_gate_evaluator_applies_metric_and_duplicate_thresholds()
+    {
+        Assert.True(ToolOptions.TryParse(
+            [
+                "analyze",
+                "Fixture.csproj",
+                "--max-complexity",
+                "n",
+                "--max-cyclomatic-complexity",
+                "3",
+                "--max-nesting-depth",
+                "1",
+                "--max-method-nloc",
+                "10",
+                "--max-statement-count",
+                "20",
+                "--max-token-count",
+                "40",
+                "--max-parameters",
+                "2",
+                "--max-cognitive-complexity",
+                "5",
+                "--max-duplicate-rate",
+                "10",
+                "--max-duplicate-tokens",
+                "15",
+            ],
+            out ToolOptions? options,
+            out _));
+        ProjectReport report = CreateReportWithMember("M", "O(n log n)");
+        report.Projects[0].Files[0].Members[0] = new MemberReport
+        {
+            DisplayName = "M",
+            Kind = "method",
+            SymbolId = "M",
+            Location = Location("Alpha.cs"),
+            BigO = BigOReport.Known("O(n log n)"),
+            CyclomaticComplexity = MetricReport<int>.Known(4),
+            MaximumNestingDepth = MetricReport<int>.Known(2),
+            Nloc = MetricReport<int>.Known(11),
+            StatementCount = MetricReport<int>.Known(21),
+            TokenCount = MetricReport<int>.Known(41),
+            ParameterCount = MetricReport<int>.Known(3),
+            CognitiveComplexity = MetricReport<int>.Known(6),
+        };
+        report.Duplicates = new DuplicateSummaryReport
+        {
+            Enabled = true,
+            MinimumTokens = 10,
+            TotalNormalizedTokens = 100,
+            DuplicateTokenCount = 20,
+            DuplicateRate = MetricReport<double>.Known(20),
+        };
+
+        QualityGateEvaluator.Evaluate(report, options!);
+
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "bigO" && !gate.Passed);
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "cyclomaticComplexity" && !gate.Passed);
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "maximumNestingDepth" && !gate.Passed);
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "nloc" && !gate.Passed);
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "statementCount" && !gate.Passed);
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "tokenCount" && !gate.Passed);
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "parameterCount" && !gate.Passed);
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "cognitiveComplexity" && !gate.Passed);
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "duplicateRate" && !gate.Passed);
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "duplicateTokens" && !gate.Passed);
+    }
+
+    [Theory]
+    [InlineData("constant", "O(1)")]
+    [InlineData("log_n", "O(log n)")]
+    [InlineData("n", "O(n)")]
+    [InlineData("n_log_n", "O(n log n)")]
+    [InlineData("n2", "O(n^2)")]
+    [InlineData("n3", "O(n^3)")]
+    [InlineData("exponential", "O(2^n)")]
+    [InlineData("factorial", "O(n!)")]
+    public void Quality_gate_evaluator_accepts_supported_big_o_thresholds(string threshold, string actual)
+    {
+        Assert.True(ToolOptions.TryParse(
+            ["analyze", "Fixture.csproj", "--max-complexity", threshold],
+            out ToolOptions? options,
+            out _));
+        ProjectReport report = CreateReportWithMember("M", actual);
+
+        QualityGateEvaluator.Evaluate(report, options!);
+
+        Assert.Contains(report.QualityGates, gate => gate.Metric == "bigO" && gate.Passed);
+    }
+
+    [Fact]
+    public void Console_report_writer_renders_duplicate_and_quality_gate_sections()
+    {
+        ProjectReport report = CreateReportWithMember("M", "O(n)");
+        report.Projects[0].DuplicateRate = MetricReport<double>.Known(25);
+        report.Projects[0].Files[0].NormalizedTokenCount = 40;
+        report.Projects[0].Files[0].DuplicateTokenCount = 10;
+        report.Projects[0].Files[0].DuplicateRate = MetricReport<double>.Known(25);
+        CloneGroupReport group = new()
+        {
+            Id = "CLONE0001",
+            NormalizedTokenCount = 10,
+            OccurrenceCount = 2,
+            DuplicateTokenCount = 10,
+            DuplicatePercentage = MetricReport<double>.Known(25),
+        };
+        group.Occurrences.Add(new CloneOccurrenceReport
+        {
+            ProjectPath = "Fixture.csproj",
+            FilePath = "Alpha.cs",
+            Location = Location("Alpha.cs"),
+        });
+        group.Occurrences.Add(new CloneOccurrenceReport
+        {
+            ProjectPath = "Fixture.csproj",
+            FilePath = "Beta.cs",
+            Location = Location("Beta.cs"),
+        });
+        report.Duplicates = new DuplicateSummaryReport
+        {
+            Enabled = true,
+            MinimumTokens = 10,
+            MinimumLines = 2,
+            TotalNormalizedTokens = 40,
+            DuplicateTokenCount = 10,
+            DuplicateRate = MetricReport<double>.Known(25),
+        };
+        report.Duplicates.CloneGroups.Add(group);
+        report.QualityGates.Add(new QualityGateReport
+        {
+            Metric = "duplicateRate",
+            Subject = "project",
+            Threshold = "10",
+            Actual = "25",
+            Passed = false,
+        });
+
+        string output = new ConsoleReportWriter().Write(report);
+
+        Assert.Contains("Duplicates:", output, StringComparison.Ordinal);
+        Assert.Contains("CLONE0001: 10 tokens, 2 occurrences", output, StringComparison.Ordinal);
+        Assert.Contains("Alpha.cs:1:1", output, StringComparison.Ordinal);
+        Assert.Contains("Quality Gates:", output, StringComparison.Ordinal);
+        Assert.Contains("FAIL duplicateRate project actual=25 threshold=10", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Malformed_xml_inputs_return_documented_error_exit_code()
     {
         using FixtureProject fixture = FixtureProject.Create();
@@ -621,6 +852,55 @@ public sealed class ProjectToolTests
 
         _ = Assert.Throws<OperationCanceledException>(() =>
             detector.AddDuplicateReport(report, minimumTokens: 2, minimumLines: null, cancellation.Token));
+    }
+
+    private static ProjectReport CreateReportWithMember(string memberName, string bigO)
+    {
+        ProjectReport report = new()
+        {
+            EntryPoint = "Fixture.csproj",
+        };
+        AnalyzedProjectReport project = new()
+        {
+            Name = "Fixture",
+            Path = "Fixture.csproj",
+        };
+        AnalyzedFileReport file = new()
+        {
+            Path = "Alpha.cs",
+        };
+        file.Members.Add(new MemberReport
+        {
+            DisplayName = memberName,
+            Kind = "method",
+            SymbolId = memberName,
+            Location = Location("Alpha.cs"),
+            BigO = BigOReport.Known(bigO),
+            CyclomaticComplexity = MetricReport<int>.Known(1),
+            MaximumNestingDepth = MetricReport<int>.Known(0),
+            Nloc = MetricReport<int>.Known(1),
+            StatementCount = MetricReport<int>.Known(1),
+            TokenCount = MetricReport<int>.Known(1),
+            ParameterCount = MetricReport<int>.Known(0),
+            CognitiveComplexity = MetricReport<int>.Known(0),
+        });
+        project.Files.Add(file);
+        report.Projects.Add(project);
+        return report;
+    }
+
+    private static SourceLocationReport Location(string path)
+    {
+        return new SourceLocationReport
+        {
+            FilePath = path,
+            StartLine = 1,
+            StartColumn = 1,
+            EndLine = 1,
+            EndColumn = 10,
+            Start = 0,
+            Length = 10,
+        };
     }
 
     private static async Task<(int ExitCode, string Output, string Error)> RunCliAsync(params string[] args)
