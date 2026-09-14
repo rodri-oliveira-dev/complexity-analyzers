@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 
 using ComplexityAnalysis.Tool.Project;
 using ComplexityAnalysis.Tool.Reporting;
@@ -55,7 +56,7 @@ internal static class ComplexityToolApplication
             await error.WriteLineAsync("Analysis was canceled.");
             return ToolExitCodes.Canceled;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or XmlException)
         {
             await error.WriteLineAsync(ex.Message);
             return ToolExitCodes.Error;

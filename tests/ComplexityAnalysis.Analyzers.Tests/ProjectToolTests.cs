@@ -136,6 +136,179 @@ public sealed class ProjectToolTests
     }
 
     [Fact]
+    public async Task Big_o_quality_gate_recognizes_quadratic_notation_emitted_by_analyzer()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject();
+        fixture.WriteSource(
+            "Alpha.cs",
+            """
+            public sealed class Alpha
+            {
+                public int CountPairs(int[] values)
+                {
+                    var count = 0;
+                    for (var i = 0; i < values.Length; i++)
+                    {
+                        for (var j = 0; j < values.Length; j++)
+                        {
+                            count++;
+                        }
+                    }
+
+                    return count;
+                }
+            }
+            """);
+
+        (int exitCode, string output, string error) = await RunCliAsync(
+            "analyze",
+            fixture.ProjectPath,
+            "--max-complexity",
+            "linear");
+
+        Assert.Equal(ToolExitCodes.QualityGateFailed, exitCode);
+        Assert.Equal(string.Empty, error);
+        Assert.Contains("FAIL bigO CountPairs", output, StringComparison.Ordinal);
+        Assert.Contains("O(n\u00b2)", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Invalid_complexity_gate_is_rejected_during_option_parsing()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject();
+
+        (int exitCode, string output, string error) = await RunCliAsync(
+            "analyze",
+            fixture.ProjectPath,
+            "--max-complexity",
+            "typo");
+
+        Assert.Equal(ToolExitCodes.Error, exitCode);
+        Assert.Equal(string.Empty, output);
+        Assert.Contains("--max-complexity", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Malformed_xml_inputs_return_documented_error_exit_code()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        await File.WriteAllTextAsync(fixture.ProjectPath, "<Project>");
+        string slnxPath = Path.Combine(fixture.DirectoryPath, "Fixture.slnx");
+        await File.WriteAllTextAsync(slnxPath, "<Solution>");
+
+        (int projectExitCode, string projectOutput, string projectError) = await RunCliAsync(
+            "analyze",
+            fixture.ProjectPath);
+        (int solutionExitCode, string solutionOutput, string solutionError) = await RunCliAsync(
+            "analyze",
+            slnxPath);
+
+        Assert.Equal(ToolExitCodes.Error, projectExitCode);
+        Assert.Equal(ToolExitCodes.Error, solutionExitCode);
+        Assert.Equal(string.Empty, projectOutput);
+        Assert.Equal(string.Empty, solutionOutput);
+        Assert.NotEqual(string.Empty, projectError);
+        Assert.NotEqual(string.Empty, solutionError);
+    }
+
+    [Fact]
+    public async Task Explicit_compile_items_are_additive_when_implicit_compile_items_are_enabled()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject(
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <ImplicitUsings>enable</ImplicitUsings>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+              <ItemGroup>
+                <Compile Include="Linked/Linked.cs" />
+              </ItemGroup>
+            </Project>
+            """);
+        fixture.WriteSource("Alpha.cs", "public sealed class Alpha { public void M() { } }");
+        fixture.WriteSource("Linked/Linked.cs", "public sealed class Linked { public void M() { } }");
+
+        (int exitCode, string output, _) = await RunCliAsync(
+            "analyze",
+            fixture.ProjectPath,
+            "--format",
+            "json");
+
+        Assert.Equal(ToolExitCodes.Success, exitCode);
+        Assert.Contains("Alpha.cs", output, StringComparison.Ordinal);
+        Assert.Contains("Linked.cs", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Compile_remove_globs_respect_directory_segments()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject(
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <ImplicitUsings>enable</ImplicitUsings>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+              <ItemGroup>
+                <Compile Remove="Generated/**/*.cs" />
+              </ItemGroup>
+            </Project>
+            """);
+        fixture.WriteSource("Alpha.cs", "public sealed class Alpha { public void M() { } }");
+        fixture.WriteSource("Generated/GeneratedManual.cs", "public sealed class GeneratedManual { public void M() { } }");
+
+        (int exitCode, string output, _) = await RunCliAsync(
+            "analyze",
+            fixture.ProjectPath,
+            "--format",
+            "json",
+            "--include-generated");
+
+        Assert.Equal(ToolExitCodes.Success, exitCode);
+        Assert.Contains("Alpha.cs", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("GeneratedManual.cs", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Compile_include_globs_respect_directory_segments_when_default_compile_items_are_disabled()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject(
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+                <ImplicitUsings>enable</ImplicitUsings>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+              <ItemGroup>
+                <Compile Include="Sources/**/*.cs" />
+              </ItemGroup>
+            </Project>
+            """);
+        fixture.WriteSource("Alpha.cs", "public sealed class Alpha { public void M() { } }");
+        fixture.WriteSource("Sources/Beta.cs", "public sealed class Beta { public void M() { } }");
+
+        (int exitCode, string output, _) = await RunCliAsync(
+            "analyze",
+            fixture.ProjectPath,
+            "--format",
+            "json");
+
+        Assert.Equal(ToolExitCodes.Success, exitCode);
+        Assert.DoesNotContain("Alpha.cs", output, StringComparison.Ordinal);
+        Assert.Contains("Beta.cs", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Generated_code_and_build_outputs_are_excluded_by_default()
     {
         using FixtureProject fixture = FixtureProject.Create();
@@ -393,6 +566,63 @@ public sealed class ProjectToolTests
         Assert.Empty(report.Duplicates.CloneGroups);
     }
 
+    [Fact]
+    public void Duplicate_detector_checks_cancellation_while_indexing_repetitive_windows()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject();
+        fixture.WriteSource(
+            "Repetitive.cs",
+            """
+            public sealed class Repetitive
+            {
+                public int M()
+                {
+                    var value = 0;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    value++;
+                    return value;
+                }
+            }
+            """);
+        ProjectReport report = new()
+        {
+            EntryPoint = fixture.ProjectPath,
+        };
+        report.Projects.Add(new AnalyzedProjectReport
+        {
+            Name = "repetitive",
+            Path = fixture.ProjectPath,
+        });
+        report.Projects[0].Files.Add(new AnalyzedFileReport
+        {
+            Path = Path.Combine(fixture.DirectoryPath, "Repetitive.cs"),
+        });
+        using CancellationTokenSource cancellation = new();
+        DuplicateCodeDetector detector = new(new CancelingHasher(cancellation, cancelAfterHashes: 2));
+
+        _ = Assert.Throws<OperationCanceledException>(() =>
+            detector.AddDuplicateReport(report, minimumTokens: 2, minimumLines: null, cancellation.Token));
+    }
+
     private static async Task<(int ExitCode, string Output, string Error)> RunCliAsync(params string[] args)
     {
         return await RunCliAsync(CancellationToken.None, args);
@@ -415,6 +645,33 @@ public sealed class ProjectToolTests
             _ = tokens;
             _ = start;
             _ = length;
+            return 42;
+        }
+    }
+
+    private sealed class CancelingHasher : INormalizedSequenceHasher
+    {
+        private readonly CancellationTokenSource cancellation;
+        private readonly int cancelAfterHashes;
+        private int hashCount;
+
+        internal CancelingHasher(CancellationTokenSource cancellation, int cancelAfterHashes)
+        {
+            this.cancellation = cancellation;
+            this.cancelAfterHashes = cancelAfterHashes;
+        }
+
+        public ulong Hash(IReadOnlyList<NormalizedToken> tokens, int start, int length)
+        {
+            _ = tokens;
+            _ = start;
+            _ = length;
+            hashCount++;
+            if (hashCount >= cancelAfterHashes)
+            {
+                cancellation.Cancel();
+            }
+
             return 42;
         }
     }
@@ -446,8 +703,7 @@ public sealed class ProjectToolTests
 
         internal void WriteProject()
         {
-            File.WriteAllText(
-                ProjectPath,
+            WriteProject(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
@@ -457,6 +713,11 @@ public sealed class ProjectToolTests
                   </PropertyGroup>
                 </Project>
                 """);
+        }
+
+        internal void WriteProject(string project)
+        {
+            File.WriteAllText(ProjectPath, project);
         }
 
         internal void WriteSource(string relativePath, string source)

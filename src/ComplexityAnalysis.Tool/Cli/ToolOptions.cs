@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 
+using ComplexityAnalysis.Analyzers.Configuration;
+
 namespace ComplexityAnalysis.Tool.Cli;
 
 internal sealed class ToolOptions
@@ -199,7 +201,13 @@ internal sealed class ToolOptions
                         return false;
                     }
 
-                    parsed.MaximumComplexity = maximumComplexity;
+                    if (!TryParseMaximumComplexity(maximumComplexity, out string? normalizedComplexity))
+                    {
+                        error = current + " must be one of: constant, log_n, linear, n, n_log_n, quadratic, n2, cubic, n3, exponential, factorial.";
+                        return false;
+                    }
+
+                    parsed.MaximumComplexity = normalizedComplexity;
                     break;
                 case "--max-cyclomatic-complexity":
                     if (!TryReadPositiveInt(args, ref index, current, out int maximumCyclomaticComplexity, out error))
@@ -301,6 +309,32 @@ internal sealed class ToolOptions
 
         format = ReportFormat.Console;
         return false;
+    }
+
+    private static bool TryParseMaximumComplexity(string value, out string threshold)
+    {
+        string normalized = value.Trim().ToLowerInvariant();
+        ComplexityThreshold parsed = normalized switch
+        {
+            "constant" => ComplexityThreshold.Constant,
+            "log_n" => ComplexityThreshold.LogN,
+            "linear" or "n" => ComplexityThreshold.Linear,
+            "n_log_n" => ComplexityThreshold.NLogN,
+            "quadratic" or "n2" => ComplexityThreshold.Quadratic,
+            "cubic" or "n3" => ComplexityThreshold.Cubic,
+            "exponential" => ComplexityThreshold.Exponential,
+            "factorial" => ComplexityThreshold.Factorial,
+            _ => ComplexityThreshold.None,
+        };
+
+        if (!parsed.TryCreateExpression(out _))
+        {
+            threshold = string.Empty;
+            return false;
+        }
+
+        threshold = parsed.ToString();
+        return true;
     }
 
     private static bool TryReadPositiveInt(

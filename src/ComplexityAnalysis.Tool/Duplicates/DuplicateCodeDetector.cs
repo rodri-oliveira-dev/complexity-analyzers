@@ -17,6 +17,8 @@ namespace ComplexityAnalysis.Tool.Duplicates;
 
 internal sealed class DuplicateCodeDetector
 {
+    private const int MaximumAnchorsPerWindowGroup = 8;
+
     private readonly INormalizedSequenceHasher hasher;
 
     internal DuplicateCodeDetector()
@@ -191,6 +193,7 @@ internal sealed class DuplicateCodeDetector
             cancellationToken.ThrowIfCancellationRequested();
             for (int start = 0; start <= stream.Count - minimumTokens; start++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 ulong hash = hasher.Hash(stream, start, minimumTokens);
                 if (!index.TryGetValue(hash, out List<WindowOccurrence>? occurrences))
                 {
@@ -206,23 +209,37 @@ internal sealed class DuplicateCodeDetector
         foreach (List<WindowOccurrence> bucket in index.Values.Where(bucket => bucket.Count > 1))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            for (int leftIndex = 0; leftIndex < bucket.Count; leftIndex++)
+            foreach (List<WindowOccurrence> exactWindowGroup in GroupByExactWindow(bucket, minimumTokens, cancellationToken))
             {
-                for (int rightIndex = leftIndex + 1; rightIndex < bucket.Count; rightIndex++)
+                cancellationToken.ThrowIfCancellationRequested();
+                List<WindowOccurrence> anchors = [];
+                foreach (WindowOccurrence occurrence in exactWindowGroup
+                    .OrderBy(occurrence => occurrence.SortKey, StringComparer.Ordinal))
                 {
-                    WindowOccurrence left = bucket[leftIndex];
-                    WindowOccurrence right = bucket[rightIndex];
-                    if (!SequenceEquals(left.Stream, left.Start, right.Stream, right.Start, minimumTokens))
+                    cancellationToken.ThrowIfCancellationRequested();
+                    bool comparedWithAnchor = false;
+                    foreach (WindowOccurrence anchor in anchors)
                     {
-                        continue;
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (Overlaps(anchor, occurrence, minimumTokens))
+                        {
+                            continue;
+                        }
+
+                        CloneCandidate candidate = Extend(anchor, occurrence, minimumTokens, cancellationToken);
+                        if (candidate.TokenCount >= minimumTokens
+                            && (minimumLines is null || candidate.Left.LineCount >= minimumLines.Value && candidate.Right.LineCount >= minimumLines.Value)
+                            && !candidate.Left.Overlaps(candidate.Right))
+                        {
+                            candidates.Add(candidate);
+                        }
+
+                        comparedWithAnchor = true;
                     }
 
-                    CloneCandidate candidate = Extend(left, right, minimumTokens);
-                    if (candidate.TokenCount >= minimumTokens
-                        && (minimumLines is null || candidate.Left.LineCount >= minimumLines.Value && candidate.Right.LineCount >= minimumLines.Value)
-                        && !candidate.Left.Overlaps(candidate.Right))
+                    if (!comparedWithAnchor && anchors.Count < MaximumAnchorsPerWindowGroup)
                     {
-                        candidates.Add(candidate);
+                        anchors.Add(occurrence);
                     }
                 }
             }
@@ -232,25 +249,56 @@ internal sealed class DuplicateCodeDetector
         return candidates;
     }
 
-    private static bool SequenceEquals(
-        IReadOnlyList<NormalizedToken> left,
-        int leftStart,
-        IReadOnlyList<NormalizedToken> right,
-        int rightStart,
-        int length)
+    private static IEnumerable<List<WindowOccurrence>> GroupByExactWindow(
+        List<WindowOccurrence> bucket,
+        int minimumTokens,
+        CancellationToken cancellationToken)
     {
-        for (int offset = 0; offset < length; offset++)
+        Dictionary<string, List<WindowOccurrence>> exactGroups = [];
+        foreach (WindowOccurrence occurrence in bucket)
         {
-            if (!StringComparer.Ordinal.Equals(left[leftStart + offset].Value, right[rightStart + offset].Value))
+            cancellationToken.ThrowIfCancellationRequested();
+            string signature = CreateSignature(occurrence.Stream, occurrence.Start, minimumTokens, cancellationToken);
+            if (!exactGroups.TryGetValue(signature, out List<WindowOccurrence>? occurrences))
             {
-                return false;
+                occurrences = [];
+                exactGroups.Add(signature, occurrences);
             }
+
+            occurrences.Add(occurrence);
         }
 
-        return true;
+        return exactGroups.Values.Where(group => group.Count > 1);
     }
 
-    private static CloneCandidate Extend(WindowOccurrence left, WindowOccurrence right, int minimumTokens)
+    private static string CreateSignature(
+        IReadOnlyList<NormalizedToken> stream,
+        int start,
+        int length,
+        CancellationToken cancellationToken)
+    {
+        string[] values = new string[length];
+        for (int offset = 0; offset < length; offset++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            values[offset] = stream[start + offset].Value;
+        }
+
+        return string.Join("\u001f", values);
+    }
+
+    private static bool Overlaps(WindowOccurrence left, WindowOccurrence right, int length)
+    {
+        return left.Stream[left.Start].StreamId == right.Stream[right.Start].StreamId
+            && left.Start < right.Start + length
+            && right.Start < left.Start + length;
+    }
+
+    private static CloneCandidate Extend(
+        WindowOccurrence left,
+        WindowOccurrence right,
+        int minimumTokens,
+        CancellationToken cancellationToken)
     {
         int leftStart = left.Start;
         int rightStart = right.Start;
@@ -258,6 +306,7 @@ internal sealed class DuplicateCodeDetector
             && rightStart > 0
             && StringComparer.Ordinal.Equals(left.Stream[leftStart - 1].Value, right.Stream[rightStart - 1].Value))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             leftStart--;
             rightStart--;
         }
@@ -267,6 +316,7 @@ internal sealed class DuplicateCodeDetector
             && rightStart + length < right.Stream.Count
             && StringComparer.Ordinal.Equals(left.Stream[leftStart + length].Value, right.Stream[rightStart + length].Value))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             length++;
         }
 
@@ -353,7 +403,10 @@ internal sealed class DuplicateCodeDetector
         ];
     }
 
-    private sealed record WindowOccurrence(IReadOnlyList<NormalizedToken> Stream, int Start);
+    private sealed record WindowOccurrence(IReadOnlyList<NormalizedToken> Stream, int Start)
+    {
+        internal string SortKey => Stream[Start].FilePath + ":" + Start.ToString("D10", CultureInfo.InvariantCulture);
+    }
 
     private sealed record CloneCandidate(CloneRange Left, CloneRange Right, int TokenCount)
     {

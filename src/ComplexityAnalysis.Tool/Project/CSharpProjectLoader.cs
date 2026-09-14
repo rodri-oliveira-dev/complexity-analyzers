@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -94,9 +96,11 @@ internal static class CSharpProjectLoader
                 .SelectMany(SplitItemList)
         ];
 
-        IEnumerable<string> files = includes.Count == 0
+        IEnumerable<string> implicitFiles = HasImplicitCompileItems(projectDocument)
             ? Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
-            : includes.SelectMany(include => ExpandInclude(projectDirectory, include));
+            : [];
+        IEnumerable<string> explicitFiles = includes.SelectMany(include => ExpandInclude(projectDirectory, include));
+        IEnumerable<string> files = implicitFiles.Concat(explicitFiles);
 
         HashSet<string> removed = new(
             removes.SelectMany(remove => ExpandInclude(projectDirectory, remove)),
@@ -132,18 +136,93 @@ internal static class CSharpProjectLoader
         string normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
         if (normalized.Contains('*', StringComparison.Ordinal))
         {
-            if (StringComparer.Ordinal.Equals(normalized, "**" + Path.DirectorySeparatorChar + "*.cs")
-                || StringComparer.Ordinal.Equals(normalized, "**/*.cs"))
-            {
-                return Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories);
-            }
-
-            string fileName = Path.GetFileName(normalized).Replace("*", string.Empty, StringComparison.Ordinal);
-            return Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
-                .Where(path => fileName.Length == 0 || Path.GetFileName(path).Contains(fileName, StringComparison.OrdinalIgnoreCase));
+            return ExpandGlob(projectDirectory, normalized);
         }
 
         return [Path.GetFullPath(Path.Combine(projectDirectory, normalized))];
+    }
+
+    private static IEnumerable<string> ExpandGlob(string projectDirectory, string normalizedPattern)
+    {
+        string normalizedProjectDirectory = Path.GetFullPath(projectDirectory);
+        string pattern = PathUtilities.Normalize(normalizedPattern);
+        int firstWildcard = pattern.IndexOfAny(['*', '?']);
+        int lastSeparatorBeforeWildcard = pattern.LastIndexOf('/', Math.Max(0, firstWildcard));
+        string basePrefix = lastSeparatorBeforeWildcard >= 0
+            ? pattern[..(lastSeparatorBeforeWildcard + 1)]
+            : string.Empty;
+        string searchRoot = Path.GetFullPath(Path.Combine(normalizedProjectDirectory, basePrefix.Replace('/', Path.DirectorySeparatorChar)));
+        if (!Directory.Exists(searchRoot))
+        {
+            return [];
+        }
+
+        string relativePattern = lastSeparatorBeforeWildcard >= 0
+            ? pattern[(lastSeparatorBeforeWildcard + 1)..]
+            : pattern;
+        Regex regex = new("^" + GlobToRegex(relativePattern) + "$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        return Directory.EnumerateFiles(searchRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => regex.IsMatch(PathUtilities.Normalize(Path.GetRelativePath(searchRoot, path))));
+    }
+
+    private static string GlobToRegex(string pattern)
+    {
+        StringBuilder builder = new();
+        for (int index = 0; index < pattern.Length; index++)
+        {
+            char current = pattern[index];
+            if (current == '*')
+            {
+                bool isDoubleStar = index + 1 < pattern.Length && pattern[index + 1] == '*';
+                if (isDoubleStar)
+                {
+                    index++;
+                    if (index + 1 < pattern.Length && pattern[index + 1] == '/')
+                    {
+                        index++;
+                        _ = builder.Append("(?:.*/)?");
+                    }
+                    else
+                    {
+                        _ = builder.Append(".*");
+                    }
+                }
+                else
+                {
+                    _ = builder.Append("[^/]*");
+                }
+            }
+            else if (current == '?')
+            {
+                _ = builder.Append("[^/]");
+            }
+            else
+            {
+                _ = builder.Append(Regex.Escape(current.ToString()));
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool HasImplicitCompileItems(XDocument projectDocument)
+    {
+        return !IsFalse(ReadProperty(projectDocument, "EnableDefaultItems"))
+            && !IsFalse(ReadProperty(projectDocument, "EnableDefaultCompileItems"));
+    }
+
+    private static string? ReadProperty(XDocument projectDocument, string propertyName)
+    {
+        return projectDocument
+            .Descendants()
+            .Where(element => element.Name.LocalName == propertyName)
+            .Select(element => element.Value)
+            .LastOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private static bool IsFalse(string? value)
+    {
+        return StringComparer.OrdinalIgnoreCase.Equals(value?.Trim(), "false");
     }
 
     private static bool IsBuildOutput(string path)
