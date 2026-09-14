@@ -26,6 +26,15 @@ The analyzer must remain:
 
 Generated code remains excluded from syntax-node analysis.
 
+Project-level analysis in `ComplexityAnalysis.Tool` is measured separately from
+compiler analyzer hot paths. Aggregate reporting and duplicate detection can
+scan project files because they run as an explicit CLI command, not inside
+Roslyn analyzer callbacks. Duplicate detection uses fixed normalized-token
+windows, fingerprint indexing, sequence verification for hash candidates, and
+deterministic overlap suppression. Its expected storage is linear in normalized
+tokens, and candidate verification is limited to repeated fingerprint buckets
+rather than all substrings.
+
 ## Workloads
 
 The baseline uses four workload groups.

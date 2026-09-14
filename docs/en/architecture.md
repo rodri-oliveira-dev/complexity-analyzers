@@ -83,6 +83,39 @@ It is not a runtime library. Consumer applications do not call analyzer classes,
 
 The repository build SDK is a separate concern. `global.json` selects SDK `10.0.400` for repository restore, build, tests, and pack, while supported compiler hosts are validated by installing the produced `.nupkg` into temporary consumer projects.
 
+## Project-Level Tooling Boundary
+
+`ComplexityAnalysis.Tool` is a separate repository tool for project-level
+analysis:
+
+```text
+.csproj / .slnx / .sln
+        |
+        v
+ComplexityAnalysis.Tool
+        |
+        +-- project/source loading
+        +-- aggregate report model
+        +-- console and JSON writers
+        +-- opt-in quality gates
+        +-- normalized duplicate-code detection
+        |
+        v
+shared analyzer metric calculators
+```
+
+The dependency direction is one-way: the CLI can reference
+`ComplexityAnalysis.Analyzers` to reuse metric implementations, but the analyzer
+project and produced NuGet package do not reference the CLI. Whole-project
+source loading, duplicate detection, filesystem traversal, report rendering, and
+quality-gate exit codes are therefore kept outside `DiagnosticAnalyzer.Initialize`
+and analyzer execution callbacks.
+
+The CLI currently supports `.csproj`, `.slnx`, and `.sln` entry points without
+adding `Microsoft.CodeAnalysis.Workspaces` to the analyzer package. SARIF is a
+future report-writer extension over the aggregate report model rather than a
+dependency of analyzer internals.
+
 ## Compatibility contracts
 
 | Contract | Current value |
@@ -109,6 +142,12 @@ src/ComplexityAnalysis.Analyzers/
     Diagnostics/
     Model/
     ComplexityAnalyzer.cs
+
+src/ComplexityAnalysis.Tool/
+    Cli/
+    Duplicates/
+    Project/
+    Reporting/
 
 tests/
 performance/

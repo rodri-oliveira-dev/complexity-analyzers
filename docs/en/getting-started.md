@@ -26,6 +26,21 @@ dotnet test ComplexityAnalysis.Analyzers.slnx --configuration Release --no-build
 
 The analyzer is the product represented by the repository root. Production code lives under `src/`, tests under `tests/`, performance validation under `performance/`, and documentation under `docs/`.
 
+## Run The Project-Level CLI
+
+The repository also builds `ComplexityAnalysis.Tool`, a project-level command
+line surface for aggregate reports and CI-oriented gates. It is separate from
+the analyzer package consumed by applications.
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze ComplexityAnalysis.Analyzers.slnx --format json --detect-duplicates
+```
+
+The tool supports `.csproj`, `.slnx`, and `.sln` inputs. See
+[Project-Level Tooling](project-tooling.md) for JSON, console output, quality
+gates, exclusions, duplicate detection, exit codes, and normalization rules.
+
 ## Create a local package
 
 Build first, then create a local NuGet package:
