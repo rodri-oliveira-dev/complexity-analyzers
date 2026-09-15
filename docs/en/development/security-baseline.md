@@ -8,7 +8,7 @@ GitHub CodeQL Default Setup is the authoritative source of alerts under **Securi
 
 `.github/workflows/codeql.yml` complements Default Setup by validating semantic C# analysis against the repository's explicit build contract for pull requests targeting `main`, pushes to `main`, a weekly schedule, and manual runs. The workflow uses manual build mode, the SDK selected by `global.json`, and the same `ComplexityAnalysis.Analyzers.slnx` Release build contract used by CI.
 
-Because GitHub does not process CodeQL analyses from advanced configurations while Default Setup is enabled, the versioned workflow intentionally does not upload its SARIF to Code Scanning. It runs the standard high-precision query suite, stores the generated SARIF as a short-lived workflow artifact for diagnostics/audit evidence, and keeps workflow permissions read-only with `contents: read` only.
+Because GitHub does not process CodeQL analyses from advanced configurations while Default Setup is enabled, the versioned workflow intentionally does not upload its SARIF to Code Scanning. It runs the standard high-precision query suite, stores the generated SARIF as a short-lived workflow artifact for diagnostics/audit evidence, and keeps workflow permissions read-only with `contents: read` and `security-events: read` only.
 
 Broader query suites can be evaluated later after the initial findings are understood; new noise should not be hidden merely to keep automation green.
 
