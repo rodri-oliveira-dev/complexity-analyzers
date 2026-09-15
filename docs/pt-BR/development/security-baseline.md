@@ -4,11 +4,13 @@ O repositório usa controles em camadas para que segurança do código-fonte, ri
 
 ## CodeQL
 
-`.github/workflows/codeql.yml` executa análise semântica de segurança para C# em pull requests direcionados à `main`, pushes para `main`, agendamento semanal e execuções manuais.
+O GitHub CodeQL Default Setup é a fonte autoritativa de alerts em **Security > Code scanning** para este repositório.
 
-O workflow usa advanced setup com build manual, o SDK selecionado por `global.json` e o mesmo contrato de build Release de `ComplexityAnalysis.Analyzers.slnx` usado pelo CI. As actions são fixadas por SHA completo e o workflow solicita apenas `contents: read` e `security-events: write`.
+`.github/workflows/codeql.yml` complementa o Default Setup validando a análise semântica de C# contra o contrato explícito de build do repositório em pull requests direcionados à `main`, pushes para `main`, agendamento semanal e execuções manuais. O workflow usa build manual, o SDK selecionado por `global.json` e o mesmo contrato de build Release de `ComplexityAnalysis.Analyzers.slnx` usado pelo CI.
 
-A baseline inicial usa as queries padrão de alta precisão do CodeQL. Suites mais amplas podem ser avaliadas depois que os findings iniciais forem compreendidos; novos ruídos não devem ser escondidos apenas para manter a automação verde.
+Como o GitHub não processa análises CodeQL de configurações avançadas enquanto o Default Setup está habilitado, o workflow versionado intencionalmente não envia seu SARIF para o Code Scanning. Ele executa a suite padrão de alta precisão, armazena o SARIF gerado como artifact temporário do workflow para diagnóstico/evidência de auditoria e mantém permissões somente leitura com apenas `contents: read`.
+
+Suites mais amplas podem ser avaliadas depois que os findings iniciais forem compreendidos; novos ruídos não devem ser escondidos apenas para manter a automação verde.
 
 ## Dependency Review
 
