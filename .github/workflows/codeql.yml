@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  security-events: read
 
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.ref }}
@@ -54,7 +55,7 @@ jobs:
         uses: github/codeql-action/analyze@4c0873ef8656cb3c50b3f42fb63bc1ade0cfa827 # v4
         with:
           category: '/language:csharp'
-          output: ../results
+          output: ${{ runner.temp }}/codeql-results
           upload: never
           upload-database: false
 
@@ -62,6 +63,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: codeql-sarif-${{ github.sha }}
-          path: ../results
+          path: ${{ runner.temp }}/codeql-results
           if-no-files-found: error
           retention-days: 7
