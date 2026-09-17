@@ -15,6 +15,8 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 The analyzer is deliberately conservative: when complexity cannot be proven safely from the available syntax and semantic information, it returns `Unknown` instead of guessing.
 
+This is intentionally not a general decision procedure for program complexity. No total algorithm can exactly classify the asymptotic running time of every arbitrary program: termination behavior can be encoded into a complexity-classification question through a reduction from the Halting Problem. The analyzer therefore operates on a documented, bounded subset of C# and preserves `Unknown` outside what it can safely establish. See [Architecture](docs/en/architecture.md#theoretical-limits) for the detailed rationale.
+
 ## Quick install
 
 When consuming a published package version from NuGet.org:

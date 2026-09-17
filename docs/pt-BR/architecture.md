@@ -183,6 +183,16 @@ capacidade separada de classificação de tokens de fonte, com valores primitivo
 e derivados. Essas métricas são calculadas a partir da sintaxe do executable
 member e não são combinadas com o modelo de complexidade Big-O nem entre si.
 
+## Limites teóricos
+
+O analyzer deliberadamente não tenta classificar o tempo assintótico de execução de todo programa C# possível. Um classificador total e exato para implementações arbitrárias encontra limites de computabilidade.
+
+Uma redução direta a partir do Halting Problem mostra essa fronteira sem depender de programas de entrada que não terminam. Dada uma máquina arbitrária `M`, construa um programa `P(n)` que simula `M` por no máximo `n` passos. Se a simulação ainda não terminou, `P` executa trabalho linear; se já terminou, `P` executa trabalho quadrático. `P(n)` sempre termina porque a simulação é limitada. Se `M` nunca termina, `P` permanece `O(n)`. Se `M` termina após um número fixo de passos, então, para todo `n` suficientemente grande, `P` executa trabalho quadrático e é `O(n^2)`. Um classificador exato capaz de distinguir essas classes para programas arbitrários permitiria, portanto, decidir se `M` termina.
+
+O Teorema de Rice está relacionado ao contexto mais amplo de computabilidade, mas não é a justificativa direta usada aqui. Em sua forma clássica, Rice trata de propriedades não triviais e extensionais da função parcial computada por um programa. A complexidade temporal de uma implementação específica não é extensional: dois programas podem calcular exatamente a mesma função e ainda possuir tempos assintóticos de execução diferentes.
+
+Por isso, este analyzer trabalha sobre formatos de programa explicitamente suportados e evidências semânticas comprováveis, com análise interprocedural e resolução de recorrências limitadas. Quando o modelo disponível não consegue estabelecer um resultado seguro, `Unknown` é o resultado esperado, e não uma classe de complexidade inferida sem evidência suficiente.
+
 ## Análise com Roslyn
 
 A principal camada de análise fica em:

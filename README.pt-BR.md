@@ -15,6 +15,8 @@
 
 O analyzer é deliberadamente conservador: quando não consegue comprovar a complexidade com segurança a partir das informações sintáticas e semânticas disponíveis, retorna `Unknown` em vez de fazer uma estimativa insegura.
 
+Isso é intencionalmente diferente de um procedimento geral de decisão para complexidade de programas. Não existe um algoritmo total capaz de classificar exatamente o tempo assintótico de execução de todo programa arbitrário: o comportamento de terminação pode ser codificado em uma pergunta de classificação de complexidade por meio de uma redução a partir do Halting Problem. Por isso, o analyzer opera sobre um subconjunto documentado e limitado de C# e preserva `Unknown` fora do que consegue estabelecer com segurança. Veja [Arquitetura](docs/pt-BR/architecture.md#limites-teóricos) para a justificativa detalhada.
+
 ## Instalação rápida
 
 Ao consumir uma versão publicada do pacote no NuGet.org:
