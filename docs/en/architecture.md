@@ -182,6 +182,16 @@ separate source-token classification capability with primitive and derived
 values. These metrics are computed from executable-member syntax and are not
 combined with the Big-O complexity model or with each other.
 
+## Theoretical limits
+
+The analyzer deliberately does not attempt to classify the asymptotic running time of every possible C# program. A total and exact classifier for arbitrary implementations would run into computability limits.
+
+A direct reduction from the Halting Problem illustrates the boundary without relying on non-terminating input programs. Given an arbitrary machine `M`, construct a program `P(n)` that simulates `M` for at most `n` steps. If the simulation has not halted, `P` performs linear work; if it has halted, `P` performs quadratic work. `P(n)` always terminates because the simulation is bounded. If `M` never halts, `P` remains `O(n)`. If `M` halts after some fixed number of steps, then for every sufficiently large `n`, `P` performs quadratic work and is `O(n^2)`. An exact classifier able to distinguish those classes for arbitrary programs would therefore decide whether `M` halts.
+
+Rice's theorem is related to the broader computability context, but it is not the direct justification used here. In its classical form, Rice's theorem concerns non-trivial extensional properties of the partial function computed by a program. Time complexity of a particular implementation is not extensional: two programs can compute the same function while having different asymptotic running times.
+
+For that reason, this analyzer operates on explicitly supported program shapes and semantic evidence, with bounded interprocedural and recurrence analysis. When the available model cannot establish a safe result, `Unknown` is the intended result rather than a guessed complexity class.
+
 ## Roslyn analysis
 
 The main analysis layer lives under:
