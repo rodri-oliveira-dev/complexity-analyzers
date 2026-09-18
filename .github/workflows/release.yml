@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - .github/workflows/release.yml
+      - README.md
+      - resources/icon.png
       - src/ComplexityAnalysis.Analyzers/**
       - tests/ComplexityAnalysis.Analyzers.Tests/**
       - Directory.Build.props
