@@ -33,3 +33,34 @@ Automated update pull requests must pass the same applicable quality, compatibil
 Actions changed as part of security-sensitive workflow work should use full commit SHAs with human-readable version comments. Read-only checkouts should disable credential persistence.
 
 Workflow hardening must not rename required jobs casually. The active ruleset depends on stable check names documented in `quality-gates.md`.
+
+
+## Release provenance and SBOM
+
+The official `Release` workflow generates an SPDX 2.3 SBOM from the exact `.nupkg` produced by `build-and-pack`. The package and SBOM are uploaded together as one immutable workflow artifact and the same downloaded `.nupkg` is reused for NuGet.org, GitHub Packages, attestations, and the GitHub Release.
+
+The `github-release` job uses GitHub OIDC with least-privilege attestation permissions to create:
+
+- a build-provenance attestation for the published `.nupkg` and its standalone SPDX SBOM;
+- an SPDX SBOM attestation whose subject is the published `.nupkg`.
+
+The standalone `ComplexityAnalysis.Analyzers.<version>.sbom.spdx.json` file is also attached to the GitHub Release.
+
+After downloading a release package, verify its build provenance with GitHub CLI:
+
+```bash
+gh attestation verify ComplexityAnalysis.Analyzers.<version>.nupkg \
+  --repo rodri-oliveira-dev/complexity-analyzers \
+  --signer-workflow rodri-oliveira-dev/complexity-analyzers/.github/workflows/release.yml
+```
+
+Verify the SPDX 2.3 SBOM attestation explicitly with:
+
+```bash
+gh attestation verify ComplexityAnalysis.Analyzers.<version>.nupkg \
+  --repo rodri-oliveira-dev/complexity-analyzers \
+  --signer-workflow rodri-oliveira-dev/complexity-analyzers/.github/workflows/release.yml \
+  --predicate-type https://spdx.dev/Document/v2.3
+```
+
+Attestations prove artifact provenance and bind the SBOM to the package digest. They complement, rather than replace, package tests, CodeQL, Dependency Review, NuGet auditing, Trusted Publishing, and human review.
