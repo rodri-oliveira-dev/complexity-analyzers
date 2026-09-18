@@ -101,6 +101,8 @@ Do not introduce `Microsoft.CodeAnalysis.Workspaces` or runtime dependencies unl
 
 Production releases are created manually through the `Release` GitHub Actions workflow in `.github/workflows/release.yml`.
 
+Pull requests that change the release workflow or package-relevant files run only the `build-and-pack` path with a synthetic CI version. This dry run exercises package validation and SBOM generation without creating tags, publishing packages, generating attestations, or creating a GitHub Release.
+
 Run the workflow from the `main` branch and provide only the semantic package version, without a `v` prefix:
 
 ```text

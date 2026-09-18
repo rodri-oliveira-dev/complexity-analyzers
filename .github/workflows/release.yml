@@ -1,6 +1,18 @@
 name: Release
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release.yml
+      - src/ComplexityAnalysis.Analyzers/**
+      - tests/ComplexityAnalysis.Analyzers.Tests/**
+      - Directory.Build.props
+      - Directory.Build.targets
+      - Directory.Packages.props
+      - ComplexityAnalysis.Analyzers.slnx
+      - global.json
   workflow_dispatch:
     inputs:
       version:
@@ -39,11 +51,11 @@ jobs:
         id: version
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.version || format('0.0.0-ci.{0}', github.run_number) }}
         run: |
           set -euo pipefail
 
-          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF" != "refs/heads/main" ]]; then
             echo "::error::Releases must be started from the main branch. Current ref: $GITHUB_REF"
             exit 1
           fi
@@ -61,15 +73,17 @@ jobs:
 
           release_tag="v$VERSION"
 
-          git fetch --tags --force
-          if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
-            tag_sha="$(git rev-list -n 1 "$release_tag")"
-            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
-              echo "::error::Tag '$release_tag' already exists and points to $tag_sha instead of $GITHUB_SHA."
-              exit 1
-            fi
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            git fetch --tags --force
+            if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+              tag_sha="$(git rev-list -n 1 "$release_tag")"
+              if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+                echo "::error::Tag '$release_tag' already exists and points to $tag_sha instead of $GITHUB_SHA."
+                exit 1
+              fi
 
-            echo "Tag '$release_tag' already exists on the validated commit; this run can be safely retried."
+              echo "Tag '$release_tag' already exists on the validated commit; this run can be safely retried."
+            fi
           fi
 
           echo "package_version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -194,6 +208,7 @@ jobs:
 
   ensure-release-tag:
     name: Create release tag
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     needs: build-and-pack
     runs-on: ubuntu-latest
     permissions:
@@ -230,6 +245,7 @@ jobs:
 
   publish-nuget:
     name: Publish to NuGet.org
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     needs:
       - build-and-pack
       - ensure-release-tag
@@ -268,6 +284,7 @@ jobs:
 
   publish-github-packages:
     name: Publish to GitHub Packages
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     needs:
       - build-and-pack
       - ensure-release-tag
@@ -300,6 +317,7 @@ jobs:
 
   github-release:
     name: Create GitHub Release
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     needs:
       - build-and-pack
       - ensure-release-tag

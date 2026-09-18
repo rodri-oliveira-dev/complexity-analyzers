@@ -98,6 +98,8 @@ Não introduza `Microsoft.CodeAnalysis.Workspaces` ou dependências de runtime, 
 
 Releases de produção são criadas manualmente pelo workflow `Release` do GitHub Actions em `.github/workflows/release.yml`.
 
+Pull requests que alteram o workflow de release ou arquivos relevantes ao package executam somente o caminho `build-and-pack` com uma versão sintética de CI. Esse dry run exercita validação do package e geração da SBOM sem criar tags, publicar packages, gerar attestations ou criar GitHub Release.
+
 Execute o workflow a partir da branch `main` e informe apenas a versão semântica do package, sem o prefixo `v`:
 
 ```text
