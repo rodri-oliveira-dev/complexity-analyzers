@@ -46,7 +46,9 @@ O job `github-release` usa GitHub OIDC com permissões mínimas de attestation p
 
 O arquivo independente `ComplexityAnalysis.Analyzers.<version>.sbom.spdx.json` também é anexado à GitHub Release.
 
-Depois de baixar um package de release, verifique sua build provenance com GitHub CLI:
+Para verificação byte a byte, use o `.nupkg` anexado à GitHub Release. Um registry pode adicionar metadados de repository signing após a publicação, alterando legitimamente os bytes do package baixado.
+
+Verifique a build provenance do package da GitHub Release com GitHub CLI:
 
 ```bash
 gh attestation verify ComplexityAnalysis.Analyzers.<version>.nupkg \
