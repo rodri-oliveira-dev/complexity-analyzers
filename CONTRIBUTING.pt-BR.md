@@ -98,6 +98,8 @@ Não introduza `Microsoft.CodeAnalysis.Workspaces` ou dependências de runtime, 
 
 Releases de produção são criadas manualmente pelo workflow `Release` do GitHub Actions em `.github/workflows/release.yml`.
 
+Pull requests que alteram o workflow de release ou arquivos relevantes ao package executam somente o caminho `build-and-pack` com uma versão sintética de CI. Esse dry run exercita validação do package e geração da SBOM sem criar tags, publicar packages, gerar attestations ou criar GitHub Release.
+
 Execute o workflow a partir da branch `main` e informe apenas a versão semântica do package, sem o prefixo `v`:
 
 ```text
@@ -120,10 +122,12 @@ O pipeline de release:
 
 1. valida a versão semântica e exige execução a partir da `main`;
 2. restaura, compila, testa, empacota e valida o `ComplexityAnalysis.Analyzers`;
-3. cria a Git tag `v<version>` correspondente, ou a verifica ao repetir com segurança a mesma release;
-4. publica o `.nupkg` no NuGet.org usando Trusted Publishing e GitHub OIDC;
-5. publica o mesmo `.nupkg` no GitHub Packages usando o `GITHUB_TOKEN` do workflow;
-6. cria uma GitHub Release para a tag gerada e anexa o package como artifact.
+3. gera e valida uma SBOM SPDX 2.3 a partir do `.nupkg` final exato;
+4. cria a Git tag `v<version>` correspondente, ou a verifica ao repetir com segurança a mesma release;
+5. publica o mesmo `.nupkg` no NuGet.org usando Trusted Publishing e GitHub OIDC;
+6. publica o mesmo `.nupkg` no GitHub Packages usando o `GITHUB_TOKEN` do workflow;
+7. cria attestations de build provenance e SBOM do GitHub para o package de release;
+8. cria ou atualiza a GitHub Release e anexa o package e sua SBOM SPDX.
 
 A política de Trusted Publishing do NuGet.org deve corresponder exatamente à identidade do workflow:
 
@@ -136,6 +140,8 @@ Package: ComplexityAnalysis.Analyzers
 ```
 
 O job de publicação no NuGet utiliza o environment do GitHub chamado `release` e `id-token: write`; nenhuma NuGet API key de longa duração deve ser armazenada nos secrets do repositório.
+
+A provenance da release e a SBOM podem ser verificadas localmente com GitHub CLI. Veja [Baseline de Segurança do Repositório](docs/pt-BR/development/security-baseline.md#provenance-de-release-e-sbom).
 
 Não mova, reutilize ou recrie manualmente uma release tag existente para outro commit. Release tags devem ser imutáveis.
 

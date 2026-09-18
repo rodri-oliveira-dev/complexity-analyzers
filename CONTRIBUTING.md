@@ -101,6 +101,8 @@ Do not introduce `Microsoft.CodeAnalysis.Workspaces` or runtime dependencies unl
 
 Production releases are created manually through the `Release` GitHub Actions workflow in `.github/workflows/release.yml`.
 
+Pull requests that change the release workflow or package-relevant files run only the `build-and-pack` path with a synthetic CI version. This dry run exercises package validation and SBOM generation without creating tags, publishing packages, generating attestations, or creating a GitHub Release.
+
 Run the workflow from the `main` branch and provide only the semantic package version, without a `v` prefix:
 
 ```text
@@ -123,10 +125,12 @@ The release pipeline:
 
 1. validates the semantic version and requires execution from `main`;
 2. restores, builds, tests, packs, and validates `ComplexityAnalysis.Analyzers`;
-3. creates the corresponding `v<version>` Git tag, or verifies it when safely retrying the same release;
-4. publishes the `.nupkg` to NuGet.org using Trusted Publishing and GitHub OIDC;
-5. publishes the same `.nupkg` to GitHub Packages using the workflow `GITHUB_TOKEN`;
-6. creates a GitHub Release for the generated tag and attaches the package artifact.
+3. generates and validates an SPDX 2.3 SBOM from the exact final `.nupkg`;
+4. creates the corresponding `v<version>` Git tag, or verifies it when safely retrying the same release;
+5. publishes the same `.nupkg` to NuGet.org using Trusted Publishing and GitHub OIDC;
+6. publishes the same `.nupkg` to GitHub Packages using the workflow `GITHUB_TOKEN`;
+7. creates GitHub build-provenance and SBOM attestations for the release package;
+8. creates or refreshes the GitHub Release and attaches both the package and its SPDX SBOM.
 
 The NuGet.org Trusted Publishing policy must match the workflow identity exactly:
 
@@ -139,6 +143,8 @@ Package: ComplexityAnalysis.Analyzers
 ```
 
 The NuGet publishing job uses the GitHub environment named `release` and `id-token: write`; no long-lived NuGet API key should be stored in repository secrets.
+
+Release provenance and the SBOM can be verified locally with GitHub CLI. See [Repository Security Baseline](docs/en/development/security-baseline.md#release-provenance-and-sbom).
 
 Do not manually move, reuse, or recreate an existing release tag for a different commit. Release tags are intended to be immutable.
 

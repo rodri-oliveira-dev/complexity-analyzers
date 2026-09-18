@@ -33,3 +33,36 @@ Pull requests de atualização automática devem passar pelos mesmos gates aplic
 Actions alteradas em trabalhos sensíveis de segurança devem usar SHA completo com comentário legível da versão. Checkouts somente leitura devem desabilitar a persistência de credenciais.
 
 O hardening de workflows não deve renomear jobs obrigatórios sem necessidade. O ruleset ativo depende dos nomes estáveis de checks documentados em `quality-gates.md`.
+
+
+## Provenance de release e SBOM
+
+O workflow oficial `Release` gera uma SBOM SPDX 2.3 a partir do `.nupkg` exato produzido por `build-and-pack`. Package e SBOM são enviados juntos como um único artifact imutável do workflow, e o mesmo `.nupkg` baixado é reutilizado para NuGet.org, GitHub Packages, attestations e GitHub Release.
+
+O job `github-release` usa GitHub OIDC com permissões mínimas de attestation para criar:
+
+- uma attestation de build provenance para o `.nupkg` publicado e sua SBOM SPDX independente;
+- uma SBOM attestation SPDX cujo subject é o `.nupkg` publicado.
+
+O arquivo independente `ComplexityAnalysis.Analyzers.<version>.sbom.spdx.json` também é anexado à GitHub Release.
+
+Para verificação byte a byte, use o `.nupkg` anexado à GitHub Release. Um registry pode adicionar metadados de repository signing após a publicação, alterando legitimamente os bytes do package baixado.
+
+Verifique a build provenance do package da GitHub Release com GitHub CLI:
+
+```bash
+gh attestation verify ComplexityAnalysis.Analyzers.<version>.nupkg \
+  --repo rodri-oliveira-dev/complexity-analyzers \
+  --signer-workflow rodri-oliveira-dev/complexity-analyzers/.github/workflows/release.yml
+```
+
+Verifique explicitamente a SBOM attestation SPDX 2.3 com:
+
+```bash
+gh attestation verify ComplexityAnalysis.Analyzers.<version>.nupkg \
+  --repo rodri-oliveira-dev/complexity-analyzers \
+  --signer-workflow rodri-oliveira-dev/complexity-analyzers/.github/workflows/release.yml \
+  --predicate-type https://spdx.dev/Document/v2.3
+```
+
+As attestations comprovam a procedência dos artifacts e vinculam a SBOM ao digest do package. Elas complementam, e não substituem, testes de package, CodeQL, Dependency Review, NuGet auditing, Trusted Publishing e review humano.
