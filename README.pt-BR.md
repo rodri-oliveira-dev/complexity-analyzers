@@ -161,7 +161,7 @@ Base case ausente, argumentos não redutores, formatos de recorrência não supo
 
 Pré-requisitos:
 
-- .NET SDK `10.0.400` ou um SDK compatível selecionado por `global.json`.
+- .NET SDK `10.0.401` ou um SDK compatível selecionado por `global.json`.
 - Um shell capaz de executar comandos `dotnet`.
 
 A partir da raiz do repositório:

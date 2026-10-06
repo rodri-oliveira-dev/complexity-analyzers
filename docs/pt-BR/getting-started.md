@@ -6,13 +6,13 @@ Este guia explica como compilar, testar, empacotar e validar o `ComplexityAnalys
 
 ## Pré-requisitos
 
-- .NET SDK `10.0.400`, ou um SDK compatível selecionado pelo `global.json` da raiz.
+- .NET SDK `10.0.401`, ou um SDK compatível selecionado pelo `global.json` da raiz.
 - Git.
 - Um shell capaz de executar comandos `dotnet`.
 
 O projeto do analyzer targeteia `netstandard2.0` porque Roslyn Analyzers são carregados por hosts de compilador e IDE, e não pelo runtime da aplicação analisada. Os testes e as ferramentas do repositório usam o SDK selecionado pelo `global.json`.
 
-O SDK de build do repositório não é a versão mínima do host consumidor. Build e testes usam atualmente o SDK `10.0.400`; a compatibilidade do pacote é validada separadamente instalando o `.nupkg` gerado em projetos consumidores compilados pelos hosts SDK suportados.
+O SDK de build do repositório não é a versão mínima do host consumidor. Build e testes usam atualmente o SDK `10.0.401`; a compatibilidade do pacote é validada separadamente instalando o `.nupkg` gerado em projetos consumidores compilados pelos hosts SDK suportados.
 
 ## Clonar e compilar
 
