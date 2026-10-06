@@ -7,7 +7,7 @@ namespace ComplexityAnalysis.Analyzers.Tests;
 
 public sealed class AnalyzerHostCompatibilityContractTests
 {
-    private const string BuildSdkVersion = "10.0.400";
+    private const string BuildSdkVersion = "10.0.401";
     private const string AnalyzerTargetFramework = "netstandard2.0";
     private const string TestTargetFramework = "net10.0";
     private const string LanguageVersion = "12.0";

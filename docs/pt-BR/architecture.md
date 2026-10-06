@@ -81,7 +81,7 @@ analyzers/dotnet/cs/
 
 Ele não é uma biblioteca de runtime. Aplicações consumidoras não chamam classes do analyzer, e as dependências usadas para autoria com Roslyn permanecem privadas em vez de serem expostas transitivamente.
 
-O SDK de build do repositório é uma preocupação separada. `global.json` seleciona o SDK `10.0.400` para restore, build, testes e pack do repositório, enquanto os hosts de compilador suportados são validados instalando o `.nupkg` produzido em projetos consumidores temporários.
+O SDK de build do repositório é uma preocupação separada. `global.json` seleciona o SDK `10.0.401` para restore, build, testes e pack do repositório, enquanto os hosts de compilador suportados são validados instalando o `.nupkg` produzido em projetos consumidores temporários.
 
 ## Fronteira Das Ferramentas Em Nível De Projeto
 
@@ -121,7 +121,7 @@ dos internals do analyzer.
 
 | Contrato | Valor atual |
 | --- | --- |
-| SDK de build do repositório | `.NET SDK 10.0.400` a partir de `global.json`. |
+| SDK de build do repositório | `.NET SDK 10.0.401` a partir de `global.json`. |
 | Versão de linguagem C# do repositório | `12.0`. |
 | Target framework do analyzer | `netstandard2.0`, preservado para compatibilidade com hosts de compilador/IDE. |
 | Baseline de API do compilador Roslyn | `Microsoft.CodeAnalysis.CSharp` `4.8.0`, resolvendo `Microsoft.CodeAnalysis.Common` `4.8.0`. |

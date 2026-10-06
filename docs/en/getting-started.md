@@ -6,13 +6,13 @@ This guide explains how to build, test, pack, and validate `ComplexityAnalysis.A
 
 ## Prerequisites
 
-- .NET SDK `10.0.400`, or a compatible SDK selected by the root `global.json`.
+- .NET SDK `10.0.401`, or a compatible SDK selected by the root `global.json`.
 - Git.
 - A shell capable of running `dotnet` commands.
 
 The analyzer project targets `netstandard2.0` because Roslyn analyzers are loaded by compiler and IDE hosts rather than by the runtime target of the application being analyzed. The repository tests and tooling use the SDK selected by `global.json`.
 
-The repository build SDK is not the minimum consumer host version. Build and test tooling currently use SDK `10.0.400`; package compatibility is validated separately by installing the generated `.nupkg` into consumer projects built by supported SDK hosts.
+The repository build SDK is not the minimum consumer host version. Build and test tooling currently use SDK `10.0.401`; package compatibility is validated separately by installing the generated `.nupkg` into consumer projects built by supported SDK hosts.
 
 ## Clone and build
 
