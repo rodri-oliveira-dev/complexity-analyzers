@@ -20,7 +20,7 @@ env:
 jobs:
   quality:
     name: Quality
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -52,7 +52,7 @@ jobs:
 
   package:
     name: Package
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
     timeout-minutes: 20
     needs: quality
     permissions:
@@ -100,7 +100,7 @@ jobs:
 
   compatibility:
     name: Compatibility (${{ matrix.sdk }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
     timeout-minutes: 15
     needs: package
     permissions:
@@ -152,7 +152,7 @@ jobs:
 
   performance:
     name: Performance
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
     timeout-minutes: 20
     needs: quality
     permissions:
