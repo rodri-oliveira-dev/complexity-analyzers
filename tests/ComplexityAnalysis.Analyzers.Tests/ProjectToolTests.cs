@@ -275,6 +275,124 @@ public sealed class ProjectToolTests
     }
 
     [Fact]
+    public void Tool_options_preserve_defaults_and_entry_path()
+    {
+        Assert.True(ToolOptions.TryParse(
+            ["analyze", "Fixture.csproj"], out ToolOptions? options, out string? error));
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.Equal(Path.GetFullPath("Fixture.csproj"), options.EntryPath);
+        Assert.Equal(ReportFormat.Console, options.Format);
+        Assert.Null(options.OutputPath);
+        Assert.False(options.IncludeGenerated);
+        Assert.False(options.IncludeBuildOutput);
+        Assert.False(options.DetectDuplicates);
+        Assert.Equal(40, options.MinimumDuplicateTokens);
+        Assert.Null(options.MinimumDuplicateLines);
+        Assert.Null(options.MaximumComplexity);
+        Assert.Null(options.MaximumDuplicateRate);
+        Assert.Null(options.MaximumDuplicateTokens);
+    }
+
+    [Fact]
+    public void Tool_options_preserve_last_value_and_implicit_duplicate_detection()
+    {
+        Assert.True(ToolOptions.TryParse(
+            [
+                "analyze", "Fixture.csproj",
+                "--format", "JSON",
+                "--format", "console",
+                "--output", "first.json",
+                "--output", "second.json",
+                "--max-complexity", "linear",
+                "--max-complexity", "quadratic",
+                "--min-duplicate-tokens", "5",
+                "--min-duplicate-tokens", "7",
+                "--min-duplicate-lines", "3",
+                "--max-duplicate-rate", "0",
+                "--max-duplicate-tokens", "12",
+                "--max-nesting-depth", "0",
+                "--max-parameters", "0",
+            ],
+            out ToolOptions? options,
+            out string? error));
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.Equal(ReportFormat.Console, options.Format);
+        Assert.Equal(Path.GetFullPath("second.json"), options.OutputPath);
+        Assert.Equal("n2", options.MaximumComplexity);
+        Assert.True(options.DetectDuplicates);
+        Assert.Equal(7, options.MinimumDuplicateTokens);
+        Assert.Equal(3, options.MinimumDuplicateLines);
+        Assert.Equal(0d, options.MaximumDuplicateRate);
+        Assert.Equal(12, options.MaximumDuplicateTokens);
+        Assert.Equal(0, options.MaximumNestingDepth);
+        Assert.Equal(0, options.MaximumParameters);
+    }
+
+    [Theory]
+    [InlineData("--format")]
+    [InlineData("--output")]
+    [InlineData("--min-duplicate-tokens")]
+    [InlineData("--min-duplicate-lines")]
+    [InlineData("--max-complexity")]
+    [InlineData("--max-cyclomatic-complexity")]
+    [InlineData("--max-nesting-depth")]
+    [InlineData("--max-method-nloc")]
+    [InlineData("--max-statement-count")]
+    [InlineData("--max-token-count")]
+    [InlineData("--max-parameters")]
+    [InlineData("--max-cognitive-complexity")]
+    [InlineData("--max-duplicate-rate")]
+    [InlineData("--max-duplicate-tokens")]
+    public void Tool_options_preserve_missing_value_errors(string option)
+    {
+        Assert.False(ToolOptions.TryParse(
+            ["analyze", "Fixture.csproj", option], out ToolOptions? options, out string? error));
+
+        Assert.Null(options);
+        Assert.Equal(option + " requires a value.", error);
+    }
+
+    [Theory]
+    [InlineData("--format", "xml", "Format must be 'console' or 'json'.")]
+    [InlineData("--min-duplicate-tokens", "0", "--min-duplicate-tokens must be greater than zero.")]
+    [InlineData("--min-duplicate-lines", "-1", "--min-duplicate-lines must be a non-negative integer.")]
+    [InlineData("--max-cyclomatic-complexity", "0", "--max-cyclomatic-complexity must be greater than zero.")]
+    [InlineData("--max-nesting-depth", "-1", "--max-nesting-depth must be a non-negative integer.")]
+    [InlineData("--max-method-nloc", "NaN", "--max-method-nloc must be a non-negative integer.")]
+    [InlineData("--max-statement-count", "0", "--max-statement-count must be greater than zero.")]
+    [InlineData("--max-token-count", "2147483648", "--max-token-count must be a non-negative integer.")]
+    [InlineData("--max-parameters", "-1", "--max-parameters must be a non-negative integer.")]
+    [InlineData("--max-cognitive-complexity", "-1", "--max-cognitive-complexity must be a non-negative integer.")]
+    [InlineData("--max-duplicate-rate", "NaN", "--max-duplicate-rate must be a non-negative number.")]
+    [InlineData("--max-duplicate-tokens", "0", "--max-duplicate-tokens must be greater than zero.")]
+    public void Tool_options_preserve_invalid_value_errors(string option, string value, string expectedError)
+    {
+        Assert.False(ToolOptions.TryParse(
+            ["analyze", "Fixture.csproj", option, value],
+            out ToolOptions? options,
+            out string? error));
+
+        Assert.Null(options);
+        Assert.Equal(expectedError, error);
+    }
+
+    [Fact]
+    public void Tool_options_preserve_first_invalid_option()
+    {
+        Assert.False(ToolOptions.TryParse(
+            ["analyze", "Fixture.csproj", "--format", "json", "--unknown", "--format", "console"],
+            out ToolOptions? options,
+            out string? error));
+
+        Assert.Null(options);
+        Assert.Equal("Unknown option '--unknown'.", error);
+    }
+
+    [Fact]
     public void Quality_gate_evaluator_applies_metric_and_duplicate_thresholds()
     {
         Assert.True(ToolOptions.TryParse(
