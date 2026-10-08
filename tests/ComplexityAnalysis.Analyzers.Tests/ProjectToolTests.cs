@@ -629,7 +629,7 @@ public sealed class ProjectToolTests
     {
         using FixtureProject fixture = FixtureProject.Create();
         fixture.WriteProject(
-            $"""
+            """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
@@ -638,10 +638,10 @@ public sealed class ProjectToolTests
                 <Nullable>enable</Nullable>
               </PropertyGroup>
               <ItemGroup>
-                <Compile Include="{{pattern}}" />
+                <Compile Include="__PATTERN__" />
               </ItemGroup>
             </Project>
-            """);
+            """.Replace("__PATTERN__", pattern, StringComparison.Ordinal));
         fixture.WriteSource("Sources/Alpha.cs", "public sealed class Alpha { public void M() { } }");
         fixture.WriteSource("Sources/Nested/Beta.cs", "public sealed class Beta { public void M() { } }");
         fixture.WriteSource("Sources/Nested/Deep/Gamma.cs", "public sealed class Gamma { public void M() { } }");
