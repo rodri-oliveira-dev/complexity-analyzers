@@ -147,149 +147,222 @@ internal sealed class ToolOptions
         ToolOptions parsed = new(Path.GetFullPath(entryPath));
         for (int index = 2; index < args.Length; index++)
         {
-            string current = args[index];
-            switch (current)
+            if (!TryParseOption(args, ref index, parsed, out error))
             {
-                case "--format":
-                    if (!TryReadValue(args, ref index, current, out string? formatValue, out error)
-                        || !TryParseFormat(formatValue, out ReportFormat format))
-                    {
-                        error ??= "Format must be 'console' or 'json'.";
-                        return false;
-                    }
-
-                    parsed.Format = format;
-                    break;
-                case "--output":
-                    if (!TryReadValue(args, ref index, current, out string? outputPath, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.OutputPath = Path.GetFullPath(outputPath);
-                    break;
-                case "--include-generated":
-                    parsed.IncludeGenerated = true;
-                    break;
-                case "--include-build-output":
-                    parsed.IncludeBuildOutput = true;
-                    break;
-                case "--detect-duplicates":
-                    parsed.DetectDuplicates = true;
-                    break;
-                case "--min-duplicate-tokens":
-                    if (!TryReadPositiveInt(args, ref index, current, out int minimumDuplicateTokens, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MinimumDuplicateTokens = minimumDuplicateTokens;
-                    parsed.DetectDuplicates = true;
-                    break;
-                case "--min-duplicate-lines":
-                    if (!TryReadPositiveInt(args, ref index, current, out int minimumDuplicateLines, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MinimumDuplicateLines = minimumDuplicateLines;
-                    parsed.DetectDuplicates = true;
-                    break;
-                case "--max-complexity":
-                    if (!TryReadValue(args, ref index, current, out string? maximumComplexity, out error))
-                    {
-                        return false;
-                    }
-
-                    if (!TryParseMaximumComplexity(maximumComplexity, out string? normalizedComplexity))
-                    {
-                        error = current + " must be one of: constant, log_n, linear, n, n_log_n, quadratic, n2, cubic, n3, exponential, factorial.";
-                        return false;
-                    }
-
-                    parsed.MaximumComplexity = normalizedComplexity;
-                    break;
-                case "--max-cyclomatic-complexity":
-                    if (!TryReadPositiveInt(args, ref index, current, out int maximumCyclomaticComplexity, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MaximumCyclomaticComplexity = maximumCyclomaticComplexity;
-                    break;
-                case "--max-nesting-depth":
-                    if (!TryReadNonNegativeInt(args, ref index, current, out int maximumNestingDepth, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MaximumNestingDepth = maximumNestingDepth;
-                    break;
-                case "--max-method-nloc":
-                    if (!TryReadPositiveInt(args, ref index, current, out int maximumMethodNloc, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MaximumMethodNloc = maximumMethodNloc;
-                    break;
-                case "--max-statement-count":
-                    if (!TryReadPositiveInt(args, ref index, current, out int maximumStatementCount, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MaximumStatementCount = maximumStatementCount;
-                    break;
-                case "--max-token-count":
-                    if (!TryReadPositiveInt(args, ref index, current, out int maximumTokenCount, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MaximumTokenCount = maximumTokenCount;
-                    break;
-                case "--max-parameters":
-                    if (!TryReadNonNegativeInt(args, ref index, current, out int maximumParameters, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MaximumParameters = maximumParameters;
-                    break;
-                case "--max-cognitive-complexity":
-                    if (!TryReadNonNegativeInt(args, ref index, current, out int maximumCognitiveComplexity, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MaximumCognitiveComplexity = maximumCognitiveComplexity;
-                    break;
-                case "--max-duplicate-rate":
-                    if (!TryReadNonNegativeDouble(args, ref index, current, out double maximumDuplicateRate, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MaximumDuplicateRate = maximumDuplicateRate;
-                    parsed.DetectDuplicates = true;
-                    break;
-                case "--max-duplicate-tokens":
-                    if (!TryReadPositiveInt(args, ref index, current, out int maximumDuplicateTokens, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.MaximumDuplicateTokens = maximumDuplicateTokens;
-                    parsed.DetectDuplicates = true;
-                    break;
-                default:
-                    error = "Unknown option '" + current + "'.";
-                    return false;
+                return false;
             }
         }
 
         options = parsed;
+        return true;
+    }
+
+    private static bool TryParseOption(string[] args, ref int index, ToolOptions parsed, out string? error)
+    {
+        string current = args[index];
+        switch (current)
+        {
+            case "--format":
+            case "--output":
+                return TryParseReportOption(args, ref index, current, parsed, out error);
+            case "--include-generated":
+                parsed.IncludeGenerated = true;
+                break;
+            case "--include-build-output":
+                parsed.IncludeBuildOutput = true;
+                break;
+            case "--detect-duplicates":
+                parsed.DetectDuplicates = true;
+                break;
+            case "--min-duplicate-tokens":
+            case "--min-duplicate-lines":
+            case "--max-duplicate-rate":
+            case "--max-duplicate-tokens":
+                return TryParseDuplicateOption(args, ref index, current, parsed, out error);
+            case "--max-complexity":
+            case "--max-cyclomatic-complexity":
+            case "--max-nesting-depth":
+            case "--max-method-nloc":
+            case "--max-statement-count":
+            case "--max-token-count":
+            case "--max-parameters":
+            case "--max-cognitive-complexity":
+                return TryParseComplexityOption(args, ref index, current, parsed, out error);
+            default:
+                error = "Unknown option '" + current + "'.";
+                return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static bool TryParseReportOption(
+        string[] args,
+        ref int index,
+        string current,
+        ToolOptions parsed,
+        out string? error)
+    {
+        error = null;
+        switch (current)
+        {
+            case "--format":
+                if (!TryReadValue(args, ref index, current, out string? formatValue, out error)
+                    || !TryParseFormat(formatValue, out ReportFormat format))
+                {
+                    error ??= "Format must be 'console' or 'json'.";
+                    return false;
+                }
+
+                parsed.Format = format;
+                break;
+            case "--output":
+                if (!TryReadValue(args, ref index, current, out string? outputPath, out error))
+                {
+                    return false;
+                }
+
+                parsed.OutputPath = Path.GetFullPath(outputPath);
+                break;
+        }
+
+        return true;
+    }
+
+    private static bool TryParseDuplicateOption(
+        string[] args,
+        ref int index,
+        string current,
+        ToolOptions parsed,
+        out string? error)
+    {
+        error = null;
+        switch (current)
+        {
+            case "--min-duplicate-tokens":
+                if (!TryReadPositiveInt(args, ref index, current, out int minimumDuplicateTokens, out error))
+                {
+                    return false;
+                }
+
+                parsed.MinimumDuplicateTokens = minimumDuplicateTokens;
+                parsed.DetectDuplicates = true;
+                break;
+            case "--min-duplicate-lines":
+                if (!TryReadPositiveInt(args, ref index, current, out int minimumDuplicateLines, out error))
+                {
+                    return false;
+                }
+
+                parsed.MinimumDuplicateLines = minimumDuplicateLines;
+                parsed.DetectDuplicates = true;
+                break;
+            case "--max-duplicate-rate":
+                if (!TryReadNonNegativeDouble(args, ref index, current, out double maximumDuplicateRate, out error))
+                {
+                    return false;
+                }
+
+                parsed.MaximumDuplicateRate = maximumDuplicateRate;
+                parsed.DetectDuplicates = true;
+                break;
+            case "--max-duplicate-tokens":
+                if (!TryReadPositiveInt(args, ref index, current, out int maximumDuplicateTokens, out error))
+                {
+                    return false;
+                }
+
+                parsed.MaximumDuplicateTokens = maximumDuplicateTokens;
+                parsed.DetectDuplicates = true;
+                break;
+        }
+
+        return true;
+    }
+
+    private static bool TryParseComplexityOption(
+        string[] args,
+        ref int index,
+        string current,
+        ToolOptions parsed,
+        out string? error)
+    {
+        error = null;
+        switch (current)
+        {
+            case "--max-complexity":
+                if (!TryReadValue(args, ref index, current, out string? maximumComplexity, out error))
+                {
+                    return false;
+                }
+
+                if (!TryParseMaximumComplexity(maximumComplexity, out string? normalizedComplexity))
+                {
+                    error = current + " must be one of: constant, log_n, linear, n, n_log_n, quadratic, n2, cubic, n3, exponential, factorial.";
+                    return false;
+                }
+
+                parsed.MaximumComplexity = normalizedComplexity;
+                break;
+            case "--max-cyclomatic-complexity":
+                if (!TryReadPositiveInt(args, ref index, current, out int maximumCyclomaticComplexity, out error))
+                {
+                    return false;
+                }
+
+                parsed.MaximumCyclomaticComplexity = maximumCyclomaticComplexity;
+                break;
+            case "--max-nesting-depth":
+                if (!TryReadNonNegativeInt(args, ref index, current, out int maximumNestingDepth, out error))
+                {
+                    return false;
+                }
+
+                parsed.MaximumNestingDepth = maximumNestingDepth;
+                break;
+            case "--max-method-nloc":
+                if (!TryReadPositiveInt(args, ref index, current, out int maximumMethodNloc, out error))
+                {
+                    return false;
+                }
+
+                parsed.MaximumMethodNloc = maximumMethodNloc;
+                break;
+            case "--max-statement-count":
+                if (!TryReadPositiveInt(args, ref index, current, out int maximumStatementCount, out error))
+                {
+                    return false;
+                }
+
+                parsed.MaximumStatementCount = maximumStatementCount;
+                break;
+            case "--max-token-count":
+                if (!TryReadPositiveInt(args, ref index, current, out int maximumTokenCount, out error))
+                {
+                    return false;
+                }
+
+                parsed.MaximumTokenCount = maximumTokenCount;
+                break;
+            case "--max-parameters":
+                if (!TryReadNonNegativeInt(args, ref index, current, out int maximumParameters, out error))
+                {
+                    return false;
+                }
+
+                parsed.MaximumParameters = maximumParameters;
+                break;
+            case "--max-cognitive-complexity":
+                if (!TryReadNonNegativeInt(args, ref index, current, out int maximumCognitiveComplexity, out error))
+                {
+                    return false;
+                }
+
+                parsed.MaximumCognitiveComplexity = maximumCognitiveComplexity;
+                break;
+        }
+
         return true;
     }
 
