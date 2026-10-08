@@ -889,6 +889,91 @@ public sealed class ProjectToolTests
     }
 
     [Fact]
+    public void Duplicate_detector_preserves_project_and_empty_file_metrics()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject();
+        fixture.WriteSource(
+            "Alpha.cs",
+            "public sealed class Alpha { public int Sum(int[] values) { int total = 0; foreach (int value in values) { total += value; } return total; } }");
+        fixture.WriteSource(
+            "Beta.cs",
+            "public sealed class Beta { public int Sum(int[] values) { int total = 0; foreach (int value in values) { total += value; } return total; } }");
+        fixture.WriteSource("Empty.cs", "public sealed class Empty { }");
+
+        ProjectReport report = new() { EntryPoint = fixture.ProjectPath };
+        AnalyzedProjectReport first = new() { Name = "First", Path = fixture.ProjectPath };
+        first.Files.Add(new AnalyzedFileReport { Path = PathUtilities.ToDisplayPath(Path.Combine(fixture.DirectoryPath, "Alpha.cs"), Directory.GetCurrentDirectory()) });
+        first.Files.Add(new AnalyzedFileReport { Path = PathUtilities.ToDisplayPath(Path.Combine(fixture.DirectoryPath, "Beta.cs"), Directory.GetCurrentDirectory()) });
+        AnalyzedProjectReport second = new() { Name = "Second", Path = fixture.ProjectPath };
+        second.Files.Add(new AnalyzedFileReport { Path = PathUtilities.ToDisplayPath(Path.Combine(fixture.DirectoryPath, "Empty.cs"), Directory.GetCurrentDirectory()) });
+        report.Projects.Add(first);
+        report.Projects.Add(second);
+
+        new DuplicateCodeDetector().AddDuplicateReport(
+            report, minimumTokens: 8, minimumLines: null, CancellationToken.None);
+
+        Assert.NotEmpty(report.Duplicates.CloneGroups);
+        Assert.Equal(0, second.Files[0].NormalizedTokenCount);
+        Assert.Equal(0, second.Files[0].DuplicateTokenCount);
+        Assert.Equal(0d, second.Files[0].DuplicateRate.Value);
+        Assert.Equal(0d, second.DuplicateRate.Value);
+        Assert.Equal(first.Files.Sum(file => file.NormalizedTokenCount), report.Duplicates.TotalNormalizedTokens);
+        Assert.Equal(
+            first.Files.Sum(file => file.DuplicateTokenCount),
+            report.Duplicates.DuplicateTokenCount);
+        Assert.True(first.Files.All(file => file.DuplicateTokenCount > 0));
+    }
+
+    [Fact]
+    public async Task Duplicate_detector_is_deterministic_with_many_clone_windows_and_line_filter()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject();
+        for (int index = 0; index < 10; index++)
+        {
+            fixture.WriteSource(
+                "Clone" + index + ".cs",
+                "public sealed class Clone" + index + " { public int Sum(int[] values) { int total = 0; foreach (int value in values) { total += value; } return total; } }");
+        }
+
+        (int firstExit, string firstOutput, _) = await RunCliAsync(
+            "analyze", fixture.ProjectPath, "--format", "json", "--detect-duplicates", "--min-duplicate-tokens", "8");
+        (int secondExit, string secondOutput, _) = await RunCliAsync(
+            "analyze", fixture.ProjectPath, "--format", "json", "--detect-duplicates", "--min-duplicate-tokens", "8");
+        (int filteredExit, string filteredOutput, _) = await RunCliAsync(
+            "analyze", fixture.ProjectPath, "--format", "json", "--detect-duplicates",
+            "--min-duplicate-tokens", "8", "--min-duplicate-lines", "1000");
+
+        Assert.Equal(ToolExitCodes.Success, firstExit);
+        Assert.Equal(ToolExitCodes.Success, secondExit);
+        Assert.Equal(ToolExitCodes.Success, filteredExit);
+        Assert.Equal(firstOutput, secondOutput);
+
+        using JsonDocument first = JsonDocument.Parse(firstOutput);
+        using JsonDocument filtered = JsonDocument.Parse(filteredOutput);
+        JsonElement groups = first.RootElement.GetProperty("Duplicates").GetProperty("CloneGroups");
+        Assert.True(groups.GetArrayLength() > 0);
+        foreach (JsonElement group in groups.EnumerateArray())
+        {
+            JsonElement occurrences = group.GetProperty("Occurrences");
+            HashSet<string> locations = [];
+            foreach (JsonElement occurrence in occurrences.EnumerateArray())
+            {
+                JsonElement location = occurrence.GetProperty("Location");
+                string key = occurrence.GetProperty("FilePath").GetString()
+                    + ":" + location.GetProperty("Start").GetInt32()
+                    + ":" + location.GetProperty("Length").GetInt32();
+                Assert.True(locations.Add(key), "Duplicate clone occurrence was reported twice.");
+            }
+        }
+
+        Assert.Equal(
+            0,
+            filtered.RootElement.GetProperty("Duplicates").GetProperty("CloneGroups").GetArrayLength());
+    }
+
+    [Fact]
     public void Duplicate_detector_verifies_hash_collisions_before_reporting()
     {
         using FixtureProject fixture = FixtureProject.Create();

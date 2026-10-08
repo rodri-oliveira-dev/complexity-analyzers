@@ -44,20 +44,7 @@ internal sealed class DuplicateCodeDetector
         int totalTokens = streams.Sum(stream => stream.Count);
         List<CloneCandidate> candidates = FindCandidates(streams, minimumTokens, minimumLines, cancellationToken);
         List<CloneGroupReport> groups = CreateGroups(candidates, totalTokens);
-        Dictionary<string, List<(int Start, int End)>> duplicateRangesByFile = [];
-        foreach (CloneGroupReport group in groups)
-        {
-            foreach (CloneOccurrenceReport occurrence in group.Occurrences)
-            {
-                if (!duplicateRangesByFile.TryGetValue(occurrence.FilePath, out List<(int Start, int End)>? ranges))
-                {
-                    ranges = [];
-                    duplicateRangesByFile.Add(occurrence.FilePath, ranges);
-                }
-
-                ranges.Add((occurrence.Location.Start, occurrence.Location.Start + occurrence.Location.Length));
-            }
-        }
+        Dictionary<string, List<(int Start, int End)>> duplicateRangesByFile = BuildDuplicateRanges(groups);
 
         int duplicateTokens = 0;
         foreach (AnalyzedProjectReport project in report.Projects)
@@ -98,6 +85,26 @@ internal sealed class DuplicateCodeDetector
         report.Duplicates = duplicateSummary;
     }
 
+    private static Dictionary<string, List<(int Start, int End)>> BuildDuplicateRanges(List<CloneGroupReport> groups)
+    {
+        Dictionary<string, List<(int Start, int End)>> duplicateRangesByFile = [];
+        foreach (CloneGroupReport group in groups)
+        {
+            foreach (CloneOccurrenceReport occurrence in group.Occurrences)
+            {
+                if (!duplicateRangesByFile.TryGetValue(occurrence.FilePath, out List<(int Start, int End)>? ranges))
+                {
+                    ranges = [];
+                    duplicateRangesByFile.Add(occurrence.FilePath, ranges);
+                }
+
+                ranges.Add((occurrence.Location.Start, occurrence.Location.Start + occurrence.Location.Length));
+            }
+        }
+
+        return duplicateRangesByFile;
+    }
+
     private static int CountDuplicateTokens(
         List<IReadOnlyList<NormalizedToken>> streams,
         string filePath,
@@ -132,59 +139,89 @@ internal sealed class DuplicateCodeDetector
 
         foreach (AnalyzedProjectReport project in report.Projects)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            SyntaxTree[] syntaxTrees =
-            [
-                .. project.Files.Select(file =>
-                {
-                    string fullPath = Path.GetFullPath(file.Path);
-                    return CSharpSyntaxTree.ParseText(
-                        File.ReadAllText(fullPath),
-                        new CSharpParseOptions(LanguageVersion.CSharp12, DocumentationMode.Parse, SourceCodeKind.Regular),
-                        fullPath,
-                        cancellationToken: cancellationToken);
-                })
-            ];
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                project.Name,
-                syntaxTrees,
-                TrustedPlatformReferences,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            AppendProjectTokenStreams(project, streams, ref streamId, cancellationToken);
+        }
 
-            foreach (SyntaxTree syntaxTree in syntaxTrees.OrderBy(tree => PathUtilities.Normalize(tree.FilePath), StringComparer.Ordinal))
+        return streams;
+    }
+
+    private static void AppendProjectTokenStreams(
+        AnalyzedProjectReport project,
+        List<IReadOnlyList<NormalizedToken>> streams,
+        ref int streamId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        SyntaxTree[] syntaxTrees =
+        [
+            .. project.Files.Select(file =>
             {
-                SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
-                foreach (SyntaxNode node in syntaxTree.GetRoot(cancellationToken).DescendantNodes())
+                string fullPath = Path.GetFullPath(file.Path);
+                return CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(fullPath),
+                    new CSharpParseOptions(LanguageVersion.CSharp12, DocumentationMode.Parse, SourceCodeKind.Regular),
+                    fullPath,
+                    cancellationToken: cancellationToken);
+            })
+        ];
+        CSharpCompilation compilation = CSharpCompilation.Create(
+            project.Name,
+            syntaxTrees,
+            TrustedPlatformReferences,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        foreach (SyntaxTree syntaxTree in syntaxTrees.OrderBy(tree => PathUtilities.Normalize(tree.FilePath), StringComparer.Ordinal))
+        {
+            SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
+            foreach (SyntaxNode node in syntaxTree.GetRoot(cancellationToken).DescendantNodes())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ExecutableMember.TryCreate(node, semanticModel, cancellationToken, out ExecutableMember? member)
+                    && member is not null
+                    && member.Body.HasBody)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (ExecutableMember.TryCreate(node, semanticModel, cancellationToken, out ExecutableMember? member)
-                        && member is not null
-                        && member.Body.HasBody)
+                    IReadOnlyList<NormalizedToken> stream = CSharpDuplicateTokenNormalizer.Normalize(
+                        member,
+                        semanticModel,
+                        project.Path,
+                        PathUtilities.ToDisplayPath(syntaxTree.FilePath, Directory.GetCurrentDirectory()),
+                        streamId,
+                        cancellationToken);
+                    if (stream.Count > 0)
                     {
-                        IReadOnlyList<NormalizedToken> stream = CSharpDuplicateTokenNormalizer.Normalize(
-                            member,
-                            semanticModel,
-                            project.Path,
-                            PathUtilities.ToDisplayPath(syntaxTree.FilePath, Directory.GetCurrentDirectory()),
-                            streamId,
-                            cancellationToken);
-                        if (stream.Count > 0)
-                        {
-                            streams.Add(stream);
-                            streamId++;
-                        }
+                        streams.Add(stream);
+                        streamId++;
                     }
                 }
             }
         }
-
-        return streams;
     }
 
     private List<CloneCandidate> FindCandidates(
         List<IReadOnlyList<NormalizedToken>> streams,
         int minimumTokens,
         int? minimumLines,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<ulong, List<WindowOccurrence>> index = BuildWindowIndex(streams, minimumTokens, cancellationToken);
+        List<CloneCandidate> candidates = [];
+        foreach (List<WindowOccurrence> bucket in index.Values.Where(bucket => bucket.Count > 1))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (List<WindowOccurrence> exactWindowGroup in GroupByExactWindow(bucket, minimumTokens, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                AppendExactWindowCandidates(exactWindowGroup, candidates, minimumTokens, minimumLines, cancellationToken);
+            }
+        }
+
+        candidates.Sort(CloneCandidate.Compare);
+        return candidates;
+    }
+
+    private Dictionary<ulong, List<WindowOccurrence>> BuildWindowIndex(
+        List<IReadOnlyList<NormalizedToken>> streams,
+        int minimumTokens,
         CancellationToken cancellationToken)
     {
         Dictionary<ulong, List<WindowOccurrence>> index = [];
@@ -205,48 +242,57 @@ internal sealed class DuplicateCodeDetector
             }
         }
 
-        List<CloneCandidate> candidates = [];
-        foreach (List<WindowOccurrence> bucket in index.Values.Where(bucket => bucket.Count > 1))
+        return index;
+    }
+
+    private static void AppendExactWindowCandidates(
+        List<WindowOccurrence> exactWindowGroup,
+        List<CloneCandidate> candidates,
+        int minimumTokens,
+        int? minimumLines,
+        CancellationToken cancellationToken)
+    {
+        List<WindowOccurrence> anchors = [];
+        foreach (WindowOccurrence occurrence in exactWindowGroup
+            .OrderBy(occurrence => occurrence.SortKey, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (List<WindowOccurrence> exactWindowGroup in GroupByExactWindow(bucket, minimumTokens, cancellationToken))
+            AppendOccurrenceCandidates(occurrence, anchors, candidates, minimumTokens, minimumLines, cancellationToken);
+        }
+    }
+
+    private static void AppendOccurrenceCandidates(
+        WindowOccurrence occurrence,
+        List<WindowOccurrence> anchors,
+        List<CloneCandidate> candidates,
+        int minimumTokens,
+        int? minimumLines,
+        CancellationToken cancellationToken)
+    {
+        bool comparedWithAnchor = false;
+        foreach (WindowOccurrence anchor in anchors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Overlaps(anchor, occurrence, minimumTokens))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                List<WindowOccurrence> anchors = [];
-                foreach (WindowOccurrence occurrence in exactWindowGroup
-                    .OrderBy(occurrence => occurrence.SortKey, StringComparer.Ordinal))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    bool comparedWithAnchor = false;
-                    foreach (WindowOccurrence anchor in anchors)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (Overlaps(anchor, occurrence, minimumTokens))
-                        {
-                            continue;
-                        }
-
-                        CloneCandidate candidate = Extend(anchor, occurrence, minimumTokens, cancellationToken);
-                        if (candidate.TokenCount >= minimumTokens
-                            && (minimumLines is null || candidate.Left.LineCount >= minimumLines.Value && candidate.Right.LineCount >= minimumLines.Value)
-                            && !candidate.Left.OverlapsWith(candidate.Right))
-                        {
-                            candidates.Add(candidate);
-                        }
-
-                        comparedWithAnchor = true;
-                    }
-
-                    if (!comparedWithAnchor && anchors.Count < MaximumAnchorsPerWindowGroup)
-                    {
-                        anchors.Add(occurrence);
-                    }
-                }
+                continue;
             }
+
+            CloneCandidate candidate = Extend(anchor, occurrence, minimumTokens, cancellationToken);
+            if (candidate.TokenCount >= minimumTokens
+                && (minimumLines is null || candidate.Left.LineCount >= minimumLines.Value && candidate.Right.LineCount >= minimumLines.Value)
+                && !candidate.Left.OverlapsWith(candidate.Right))
+            {
+                candidates.Add(candidate);
+            }
+
+            comparedWithAnchor = true;
         }
 
-        candidates.Sort(CloneCandidate.Compare);
-        return candidates;
+        if (!comparedWithAnchor && anchors.Count < MaximumAnchorsPerWindowGroup)
+        {
+            anchors.Add(occurrence);
+        }
     }
 
     private static IEnumerable<List<WindowOccurrence>> GroupByExactWindow(
