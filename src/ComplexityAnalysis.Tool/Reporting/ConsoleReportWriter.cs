@@ -12,43 +12,7 @@ internal sealed class ConsoleReportWriter : IReportWriter
         _ = builder.AppendLine("Entry: " + report.EntryPoint);
         _ = builder.AppendLine("Projects: " + report.Projects.Count.ToString(CultureInfo.InvariantCulture));
 
-        foreach (AnalyzedProjectReport project in report.Projects)
-        {
-            _ = builder.AppendLine();
-            _ = builder.AppendLine("Project: " + project.Name + " (" + project.Path + ")");
-            foreach (AnalyzedFileReport file in project.Files)
-            {
-                _ = builder.AppendLine("  File: " + file.Path);
-                foreach (MemberReport member in file.Members)
-                {
-                    _ = builder.Append("    ");
-                    _ = builder.Append(member.Kind);
-                    _ = builder.Append(' ');
-                    _ = builder.Append(member.DisplayName);
-                    _ = builder.Append(" [");
-                    _ = builder.Append(member.Location.StartLine.ToString(CultureInfo.InvariantCulture));
-                    _ = builder.Append(':');
-                    _ = builder.Append(member.Location.StartColumn.ToString(CultureInfo.InvariantCulture));
-                    _ = builder.Append("] BigO=");
-                    _ = builder.Append(member.BigO.Value ?? "Unknown");
-                    _ = builder.Append(" CC=");
-                    _ = builder.Append(Format(member.CyclomaticComplexity));
-                    _ = builder.Append(" Nesting=");
-                    _ = builder.Append(Format(member.MaximumNestingDepth));
-                    _ = builder.Append(" NLOC=");
-                    _ = builder.Append(Format(member.Nloc));
-                    _ = builder.Append(" Statements=");
-                    _ = builder.Append(Format(member.StatementCount));
-                    _ = builder.Append(" Tokens=");
-                    _ = builder.Append(Format(member.TokenCount));
-                    _ = builder.Append(" Parameters=");
-                    _ = builder.Append(Format(member.ParameterCount));
-                    _ = builder.Append(" Cognitive=");
-                    _ = builder.Append(Format(member.CognitiveComplexity));
-                    _ = builder.AppendLine();
-                }
-            }
-        }
+        AppendProjects(builder, report);
 
         if (report.Duplicates.Enabled)
         {
@@ -106,6 +70,47 @@ internal sealed class ConsoleReportWriter : IReportWriter
         }
 
         return builder.ToString();
+    }
+
+    private static void AppendProjects(StringBuilder builder, ProjectReport report)
+    {
+        foreach (AnalyzedProjectReport project in report.Projects)
+        {
+            _ = builder.AppendLine();
+            _ = builder.AppendLine("Project: " + project.Name + " (" + project.Path + ")");
+            foreach (AnalyzedFileReport file in project.Files)
+            {
+                _ = builder.AppendLine("  File: " + file.Path);
+                foreach (MemberReport member in file.Members)
+                {
+                    _ = builder.Append("    ");
+                    _ = builder.Append(member.Kind);
+                    _ = builder.Append(' ');
+                    _ = builder.Append(member.DisplayName);
+                    _ = builder.Append(" [");
+                    _ = builder.Append(member.Location.StartLine.ToString(CultureInfo.InvariantCulture));
+                    _ = builder.Append(':');
+                    _ = builder.Append(member.Location.StartColumn.ToString(CultureInfo.InvariantCulture));
+                    _ = builder.Append("] BigO=");
+                    _ = builder.Append(member.BigO.Value ?? "Unknown");
+                    _ = builder.Append(" CC=");
+                    _ = builder.Append(Format(member.CyclomaticComplexity));
+                    _ = builder.Append(" Nesting=");
+                    _ = builder.Append(Format(member.MaximumNestingDepth));
+                    _ = builder.Append(" NLOC=");
+                    _ = builder.Append(Format(member.Nloc));
+                    _ = builder.Append(" Statements=");
+                    _ = builder.Append(Format(member.StatementCount));
+                    _ = builder.Append(" Tokens=");
+                    _ = builder.Append(Format(member.TokenCount));
+                    _ = builder.Append(" Parameters=");
+                    _ = builder.Append(Format(member.ParameterCount));
+                    _ = builder.Append(" Cognitive=");
+                    _ = builder.Append(Format(member.CognitiveComplexity));
+                    _ = builder.AppendLine();
+                }
+            }
+        }
     }
 
     private static string Format(MetricReport<int> metric)

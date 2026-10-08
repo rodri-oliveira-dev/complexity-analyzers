@@ -178,24 +178,7 @@ internal static class CSharpProjectLoader
             char current = pattern[index];
             if (current == '*')
             {
-                bool isDoubleStar = index + 1 < pattern.Length && pattern[index + 1] == '*';
-                if (isDoubleStar)
-                {
-                    index++;
-                    if (index + 1 < pattern.Length && pattern[index + 1] == '/')
-                    {
-                        index++;
-                        _ = builder.Append("(?:.*/)?");
-                    }
-                    else
-                    {
-                        _ = builder.Append(".*");
-                    }
-                }
-                else
-                {
-                    _ = builder.Append("[^/]*");
-                }
+                AppendStarPattern(builder, pattern, ref index);
             }
             else if (current == '?')
             {
@@ -208,6 +191,27 @@ internal static class CSharpProjectLoader
         }
 
         return builder.ToString();
+    }
+
+    private static void AppendStarPattern(StringBuilder builder, string pattern, ref int index)
+    {
+        bool isDoubleStar = index + 1 < pattern.Length && pattern[index + 1] == '*';
+        if (!isDoubleStar)
+        {
+            _ = builder.Append("[^/]*");
+            return;
+        }
+
+        index++;
+        if (index + 1 < pattern.Length && pattern[index + 1] == '/')
+        {
+            index++;
+            _ = builder.Append("(?:.*/)?");
+        }
+        else
+        {
+            _ = builder.Append(".*");
+        }
     }
 
     private static bool HasImplicitCompileItems(XDocument projectDocument)
