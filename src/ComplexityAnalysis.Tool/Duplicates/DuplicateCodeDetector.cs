@@ -101,6 +101,7 @@ internal sealed class DuplicateCodeDetector
                 ranges.Add((occurrence.Location.Start, occurrence.Location.Start + occurrence.Location.Length));
             }
         }
+
         return duplicateRangesByFile;
     }
 
@@ -240,6 +241,7 @@ internal sealed class DuplicateCodeDetector
                 occurrences.Add(new WindowOccurrence(stream, start));
             }
         }
+
         return index;
     }
 
@@ -267,30 +269,30 @@ internal sealed class DuplicateCodeDetector
         int? minimumLines,
         CancellationToken cancellationToken)
     {
-            bool comparedWithAnchor = false;
-            foreach (WindowOccurrence anchor in anchors)
+        bool comparedWithAnchor = false;
+        foreach (WindowOccurrence anchor in anchors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Overlaps(anchor, occurrence, minimumTokens))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (Overlaps(anchor, occurrence, minimumTokens))
-                {
-                    continue;
-                }
-
-                CloneCandidate candidate = Extend(anchor, occurrence, minimumTokens, cancellationToken);
-                if (candidate.TokenCount >= minimumTokens
-                    && (minimumLines is null || candidate.Left.LineCount >= minimumLines.Value && candidate.Right.LineCount >= minimumLines.Value)
-                    && !candidate.Left.OverlapsWith(candidate.Right))
-                {
-                    candidates.Add(candidate);
-                }
-
-                comparedWithAnchor = true;
+                continue;
             }
 
-            if (!comparedWithAnchor && anchors.Count < MaximumAnchorsPerWindowGroup)
+            CloneCandidate candidate = Extend(anchor, occurrence, minimumTokens, cancellationToken);
+            if (candidate.TokenCount >= minimumTokens
+                && (minimumLines is null || candidate.Left.LineCount >= minimumLines.Value && candidate.Right.LineCount >= minimumLines.Value)
+                && !candidate.Left.OverlapsWith(candidate.Right))
             {
-                anchors.Add(occurrence);
+                candidates.Add(candidate);
             }
+
+            comparedWithAnchor = true;
+        }
+
+        if (!comparedWithAnchor && anchors.Count < MaximumAnchorsPerWindowGroup)
+        {
+            anchors.Add(occurrence);
+        }
     }
 
     private static IEnumerable<List<WindowOccurrence>> GroupByExactWindow(
