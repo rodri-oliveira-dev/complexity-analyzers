@@ -422,6 +422,86 @@ public sealed class ProjectToolTests
     }
 
     [Fact]
+    public void Console_report_writer_preserves_full_output_with_optional_sections()
+    {
+        ProjectReport report = CreateReportWithMember("M", "O(n)");
+        report.Projects[0].Files[0].Members.Add(new MemberReport
+        {
+            DisplayName = "Unknown",
+            Kind = "operator",
+            SymbolId = "Unknown",
+            Location = Location("Alpha.cs"),
+            BigO = BigOReport.Unknown(),
+        });
+        report.Projects.Add(new AnalyzedProjectReport
+        {
+            Name = "Empty",
+            Path = "Empty.csproj",
+        });
+        report.Duplicates = new DuplicateSummaryReport
+        {
+            Enabled = true,
+            MinimumTokens = 5,
+            TotalNormalizedTokens = 100,
+            DuplicateTokenCount = 5,
+            DuplicateRate = MetricReport<double>.Known(12.5),
+        };
+        CloneGroupReport group = new()
+        {
+            Id = "CLONE0001",
+            NormalizedTokenCount = 5,
+            OccurrenceCount = 2,
+            DuplicateTokenCount = 5,
+        };
+        group.Occurrences.Add(new CloneOccurrenceReport
+        {
+            ProjectPath = "Fixture.csproj",
+            FilePath = "Alpha.cs",
+            Location = Location("Alpha.cs"),
+        });
+        group.Occurrences.Add(new CloneOccurrenceReport
+        {
+            ProjectPath = "Fixture.csproj",
+            FilePath = "Beta.cs",
+            Location = Location("Beta.cs"),
+        });
+        report.Duplicates.CloneGroups.Add(group);
+        report.QualityGates.Add(new QualityGateReport
+        {
+            Metric = "nloc",
+            Subject = "member",
+            Actual = "1",
+            Threshold = "5",
+            Passed = true,
+        });
+
+        string expected = string.Join(Environment.NewLine, new[]
+        {
+            "Complexity Analysis Report",
+            "Entry: Fixture.csproj",
+            "Projects: 2",
+            "",
+            "Project: Fixture (Fixture.csproj)",
+            "  File: Alpha.cs",
+            "    method M [1:1] BigO=O(n) CC=1 Nesting=0 NLOC=1 Statements=1 Tokens=1 Parameters=0 Cognitive=0",
+            "    operator Unknown [1:1] BigO=Unknown CC=Unknown Nesting=Unknown NLOC=Unknown Statements=Unknown Tokens=Unknown Parameters=Unknown Cognitive=Unknown",
+            "",
+            "Project: Empty (Empty.csproj)",
+            "",
+            "Duplicates: 1 groups, rate 12.5",
+            "  CLONE0001: 5 tokens, 2 occurrences",
+            "    Alpha.cs:1:1-1:10",
+            "    Beta.cs:1:1-1:10",
+            "",
+            "Quality Gates:",
+            "  PASS nloc member actual=1 threshold=5",
+            "",
+        });
+
+        Assert.Equal(expected, new ConsoleReportWriter().Write(report));
+    }
+
+    [Fact]
     public async Task Malformed_xml_inputs_return_documented_error_exit_code()
     {
         using FixtureProject fixture = FixtureProject.Create();
@@ -537,6 +617,52 @@ public sealed class ProjectToolTests
         Assert.Equal(ToolExitCodes.Success, exitCode);
         Assert.DoesNotContain("Alpha.cs", output, StringComparison.Ordinal);
         Assert.Contains("Beta.cs", output, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Sources/*.cs", "Alpha.cs,Special[1].cs,Special1.cs")]
+    [InlineData("Sources/**/*.cs", "Alpha.cs,Beta.cs,Gamma.cs,Special[1].cs,Special1.cs")]
+    [InlineData("Sources/**.cs", "Alpha.cs,Beta.cs,Gamma.cs,Special[1].cs,Special1.cs")]
+    [InlineData("Sources/?lph*.cs", "Alpha.cs")]
+    [InlineData("Sources/Special[1]*.cs", "Special[1].cs")]
+    public async Task Compile_include_globs_preserve_wildcard_translation(string pattern, string expectedFiles)
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject(
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+                <ImplicitUsings>enable</ImplicitUsings>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+              <ItemGroup>
+                <Compile Include="__PATTERN__" />
+              </ItemGroup>
+            </Project>
+            """.Replace("__PATTERN__", pattern, StringComparison.Ordinal));
+        fixture.WriteSource("Sources/Alpha.cs", "public sealed class Alpha { public void M() { } }");
+        fixture.WriteSource("Sources/Nested/Beta.cs", "public sealed class Beta { public void M() { } }");
+        fixture.WriteSource("Sources/Nested/Deep/Gamma.cs", "public sealed class Gamma { public void M() { } }");
+        fixture.WriteSource("Sources/Special[1].cs", "public sealed class SpecialBracket { public void M() { } }");
+        fixture.WriteSource("Sources/Special1.cs", "public sealed class SpecialOne { public void M() { } }");
+        fixture.WriteSource("Outside/Delta.cs", "public sealed class Delta { public void M() { } }");
+
+        (int exitCode, string output, _) = await RunCliAsync(
+            "analyze", fixture.ProjectPath, "--format", "json");
+
+        Assert.Equal(ToolExitCodes.Success, exitCode);
+        using JsonDocument document = JsonDocument.Parse(output);
+        HashSet<string> actualFiles = [];
+        foreach (JsonElement file in document.RootElement.GetProperty("Projects")[0].GetProperty("Files").EnumerateArray())
+        {
+            actualFiles.Add(Path.GetFileName(file.GetProperty("Path").GetString()!));
+        }
+
+        Assert.True(
+            actualFiles.SetEquals(expectedFiles.Split(',')),
+            $"Glob '{pattern}' resolved [{string.Join(", ", actualFiles)}], expected [{expectedFiles}].");
     }
 
     [Fact]
