@@ -903,10 +903,10 @@ public sealed class ProjectToolTests
 
         ProjectReport report = new() { EntryPoint = fixture.ProjectPath };
         AnalyzedProjectReport first = new() { Name = "First", Path = fixture.ProjectPath };
-        first.Files.Add(new AnalyzedFileReport { Path = Path.Combine(fixture.DirectoryPath, "Alpha.cs") });
-        first.Files.Add(new AnalyzedFileReport { Path = Path.Combine(fixture.DirectoryPath, "Beta.cs") });
+        first.Files.Add(new AnalyzedFileReport { Path = PathUtilities.ToDisplayPath(Path.Combine(fixture.DirectoryPath, "Alpha.cs"), Directory.GetCurrentDirectory()) });
+        first.Files.Add(new AnalyzedFileReport { Path = PathUtilities.ToDisplayPath(Path.Combine(fixture.DirectoryPath, "Beta.cs"), Directory.GetCurrentDirectory()) });
         AnalyzedProjectReport second = new() { Name = "Second", Path = fixture.ProjectPath };
-        second.Files.Add(new AnalyzedFileReport { Path = Path.Combine(fixture.DirectoryPath, "Empty.cs") });
+        second.Files.Add(new AnalyzedFileReport { Path = PathUtilities.ToDisplayPath(Path.Combine(fixture.DirectoryPath, "Empty.cs"), Directory.GetCurrentDirectory()) });
         report.Projects.Add(first);
         report.Projects.Add(second);
 
