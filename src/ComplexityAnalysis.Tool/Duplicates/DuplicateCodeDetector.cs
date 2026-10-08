@@ -229,7 +229,7 @@ internal sealed class DuplicateCodeDetector
                         CloneCandidate candidate = Extend(anchor, occurrence, minimumTokens, cancellationToken);
                         if (candidate.TokenCount >= minimumTokens
                             && (minimumLines is null || candidate.Left.LineCount >= minimumLines.Value && candidate.Right.LineCount >= minimumLines.Value)
-                            && !candidate.Left.Overlaps(candidate.Right))
+                            && !candidate.Left.OverlapsWith(candidate.Right))
                         {
                             candidates.Add(candidate);
                         }
@@ -331,7 +331,7 @@ internal sealed class DuplicateCodeDetector
         List<MutableCloneGroup> mutableGroups = [];
         foreach (CloneCandidate candidate in candidates)
         {
-            string signature = candidate.CreateSignature();
+            string signature = candidate.CreateTokenSignature();
             MutableCloneGroup? group = mutableGroups.FirstOrDefault(existing => StringComparer.Ordinal.Equals(existing.Signature, signature));
             if (group is null)
             {
@@ -349,7 +349,7 @@ internal sealed class DuplicateCodeDetector
             .OrderByDescending(group => group.TokenCount)
             .ThenBy(group => group.FirstSortKey, StringComparer.Ordinal))
         {
-            if (selected.Any(existing => existing.Overlaps(group)))
+            if (selected.Any(existing => existing.OverlapsWith(group)))
             {
                 continue;
             }
@@ -410,7 +410,7 @@ internal sealed class DuplicateCodeDetector
 
     private sealed record CloneCandidate(CloneRange Left, CloneRange Right, int TokenCount)
     {
-        internal string CreateSignature()
+        internal string CreateTokenSignature()
         {
             return string.Join("\u001f", Left.Tokens.Select(token => token.Value));
         }
@@ -463,7 +463,7 @@ internal sealed class DuplicateCodeDetector
 
         internal string SortKey => First.FilePath + ":" + First.Start.ToString("D10", CultureInfo.InvariantCulture);
 
-        internal bool Overlaps(CloneRange other)
+        internal bool OverlapsWith(CloneRange other)
         {
             return First.StreamId == other.First.StreamId && Start < other.End && other.Start < End;
         }
@@ -517,13 +517,13 @@ internal sealed class DuplicateCodeDetector
             _ = occurrences.TryAdd(range.SortKey, range);
         }
 
-        internal bool Overlaps(MutableCloneGroup other)
+        internal bool OverlapsWith(MutableCloneGroup other)
         {
             foreach (CloneRange left in Occurrences)
             {
                 foreach (CloneRange right in other.Occurrences)
                 {
-                    if (left.Overlaps(right))
+                    if (left.OverlapsWith(right))
                     {
                         return true;
                     }
