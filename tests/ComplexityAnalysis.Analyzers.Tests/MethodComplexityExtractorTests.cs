@@ -2208,6 +2208,180 @@ public sealed class MethodComplexityExtractorTests
             "O(1)");
     }
 
+    [Theory]
+    [InlineData("counter-assignment")]
+    [InlineData("bound-assignment")]
+    [InlineData("bound-receiver-assignment")]
+    [InlineData("counter-ref-alias")]
+    [InlineData("bound-ref-alias")]
+    [InlineData("counter-ref-call")]
+    [InlineData("bound-local-function-call")]
+    public void For_with_unstable_control_or_bound_is_unknown(string scenario)
+    {
+        string source = scenario switch
+        {
+            "counter-assignment" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = 0; i < count; i++)
+                        {
+                            i = 0;
+                        }
+                    }
+                }
+                """,
+            "bound-assignment" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = 0; i < count; i++)
+                        {
+                            count++;
+                        }
+                    }
+                }
+                """,
+            "bound-receiver-assignment" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int[] items)
+                    {
+                        for (var i = 0; i < items.Length; i++)
+                        {
+                            items = [];
+                        }
+                    }
+                }
+                """,
+            "counter-ref-alias" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = 0; i < count; i++)
+                        {
+                            ref var alias = ref i;
+                            alias = 0;
+                        }
+                    }
+                }
+                """,
+            "bound-ref-alias" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        ref var limit = ref count;
+                        for (var i = 0; i < count; i++)
+                        {
+                            limit = 0;
+                        }
+                    }
+                }
+                """,
+            "counter-ref-call" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        for (var i = 0; i < count; i++)
+                        {
+                            Reset(ref i);
+                        }
+                    }
+
+                    void Reset(ref int value) => value = 0;
+                }
+                """,
+            "bound-local-function-call" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        void Reset() => count = 0;
+
+                        for (var i = 0; i < count; i++)
+                        {
+                            Reset();
+                        }
+                    }
+                }
+                """,
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
+        };
+
+        AssertMethodComplexity(source, "Unknown");
+    }
+
+    [Theory]
+    [InlineData("linear", "O(n)")]
+    [InlineData("logarithmic", "O(log n)")]
+    public void For_with_stable_control_and_bound_remains_classified(
+        string scenario,
+        string expectedComplexity)
+    {
+        string progression = scenario == "linear" ? "i++" : "i *= 2";
+        string initializer = scenario == "linear" ? "0" : "1";
+
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i =
+            """ + initializer + """
+            ; i < count;
+            """ + progression + """
+            )
+                    {
+                        Observe(i);
+                    }
+                }
+
+                void Observe(int value)
+                {
+                }
+            }
+            """,
+            expectedComplexity);
+    }
+
+    [Fact]
+    public void For_ignores_mutations_of_value_copies_and_unrelated_local_function_state()
+    {
+        AssertMethodComplexity(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    var copy = count;
+                    var unrelated = 0;
+
+                    void ResetUnrelated() => unrelated = 0;
+
+                    for (var i = 0; i < count; i++)
+                    {
+                        copy = 0;
+                        ResetUnrelated();
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
     [Fact]
     public void Nested_loops_over_same_input_are_quadratic()
     {
@@ -2413,6 +2587,8 @@ public sealed class MethodComplexityExtractorTests
     [InlineData("variable-factor")]
     [InlineData("condition-without-control-variable")]
     [InlineData("multiple-control-mutations")]
+    [InlineData("bound-mutation")]
+    [InlineData("bound-ref-call")]
     public void Unsupported_while_patterns_are_unknown(string scenario)
     {
         string source = scenario switch
@@ -2472,6 +2648,38 @@ public sealed class MethodComplexityExtractorTests
                             i *= 2;
                         }
                     }
+                }
+                """,
+            "bound-mutation" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        var i = 0;
+                        while (i < count)
+                        {
+                            i++;
+                            count--;
+                        }
+                    }
+                }
+                """,
+            "bound-ref-call" =>
+                """
+                public sealed class Sample
+                {
+                    void M(int count)
+                    {
+                        var i = 0;
+                        while (i < count)
+                        {
+                            i++;
+                            Reset(ref count);
+                        }
+                    }
+
+                    void Reset(ref int value) => value = 0;
                 }
                 """,
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
@@ -3270,6 +3478,37 @@ public sealed class MethodComplexityExtractorTests
             extractor.AnalyzeBlock(
                 facts.MethodDeclaration.Body!,
                 context));
+    }
+
+    [Fact]
+    public void Cancellation_requested_before_loop_stability_analysis_is_respected()
+    {
+        MethodFacts facts = CreateFacts(
+            """
+            public sealed class Sample
+            {
+                void M(int count)
+                {
+                    for (var i = 0; i < count; i++)
+                    {
+                        i = 0;
+                    }
+                }
+            }
+            """);
+        using var cancellationTokenSource = new CancellationTokenSource();
+        MethodAnalysisContext context = MethodAnalysisContext.Create(
+            facts.MethodDeclaration,
+            facts.SemanticModel,
+            cancellationTokenSource.Token);
+        ForStatementSyntax forStatement = facts.MethodDeclaration.Body!
+            .DescendantNodes()
+            .OfType<ForStatementSyntax>()
+            .Single();
+        cancellationTokenSource.Cancel();
+
+        _ = Assert.Throws<OperationCanceledException>(() =>
+            new LoopBoundAnalyzer(context).AnalyzeFor(forStatement));
     }
 
     private static void AssertMethodComplexity(string source, string expected, string? scenario = null)

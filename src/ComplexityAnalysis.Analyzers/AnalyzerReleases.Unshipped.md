@@ -31,6 +31,7 @@ BIG1005 | Message now states exponential growth and exposes `complexity` plus `r
 BIG1006 | Message wording was tightened and exposes `complexity` plus `threshold`.
 BIG9000 | Diagnostic properties expose `diagnosticRole`.
 BIG0001 | Estimated complexity can now report for supported constructors, accessors, operators, conversion operators, local functions, lambdas, anonymous methods and expression-bodied properties when complexity is known.
+BIG0001 | Loop-bound estimation now remains `Unknown` when the control variable or bound is mutated directly, through a simple `ref` alias, by a `ref`/`out` call, or by an invoked local function.
 BIG1001-BIG1004 | Actionable diagnostics now respect executable-member body boundaries and can report inside supported non-method executable roots when the same evidence requirements are met.
 BIG1005 | Direct-recursion reporting can now use the shared executable-member abstraction for supported non-lambda executable roots when recurrence extraction succeeds.
 BIG1006 | Threshold diagnostics can now report for supported executable members when their known complexity exceeds the configured maximum.

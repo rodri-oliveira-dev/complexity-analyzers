@@ -181,6 +181,11 @@ The estimate may include supported loop bounds, known BCL/LINQ operations, safe
 source-method or local-function callees in the same compilation, and selected
 solved direct recursion.
 
+Loop-bound estimates require the control variable and bound to remain stable
+apart from the recognized progression. Relevant direct mutations, simple `ref`
+aliases, `ref`/`out` calls, and invoked local functions that mutate either value
+make the loop estimate `Unknown`.
+
 ### Guidance
 
 Use `BIG0001` when you want visibility into known estimates while tuning

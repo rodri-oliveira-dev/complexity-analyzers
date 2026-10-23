@@ -185,6 +185,12 @@ A estimativa pode incluir limites de loop suportados, operações BCL/LINQ
 conhecidas, callees de métodos-fonte ou local functions seguros na mesma
 compilation e formatos selecionados de recursão direta resolvida.
 
+Estimativas de limites de loop exigem que a variável de controle e o bound
+permaneçam estáveis, exceto pela progressão reconhecida. Mutações diretas
+relevantes, aliases `ref` simples, chamadas `ref`/`out` e local functions
+invocadas que alterem qualquer um desses valores tornam a estimativa do loop
+`Unknown`.
+
 ### Orientação
 
 Use `BIG0001` quando quiser visibilidade das estimativas conhecidas ao ajustar

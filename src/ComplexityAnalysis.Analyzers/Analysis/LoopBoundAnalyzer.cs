@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
@@ -32,6 +33,11 @@ internal sealed class LoopBoundAnalyzer
             || !TryResolveBoundExpression(initializer, out LoopBoundExpression initialBound)
             || !TryAnalyzeCondition(forStatement.Condition, loopVariable, out LoopConditionAnalysis condition)
             || !TryAnalyzeIncrementors(forStatement.Incrementors, loopVariable, out LoopProgression progression)
+            || !IsLoopControlStable(
+                forStatement.Statement,
+                loopVariable,
+                condition.BoundExpression,
+                allowedLoopVariableMutation: null)
             ? LoopBoundAnalysisResult.Unknown()
             : CreateLoopResult(initialBound, condition, progression);
     }
@@ -102,7 +108,16 @@ internal sealed class LoopBoundAnalyzer
             || loopVariable is null
             || !context.TryGetLocalLoopBound(loopVariable, out LoopBoundExpression initialBound)
             || !TryAnalyzeCondition(condition, loopVariable, out LoopConditionAnalysis conditionAnalysis)
-            || !TryAnalyzeBodyProgression(body, loopVariable, out LoopProgression progression)
+            || !TryAnalyzeBodyProgression(
+                body,
+                loopVariable,
+                out LoopProgression progression,
+                out ExpressionSyntax? progressionExpression)
+            || !IsLoopControlStable(
+                body,
+                loopVariable,
+                conditionAnalysis.BoundExpression,
+                progressionExpression)
             ? LoopBoundAnalysisResult.Unknown()
             : CreateLoopResult(initialBound, conditionAnalysis, progression);
     }
@@ -195,7 +210,7 @@ internal sealed class LoopBoundAnalyzer
         }
 
         LoopDirection direction = GetConditionDirection(binary.Kind(), variableOnLeft);
-        analysis = new LoopConditionAnalysis(direction, bound);
+        analysis = new LoopConditionAnalysis(direction, bound, boundExpression);
         return true;
     }
 
@@ -215,14 +230,21 @@ internal sealed class LoopBoundAnalyzer
     private bool TryAnalyzeBodyProgression(
         StatementSyntax body,
         ISymbol loopVariable,
-        out LoopProgression progression)
+        out LoopProgression progression,
+        out ExpressionSyntax? progressionExpression)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
         progression = default;
+        progressionExpression = null;
         bool found = false;
 
-        return TryAnalyzeUnconditionalProgressionStatement(body, loopVariable, ref found, ref progression)
+        return TryAnalyzeUnconditionalProgressionStatement(
+                body,
+                loopVariable,
+                ref found,
+                ref progression,
+                ref progressionExpression)
             && found;
     }
 
@@ -230,7 +252,8 @@ internal sealed class LoopBoundAnalyzer
         StatementSyntax statement,
         ISymbol loopVariable,
         ref bool found,
-        ref LoopProgression progression)
+        ref LoopProgression progression,
+        ref ExpressionSyntax? progressionExpression)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
@@ -238,7 +261,12 @@ internal sealed class LoopBoundAnalyzer
         {
             foreach (StatementSyntax childStatement in block.Statements)
             {
-                if (!TryAnalyzeUnconditionalProgressionStatement(childStatement, loopVariable, ref found, ref progression))
+                if (!TryAnalyzeUnconditionalProgressionStatement(
+                    childStatement,
+                    loopVariable,
+                    ref found,
+                    ref progression,
+                    ref progressionExpression))
                 {
                     return false;
                 }
@@ -259,10 +287,12 @@ internal sealed class LoopBoundAnalyzer
                 || !TryAnalyzeProgression(expression, loopVariable, out progression))
             {
                 progression = default;
+                progressionExpression = null;
                 return false;
             }
 
             found = true;
+            progressionExpression = expression;
             return true;
         }
 
@@ -284,6 +314,245 @@ internal sealed class LoopBoundAnalyzer
         }
 
         return false;
+    }
+
+    private bool IsLoopControlStable(
+        StatementSyntax body,
+        ISymbol loopVariable,
+        ExpressionSyntax boundExpression,
+        ExpressionSyntax? allowedLoopVariableMutation)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        HashSet<ISymbol> protectedSymbols = new(SymbolEqualityComparer.Default)
+        {
+            loopVariable,
+        };
+
+        AddReferencedLocalAndParameterSymbols(boundExpression, protectedSymbols);
+        AddReferencedRefAliases(body, protectedSymbols);
+
+        return !ContainsRelevantMutation(
+            body,
+            protectedSymbols,
+            allowedLoopVariableMutation,
+            new HashSet<ISymbol>(SymbolEqualityComparer.Default));
+    }
+
+    private void AddReferencedLocalAndParameterSymbols(
+        ExpressionSyntax expression,
+        HashSet<ISymbol> symbols)
+    {
+        foreach (IdentifierNameSyntax identifier in expression.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            ISymbol? symbol = context.SemanticModel
+                .GetSymbolInfo(identifier, context.CancellationToken)
+                .Symbol;
+
+            if (symbol is ILocalSymbol or IParameterSymbol)
+            {
+                _ = symbols.Add(symbol);
+            }
+        }
+    }
+
+    private void AddReferencedRefAliases(SyntaxNode scope, HashSet<ISymbol> protectedSymbols)
+    {
+        bool added;
+        do
+        {
+            added = false;
+
+            foreach (IdentifierNameSyntax identifier in
+                ExecutableMemberSyntax.DescendantNodesAndSelfExcludingNestedExecutableBodies<IdentifierNameSyntax>(scope))
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+
+                ISymbol? symbol = context.SemanticModel
+                    .GetSymbolInfo(identifier, context.CancellationToken)
+                    .Symbol;
+
+                if (symbol is ILocalSymbol { RefKind: not RefKind.None } local
+                    && !protectedSymbols.Contains(local)
+                    && RefAliasTargetsProtectedSymbol(
+                        local,
+                        protectedSymbols,
+                        new HashSet<ISymbol>(SymbolEqualityComparer.Default)))
+                {
+                    added |= protectedSymbols.Add(local);
+                }
+            }
+        }
+        while (added);
+    }
+
+    private bool RefAliasTargetsProtectedSymbol(
+        ILocalSymbol alias,
+        HashSet<ISymbol> protectedSymbols,
+        HashSet<ISymbol> visitedAliases)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        if (!visitedAliases.Add(alias))
+        {
+            return false;
+        }
+
+        foreach (SyntaxReference declarationReference in alias.DeclaringSyntaxReferences)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (declarationReference.GetSyntax(context.CancellationToken) is VariableDeclaratorSyntax
+                {
+                    Initializer.Value: RefExpressionSyntax refExpression,
+                })
+            {
+                ISymbol? target = context.SemanticModel
+                    .GetSymbolInfo(refExpression.Expression, context.CancellationToken)
+                    .Symbol;
+
+                if (target is not null
+                    && (protectedSymbols.Contains(target)
+                        || (target is ILocalSymbol { RefKind: not RefKind.None } targetAlias
+                            && RefAliasTargetsProtectedSymbol(targetAlias, protectedSymbols, visitedAliases))))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool ContainsRelevantMutation(
+        SyntaxNode scope,
+        HashSet<ISymbol> protectedSymbols,
+        ExpressionSyntax? allowedLoopVariableMutation,
+        HashSet<ISymbol> visitedLocalFunctions)
+    {
+        foreach (ExpressionSyntax expression in
+            ExecutableMemberSyntax.DescendantNodesAndSelfExcludingNestedExecutableBodies<ExpressionSyntax>(scope))
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (!ReferenceEquals(expression, allowedLoopVariableMutation)
+                && TargetsProtectedSymbolMutation(expression, protectedSymbols))
+            {
+                return true;
+            }
+
+            if (expression is InvocationExpressionSyntax invocation
+                && (InvocationPassesProtectedSymbolByReference(invocation, protectedSymbols)
+                    || InvokedLocalFunctionMutatesProtectedSymbol(
+                        invocation,
+                        protectedSymbols,
+                        visitedLocalFunctions)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TargetsProtectedSymbolMutation(
+        ExpressionSyntax expression,
+        HashSet<ISymbol> protectedSymbols)
+    {
+        expression = UnwrapParentheses(expression);
+
+        return expression switch
+        {
+            AssignmentExpressionSyntax assignment => IsProtectedSymbolReference(assignment.Left, protectedSymbols),
+            PostfixUnaryExpressionSyntax postfixUnary when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression)
+                || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                IsProtectedSymbolReference(postfixUnary.Operand, protectedSymbols),
+            PrefixUnaryExpressionSyntax prefixUnary when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression)
+                || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                IsProtectedSymbolReference(prefixUnary.Operand, protectedSymbols),
+            _ => false,
+        };
+    }
+
+    private bool InvocationPassesProtectedSymbolByReference(
+        InvocationExpressionSyntax invocation,
+        HashSet<ISymbol> protectedSymbols)
+    {
+        foreach (ArgumentSyntax argument in invocation.ArgumentList.Arguments)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            if ((argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword)
+                    || argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword))
+                && IsProtectedSymbolReference(argument.Expression, protectedSymbols))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool InvokedLocalFunctionMutatesProtectedSymbol(
+        InvocationExpressionSyntax invocation,
+        HashSet<ISymbol> protectedSymbols,
+        HashSet<ISymbol> visitedLocalFunctions)
+    {
+        ISymbol? invokedSymbol = context.SemanticModel
+            .GetSymbolInfo(invocation, context.CancellationToken)
+            .Symbol;
+
+        if (invokedSymbol is not IMethodSymbol { MethodKind: MethodKind.LocalFunction } localFunction
+            || !visitedLocalFunctions.Add(localFunction))
+        {
+            return false;
+        }
+
+        foreach (SyntaxReference syntaxReference in localFunction.DeclaringSyntaxReferences)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (syntaxReference.GetSyntax(context.CancellationToken) is not LocalFunctionStatementSyntax declaration)
+            {
+                continue;
+            }
+
+            SyntaxNode? localFunctionBody = declaration.Body ?? (SyntaxNode?)declaration.ExpressionBody?.Expression;
+            if (localFunctionBody is null)
+            {
+                continue;
+            }
+
+            HashSet<ISymbol> localProtectedSymbols = new(protectedSymbols, SymbolEqualityComparer.Default);
+            AddReferencedRefAliases(localFunctionBody, localProtectedSymbols);
+
+            if (ContainsRelevantMutation(
+                localFunctionBody,
+                localProtectedSymbols,
+                allowedLoopVariableMutation: null,
+                visitedLocalFunctions))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsProtectedSymbolReference(
+        ExpressionSyntax expression,
+        HashSet<ISymbol> protectedSymbols)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        SymbolInfo symbolInfo = context.SemanticModel.GetSymbolInfo(
+            UnwrapParentheses(expression),
+            context.CancellationToken);
+
+        return symbolInfo.Symbol is not null
+            && protectedSymbols.Contains(symbolInfo.Symbol);
     }
 
     private bool TryAnalyzeProgression(
@@ -735,10 +1004,14 @@ internal sealed class LoopBoundAnalyzer
 
     private readonly struct LoopConditionAnalysis
     {
-        internal LoopConditionAnalysis(LoopDirection direction, LoopBoundExpression bound)
+        internal LoopConditionAnalysis(
+            LoopDirection direction,
+            LoopBoundExpression bound,
+            ExpressionSyntax boundExpression)
         {
             Direction = direction;
             Bound = bound;
+            BoundExpression = boundExpression;
         }
 
         internal LoopDirection Direction
@@ -747,6 +1020,11 @@ internal sealed class LoopBoundAnalyzer
         }
 
         internal LoopBoundExpression Bound
+        {
+            get;
+        }
+
+        internal ExpressionSyntax BoundExpression
         {
             get;
         }
