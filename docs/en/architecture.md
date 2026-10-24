@@ -278,6 +278,14 @@ src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/
 
 Deferred LINQ operations such as `Where` and `OrderBy` are not charged as full enumeration merely when created. Enumeration or sorting cost is applied when supported consumption is proven, such as through a terminal operation or `foreach`.
 
+The bounded deferred-sequence analysis can follow a pipeline through an
+unchanged local initializer. It resolves locals and delegate targets by Roslyn
+symbol identity, rejects intervening writes, and replays the pipeline plan for
+each proven consumption. Delegate-body cost is propagated only from inline
+delegates, stable local delegates without mutable captured state, or safe
+source/local targets available in the same syntax tree; other targets make the
+consumed pipeline `Unknown`.
+
 Unsupported or unresolved operations remain `Unknown`.
 
 Collection mappings are keyed to the statically resolved declaring symbol.

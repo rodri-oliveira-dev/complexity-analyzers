@@ -133,7 +133,13 @@ the backing storage can still take `O(n)`. Calls resolved only through generic
 collection interfaces remain `Unknown` because interface contracts do not prove
 the runtime implementation or its complexity.
 
-Deferred LINQ pipeline creation is not charged as a full enumeration. Enumeration cost is counted when a supported terminal operation or `foreach` consumes the pipeline.
+Deferred LINQ pipeline creation is not charged as a full enumeration. Direct
+chains and stable local pipelines retain their known cardinality and are charged
+when a supported terminal operation or `foreach` consumes them, including each
+proven re-enumeration. Predicate and selector cost is included only for inline
+delegates, stable local delegates, or safe source/local targets whose body is
+available; unresolved or reassigned delegate targets and delegates with mutable
+captured state remain `Unknown` when the pipeline is consumed.
 
 ### Interprocedural analysis
 

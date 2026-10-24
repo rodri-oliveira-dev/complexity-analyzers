@@ -1209,7 +1209,14 @@ Mappings são baseados nos símbolos resolvidos. Métodos do usuário com o mesm
 nome não são mapeados automaticamente.
 
 A criação de uma pipeline deferred é tratada como trabalho de setup. O custo de
-enumeração ou ordenação só é cobrado quando consumo suportado é comprovado.
+enumeração ou ordenação só é cobrado quando consumo suportado é comprovado. Uma
+pipeline armazenada em um local estável preserva a cardinalidade conhecida da
+fonte e os custos das operações, e cada consumo terminal ou reenumeração por
+`foreach` comprovado é analisado. Corpos de predicates e selectors só contribuem
+quando o delegate é uma lambda ou anonymous method inline, um delegate local
+estável ou um alvo de método fonte/local seguro com corpo disponível. Parâmetros
+delegate, method groups externos, locais reatribuídos e estado capturado mutável
+permanecem `Unknown` no consumo.
 
 ## Escopo de Chamadas-Fonte Suportadas
 

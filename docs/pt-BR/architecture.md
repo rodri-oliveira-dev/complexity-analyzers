@@ -280,6 +280,14 @@ src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/
 
 Operações LINQ deferred como `Where` e `OrderBy` não são contabilizadas como enumeração completa apenas por serem criadas. O custo de enumeração ou ordenação é aplicado quando o consumo suportado é comprovado, por exemplo por uma operação terminal ou `foreach`.
 
+A análise limitada de sequências deferred pode acompanhar uma pipeline por um
+inicializador local não alterado. Ela resolve locais e alvos de delegate por
+identidade de símbolo Roslyn, rejeita escritas intermediárias e reaplica o plano
+da pipeline a cada consumo comprovado. O custo do corpo do delegate só é
+propagado a partir de delegates inline, delegates locais estáveis sem estado
+capturado mutável ou alvos fonte/locais seguros disponíveis na mesma syntax
+tree; outros alvos tornam a pipeline consumida `Unknown`.
+
 Operações não suportadas ou não resolvidas permanecem `Unknown`.
 
 Os mappings de coleções usam o símbolo declarador resolvido estaticamente.

@@ -1652,6 +1652,335 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
+    public void Stored_ordering_pipeline_is_charged_only_when_consumed()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values)
+                {
+                    var query = values.OrderBy(value => value);
+                    return query.ToList();
+                }
+            }
+            """,
+            "O(n log n)");
+    }
+
+    [Fact]
+    public void Stored_pipeline_reenumeration_retains_the_pipeline_cost()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                int[] M(IEnumerable<int> values)
+                {
+                    var query = values.OrderBy(value => value);
+                    var first = query.ToList();
+                    return query.ToArray();
+                }
+            }
+            """,
+            "O(n log n)");
+    }
+
+    [Fact]
+    public void Stored_pipeline_propagates_proven_closure_cost()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values, List<int> blocked)
+                {
+                    var query = values.Where(value => blocked.Contains(value));
+                    return query.ToList();
+                }
+            }
+            """,
+            "O(n + n \u00b7 m)");
+    }
+
+    [Fact]
+    public void Consumed_pipeline_propagates_anonymous_delegate_cost()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values, List<int> blocked) =>
+                    values.Where(delegate(int value)
+                    {
+                        return blocked.Contains(value);
+                    }).ToList();
+            }
+            """,
+            "O(n + n \u00b7 m)");
+    }
+
+    [Fact]
+    public void Stored_pipeline_with_mutated_closure_target_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(
+                    IEnumerable<int> values,
+                    List<int> blocked,
+                    List<int> replacement)
+                {
+                    var query = values.Where(value => blocked.Contains(value));
+                    blocked = replacement;
+                    return query.ToList();
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Stored_pipeline_with_stable_local_delegate_propagates_delegate_cost()
+    {
+        AssertMethodComplexity(
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values)
+                {
+                    Func<int, bool> predicate = value => value > 0;
+                    var query = values.Where(predicate);
+                    return query.ToList();
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Stored_pipeline_with_local_function_target_propagates_delegate_cost()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values, List<int> blocked)
+                {
+                    var query = values.Where(IsBlocked);
+                    return query.ToList();
+
+                    bool IsBlocked(int value) => blocked.Contains(value);
+                }
+            }
+            """,
+            "O(n + n \u00b7 m)");
+    }
+
+    [Fact]
+    public void Local_function_target_with_mutated_capture_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(
+                    IEnumerable<int> values,
+                    List<int> blocked,
+                    List<int> replacement)
+                {
+                    var query = values.Where(IsBlocked);
+                    blocked = replacement;
+                    return query.ToList();
+
+                    bool IsBlocked(int value) => blocked.Contains(value);
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Stored_pipeline_in_foreach_is_charged_when_enumerated()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                void M(IEnumerable<int> values)
+                {
+                    var query = values.Where(value => value > 0);
+                    foreach (var value in query)
+                    {
+                        var next = value + 1;
+                    }
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Delegate_parameter_target_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values, Func<int, bool> predicate) =>
+                    values.Where(predicate).ToList();
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void External_method_group_target_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<string> M(IEnumerable<string> values) =>
+                    values.Where(string.IsNullOrEmpty).ToList();
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Deferred_pipeline_with_unknown_delegate_is_not_charged_before_consumption()
+    {
+        AssertMethodComplexity(
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                void M(IEnumerable<int> values, Func<int, bool> predicate)
+                {
+                    var query = values.Where(predicate);
+                }
+            }
+            """,
+            "O(1)");
+    }
+
+    [Fact]
+    public void Reassigned_local_delegate_target_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(IEnumerable<int> values, Func<int, bool> replacement)
+                {
+                    Func<int, bool> predicate = value => value > 0;
+                    predicate = replacement;
+                    return values.Where(predicate).ToList();
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Local_delegate_with_mutated_capture_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(
+                    IEnumerable<int> values,
+                    List<int> blocked,
+                    List<int> replacement)
+                {
+                    Func<int, bool> predicate = value => blocked.Contains(value);
+                    var query = values.Where(predicate);
+                    blocked = replacement;
+                    return query.ToList();
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
+    public void Reassigned_stored_pipeline_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                List<int> M(
+                    IEnumerable<int> values,
+                    IEnumerable<int> replacement,
+                    bool replace)
+                {
+                    var query = values.Where(value => value > 0);
+                    if (replace)
+                    {
+                        query = replacement;
+                    }
+
+                    return query.ToList();
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
     public void Linq_select_consumed_by_to_array_enumerates_once()
     {
         AssertMethodComplexity(

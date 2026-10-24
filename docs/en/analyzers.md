@@ -1193,7 +1193,13 @@ Mappings are based on resolved symbols. Same-name user methods are not mapped
 automatically.
 
 Deferred pipeline creation is treated as setup work. Enumeration or sorting cost
-is charged only when supported consumption is proven.
+is charged only when supported consumption is proven. A pipeline stored in a
+stable local retains its known source cardinality and operation costs, and every
+proven terminal consumption or `foreach` re-enumeration is analyzed. Predicate
+and selector bodies contribute only when the delegate is an inline lambda or
+anonymous method, a stable local delegate, or a safe source/local method target
+with an available body. Delegate parameters, external method groups, reassigned
+locals, and mutable captured state remain `Unknown` at consumption.
 
 ## Supported Source-Callable Scope
 

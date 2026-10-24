@@ -134,7 +134,14 @@ custar `O(n)`. Chamadas resolvidas apenas por interfaces genéricas de coleção
 permanecem `Unknown`, pois o contrato da interface não comprova a implementação
 de runtime nem sua complexidade.
 
-A criação de uma pipeline LINQ deferred não é contabilizada como uma enumeração completa. O custo de enumeração é considerado quando uma operação terminal suportada ou um `foreach` consome a pipeline.
+A criação de uma pipeline LINQ deferred não é contabilizada como uma enumeração
+completa. Cadeias diretas e pipelines locais estáveis preservam sua cardinalidade
+conhecida e são cobradas quando uma operação terminal suportada ou um `foreach`
+as consome, inclusive em cada reenumeração comprovada. O custo de predicates e
+selectors só é incluído para delegates inline, delegates locais estáveis ou
+alvos fonte/locais seguros cujo corpo esteja disponível; alvos não resolvidos ou
+reatribuídos e delegates com estado capturado mutável permanecem `Unknown` quando
+a pipeline é consumida.
 
 ### Análise interprocedural
 
