@@ -211,6 +211,18 @@ JSON reports, opt-in quality gates, generated/build-output exclusions, and
 normalized duplicate-code detection. It is separate from the packaged Roslyn
 analyzer; no project scanning is added to `DiagnosticAnalyzer` hot paths.
 
+To create and install the CLI as a local .NET Tool without publishing it:
+
+```bash
+dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
+dotnet tool install ComplexityAnalysis.Tool --version 0.0.0-local --add-source artifacts/local-packages --tool-path artifacts/local-tools
+artifacts/local-tools/complexity-analysis analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
+```
+
+The tool package is independent from `ComplexityAnalysis.Analyzers`; installing
+the analyzer does not install the CLI, and analyzer consumers gain no runtime
+dependency on it.
+
 See [Project-Level Tooling](docs/en/project-tooling.md).
 
 ## Configuration

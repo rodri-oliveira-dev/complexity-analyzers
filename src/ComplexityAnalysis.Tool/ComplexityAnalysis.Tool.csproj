@@ -2,13 +2,33 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>complexity-analysis</ToolCommandName>
+    <PackageId>ComplexityAnalysis.Tool</PackageId>
+    <Title>Complexity Analysis .NET Tool</Title>
+    <Description>Deterministic project-level C# complexity reports, snapshots, regression comparison, quality gates, and SARIF export.</Description>
+    <Authors>Rodrigo de Oliveira</Authors>
+    <PackageTags>dotnet-tool;csharp;static-analysis;complexity;big-o;code-quality;sarif</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);EnableGenerateDocumentationFile</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <ProjectReference Include="..\ComplexityAnalysis.Analyzers\ComplexityAnalysis.Analyzers.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../resources/icon.png" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>

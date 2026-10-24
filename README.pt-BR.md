@@ -214,6 +214,18 @@ build e detecção normalizada de código duplicado. Ela é separada do pacote
 Roslyn analyzer; nenhum scan de projeto é adicionado aos hot paths de
 `DiagnosticAnalyzer`.
 
+Para criar e instalar a CLI como .NET Tool local sem publicá-la:
+
+```bash
+dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
+dotnet tool install ComplexityAnalysis.Tool --version 0.0.0-local --add-source artifacts/local-packages --tool-path artifacts/local-tools
+artifacts/local-tools/complexity-analysis analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
+```
+
+O pacote da ferramenta é independente de `ComplexityAnalysis.Analyzers`;
+instalar o analyzer não instala a CLI, e seus consumidores não recebem uma
+dependência runtime da ferramenta.
+
 Veja [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md).
 
 ## Configuração

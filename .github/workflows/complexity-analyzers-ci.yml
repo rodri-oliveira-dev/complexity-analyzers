@@ -84,12 +84,20 @@ jobs:
           --output artifacts/packages
           -p:PackageVersion=${{ env.PACKAGE_VERSION }}
 
+      - name: Pack project-level tool
+        run: >
+          dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj
+          --configuration Release
+          --no-build
+          --output artifacts/packages
+          -p:PackageVersion=${{ env.PACKAGE_VERSION }}
+
       - name: Contract tests
         run: >
           dotnet test ComplexityAnalysis.Analyzers.slnx
           --configuration Release
           --no-build
-          --filter AnalyzerPackageContractTests
+          --filter "AnalyzerPackageContractTests|ToolPackageContractTests"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
