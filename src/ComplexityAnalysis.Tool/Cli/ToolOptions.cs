@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 
 using ComplexityAnalysis.Analyzers.Configuration;
 
@@ -34,6 +31,12 @@ internal sealed class ToolOptions
     }
 
     internal bool IncludeEvidence
+    {
+        get;
+        private set;
+    }
+
+    internal bool Snapshot
     {
         get;
         private set;
@@ -165,6 +168,12 @@ internal sealed class ToolOptions
             return false;
         }
 
+        if (parsed.Snapshot && parsed.Format != ReportFormat.Json)
+        {
+            error = "--snapshot requires --format json.";
+            return false;
+        }
+
         options = parsed;
         return true;
     }
@@ -184,6 +193,10 @@ internal sealed class ToolOptions
                 parsed.IncludeBuildOutput = true;
                 break;
             case "--include-evidence":
+                parsed.IncludeEvidence = true;
+                break;
+            case "--snapshot":
+                parsed.Snapshot = true;
                 parsed.IncludeEvidence = true;
                 break;
             case "--detect-duplicates":
@@ -240,6 +253,8 @@ internal sealed class ToolOptions
 
                 parsed.OutputPath = Path.GetFullPath(outputPath);
                 break;
+            default:
+                break;
         }
 
         return true;
@@ -290,6 +305,8 @@ internal sealed class ToolOptions
 
                 parsed.MaximumDuplicateTokens = maximumDuplicateTokens;
                 parsed.DetectDuplicates = true;
+                break;
+            default:
                 break;
         }
 
@@ -375,6 +392,8 @@ internal sealed class ToolOptions
                 }
 
                 parsed.MaximumCognitiveComplexity = maximumCognitiveComplexity;
+                break;
+            default:
                 break;
         }
 

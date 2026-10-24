@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace ComplexityAnalysis.Tool.Reporting;
@@ -16,6 +15,20 @@ internal sealed class ProjectReport
         get;
         init;
     } = true;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SnapshotOriginReport? Origin
+    {
+        get;
+        init;
+    }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SnapshotConfigurationReport? Configuration
+    {
+        get;
+        init;
+    }
 
     public required string EntryPoint
     {
@@ -106,6 +119,13 @@ internal sealed class AnalyzedFileReport
 
 internal sealed class MemberReport
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StableId
+    {
+        get;
+        init;
+    }
+
     public required string DisplayName
     {
         get;
@@ -190,6 +210,52 @@ internal sealed class MemberReport
         get;
         init;
     } = HalsteadMetricReport.Unknown();
+}
+
+internal sealed class SnapshotOriginReport
+{
+    public required string Kind
+    {
+        get; init;
+    }
+
+    public required string EntryPoint
+    {
+        get; init;
+    }
+}
+
+internal sealed class SnapshotConfigurationReport
+{
+    public bool IncludeGenerated
+    {
+        get; init;
+    }
+
+    public bool IncludeBuildOutput
+    {
+        get; init;
+    }
+
+    public bool IncludeEvidence
+    {
+        get; init;
+    }
+
+    public bool DetectDuplicates
+    {
+        get; init;
+    }
+
+    public int MinimumDuplicateTokens
+    {
+        get; init;
+    }
+
+    public int? MinimumDuplicateLines
+    {
+        get; init;
+    }
 }
 
 internal sealed class BigOReport

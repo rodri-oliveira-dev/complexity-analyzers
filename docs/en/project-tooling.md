@@ -38,6 +38,17 @@ JSON output is available for automation:
 dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --output artifacts/project-report.json
 ```
 
+For a comparison baseline, add `--snapshot`. This emits the independent
+`complexity-snapshot/1.0` contract, includes deterministic evidence, and records
+normalized origin and analysis configuration. Members use Roslyn documentation
+IDs, so overloads remain distinct and source line or file moves do not change
+identity. Renames are represented as removal plus addition; duplicate identities
+are ambiguous and are never matched heuristically.
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj --format json --snapshot --output artifacts/baseline.json
+```
+
 The default JSON contract remains schema `1.0`. Deterministic complexity
 evidence is opt-in and uses schema `1.1`:
 

@@ -1,10 +1,4 @@
-using System;
 using System.Collections.Immutable;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 using ComplexityAnalysis.Analyzers.Analysis;
 using ComplexityAnalysis.Analyzers.Analysis.Evidence;
@@ -37,7 +31,25 @@ internal static class ProjectAnalysisRunner
         ProjectReport report = new()
         {
             EntryPoint = PathUtilities.ToDisplayPath(options.EntryPath, baseDirectory),
-            SchemaVersion = options.IncludeEvidence ? "1.1" : "1.0",
+            SchemaVersion = options.Snapshot ? "complexity-snapshot/1.0" : options.IncludeEvidence ? "1.1" : "1.0",
+            Origin = options.Snapshot
+                ? new SnapshotOriginReport
+                {
+                    Kind = "projectAnalysis",
+                    EntryPoint = PathUtilities.ToDisplayPath(options.EntryPath, baseDirectory),
+                }
+                : null,
+            Configuration = options.Snapshot
+                ? new SnapshotConfigurationReport
+                {
+                    IncludeGenerated = options.IncludeGenerated,
+                    IncludeBuildOutput = options.IncludeBuildOutput,
+                    IncludeEvidence = options.IncludeEvidence,
+                    DetectDuplicates = options.DetectDuplicates,
+                    MinimumDuplicateTokens = options.MinimumDuplicateTokens,
+                    MinimumDuplicateLines = options.MinimumDuplicateLines,
+                }
+                : null,
         };
 
         foreach (string projectPath in ProjectEntryResolver.ResolveProjectPaths(options.EntryPath))
@@ -207,6 +219,8 @@ internal static class ProjectAnalysisRunner
 
         return new MemberReport
         {
+            StableId = member.Symbol.GetDocumentationCommentId()
+                ?? member.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             DisplayName = member.DisplayName,
             Kind = member.Kind.ToString(),
             SymbolId = member.Symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
@@ -404,12 +418,7 @@ internal static class ProjectAnalysisRunner
         }
 
         int startComparison = left.Location.Start.CompareTo(right.Location.Start);
-        if (startComparison != 0)
-        {
-            return startComparison;
-        }
-
-        return StringComparer.Ordinal.Compare(left.DisplayName, right.DisplayName);
+        return startComparison != 0 ? startComparison : StringComparer.Ordinal.Compare(left.DisplayName, right.DisplayName);
     }
 
     private static ImmutableArray<MetadataReference> TrustedPlatformReferences
