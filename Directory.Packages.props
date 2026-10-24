@@ -6,9 +6,13 @@
   <ItemGroup>
     <!-- Roslyn is pinned to match the reference implementation and avoid newer host-only APIs. -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
 
     <!-- Stable analyzer-authoring rules compatible with the Roslyn 4.x package family. -->
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
+
+    <!-- Official SDK used only by the separate local stdio MCP host. -->
+    <PackageVersion Include="ModelContextProtocol" Version="2.3.0" />
 
     <!-- Test infrastructure for the isolated analyzer workspace. -->
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />

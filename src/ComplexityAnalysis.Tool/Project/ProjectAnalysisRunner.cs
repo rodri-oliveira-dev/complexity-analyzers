@@ -22,10 +22,12 @@ internal static class ProjectAnalysisRunner
 
     internal static async Task<ProjectReport> AnalyzeAsync(
         ToolOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<string>? validatePath = null)
     {
         _ = options ?? throw new ArgumentNullException(nameof(options));
         cancellationToken.ThrowIfCancellationRequested();
+        validatePath?.Invoke(options.EntryPath);
 
         string baseDirectory = Directory.GetCurrentDirectory();
         ProjectReport report = new()
@@ -55,7 +57,12 @@ internal static class ProjectAnalysisRunner
         foreach (string projectPath in ProjectEntryResolver.ResolveProjectPaths(options.EntryPath))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            CSharpProjectSource project = await CSharpProjectLoader.LoadAsync(projectPath, options, cancellationToken);
+            validatePath?.Invoke(projectPath);
+            CSharpProjectSource project = await CSharpProjectLoader.LoadAsync(
+                projectPath,
+                options,
+                cancellationToken,
+                validatePath);
             report.Projects.Add(AnalyzeProject(
                 project,
                 baseDirectory,

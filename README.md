@@ -225,6 +225,30 @@ dependency on it.
 
 See [Project-Level Tooling](docs/en/project-tooling.md).
 
+## Local MCP server
+
+`ComplexityAnalysis.Mcp` exposes the CLI analysis contracts to local MCP clients
+over `stdio`. Its three tools are read-only: analyze a project, query evidence
+for a stable member identity, and compare two snapshots. Build the solution,
+then configure the client to run the host with an explicit allowed root:
+
+```json
+{
+  "command": "dotnet",
+  "args": [
+    "./src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
+    "--root",
+    "."
+  ]
+}
+```
+
+The host rejects paths outside that root, symbolic-link traversal, unsupported
+inputs, and workloads beyond its configured timeout, byte, and file limits. It
+does not expose shell, write, network, or arbitrary process operations.
+
+See [Local MCP Server](docs/en/mcp-server.md).
+
 ## Configuration
 
 Analyzer behavior is configurable through Roslyn analyzer config. Diagnostic severities continue to use standard `dotnet_diagnostic.<RULE_ID>.severity` entries.
@@ -307,6 +331,7 @@ See [Architecture](docs/en/architecture.md).
 - [Configuration](docs/en/configuration.md)
 - [C# Halstead Metrics](docs/en/halstead-metrics.md)
 - [Project-Level Tooling](docs/en/project-tooling.md)
+- [Local MCP Server](docs/en/mcp-server.md)
 - [Runnable sample](samples/ComplexityAnalysis.Sample/README.md)
 - [Release Quality Governance](docs/en/development/quality-gates.md)
 - [Documentação em português](README.pt-BR.md)

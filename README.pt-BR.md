@@ -228,6 +228,32 @@ dependência runtime da ferramenta.
 
 Veja [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md).
 
+## Servidor MCP local
+
+`ComplexityAnalysis.Mcp` expõe os contratos de análise da CLI para clientes MCP
+locais por `stdio`. Suas três ferramentas são somente leitura: analisar um
+projeto, consultar evidências por identidade estável de membro e comparar dois
+snapshots. Compile a solution e configure o cliente para executar o host com
+uma raiz permitida explícita:
+
+```json
+{
+  "command": "dotnet",
+  "args": [
+    "./src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
+    "--root",
+    "."
+  ]
+}
+```
+
+O host rejeita caminhos fora dessa raiz, traversal por links simbólicos,
+entradas não suportadas e cargas acima dos limites configurados de timeout,
+bytes e arquivos. Ele não expõe operações de shell, escrita, rede ou execução
+arbitrária de processos.
+
+Veja [Servidor MCP Local](docs/pt-BR/mcp-server.md).
+
 ## Configuração
 
 O comportamento do analyzer pode ser configurado pelo Roslyn analyzer config. As severidades dos diagnósticos continuam usando as entradas padrão `dotnet_diagnostic.<RULE_ID>.severity`.
@@ -310,6 +336,7 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 - [Configuração](docs/pt-BR/configuration.md)
 - [Métricas Halstead para C#](docs/pt-BR/halstead-metrics.md)
 - [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md)
+- [Servidor MCP Local](docs/pt-BR/mcp-server.md)
 - [Sample executável](samples/ComplexityAnalysis.Sample/README.md)
 - [Governança de Qualidade de Release](docs/pt-BR/development/quality-gates.md)
 - [Documentation in English](README.md)
