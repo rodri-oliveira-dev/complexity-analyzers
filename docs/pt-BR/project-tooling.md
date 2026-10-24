@@ -127,6 +127,21 @@ Exit codes:
 - `2`: pelo menos um quality gate explicitamente configurado falhou;
 - `130`: cancelamento solicitado.
 
+## Comparar Snapshots
+
+Compare dois snapshots gerados anteriormente sem invocar Git ou serviço externo:
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- compare artifacts/base.json artifacts/head.json --format json
+```
+
+Use `--format console` (padrão) ou `--format json`, além de `--output <path>`
+quando necessário. Os findings distinguem regressões, melhorias, equivalência,
+incomparabilidade e membros adicionados, removidos ou ambíguos.
+`--fail-on-regression` é opt-in e retorna o exit code `2` somente para regressões
+comprovadas. `Unknown` e garantias, hipóteses, configurações ou dimensões de
+entrada incompatíveis não falham o gate.
+
 ## Detecção De Duplicação
 
 A detecção de duplicação também é opt-in:
