@@ -294,7 +294,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         false,
         false,
         false)]
@@ -309,7 +309,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         false,
         false,
         false)]
@@ -322,7 +322,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         false,
         false,
         false)]
@@ -335,7 +335,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         false,
         false,
         false)]
@@ -343,7 +343,7 @@ public sealed class KnownOperationRegistryTests
         string operationFamily,
         string source,
         string expectedComplexity,
-        string expectedCase,
+        string expectedGuarantee,
         bool expectedEnumeratesReceiver,
         bool expectedOrders,
         bool expectedLookupOperation)
@@ -354,7 +354,7 @@ public sealed class KnownOperationRegistryTests
             mapping,
             operationFamily,
             expectedComplexity,
-            ParseComplexityCase(expectedCase),
+            ParseGuarantee(expectedGuarantee),
             expectedEnumeratesReceiver,
             expectedOrders,
             expectedLookupOperation);
@@ -372,7 +372,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -387,7 +387,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -402,7 +402,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -417,7 +417,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -432,7 +432,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n log n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         true,
         false)]
@@ -447,7 +447,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n log n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         true,
         false)]
@@ -462,7 +462,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n log n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         true,
         false)]
@@ -477,7 +477,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n log n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         true,
         false)]
@@ -492,7 +492,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "Average",
+        "Expected",
         false,
         false,
         true)]
@@ -507,7 +507,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -522,7 +522,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "Average",
+        "Expected",
         false,
         false,
         true)]
@@ -530,7 +530,7 @@ public sealed class KnownOperationRegistryTests
         string operationFamily,
         string source,
         string expectedComplexity,
-        string expectedCase,
+        string expectedGuarantee,
         bool expectedEnumeratesReceiver,
         bool expectedOrders,
         bool expectedLookupOperation)
@@ -541,7 +541,7 @@ public sealed class KnownOperationRegistryTests
             mapping,
             operationFamily,
             expectedComplexity,
-            ParseComplexityCase(expectedCase),
+            ParseGuarantee(expectedGuarantee),
             expectedEnumeratesReceiver,
             expectedOrders,
             expectedLookupOperation);
@@ -601,7 +601,16 @@ public sealed class KnownOperationRegistryTests
         Assert.Equal("hashset-contains", hashSetContains.Metadata.OperationFamily);
         Assert.Equal("O(n)", listContains.Complexity.ToBigONotation());
         Assert.Equal("O(1)", hashSetContains.Complexity.ToBigONotation());
-        Assert.Equal(KnownOperationComplexityCase.Average, hashSetContains.ComplexityCase);
+        Assert.Contains(
+            listContains.Estimate.Assumptions,
+            assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);
+        Assert.Equal(ComplexityGuarantee.Expected, hashSetContains.Estimate.Guarantee);
+        Assert.Contains(
+            hashSetContains.Estimate.Assumptions,
+            assumption => assumption.Kind == ComplexityAssumptionKind.HashDistribution);
+        Assert.Contains(
+            hashSetContains.Estimate.Assumptions,
+            assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);
     }
 
     [Fact]
@@ -904,7 +913,7 @@ public sealed class KnownOperationRegistryTests
         KnownOperationMapping mapping,
         string operationFamily,
         string expectedComplexity,
-        KnownOperationComplexityCase expectedCase,
+        ComplexityGuarantee expectedGuarantee,
         bool expectedEnumeratesReceiver,
         bool expectedOrders,
         bool expectedLookupOperation)
@@ -912,18 +921,28 @@ public sealed class KnownOperationRegistryTests
         Assert.Equal(operationFamily, mapping.Metadata.OperationFamily);
         Assert.Equal(expectedComplexity, mapping.Complexity.ToBigONotation());
         Assert.Equal(KnownOperationExecutionKind.Immediate, mapping.ExecutionKind);
-        Assert.Equal(expectedCase, mapping.ComplexityCase);
+        Assert.Equal(expectedGuarantee, mapping.Estimate.Guarantee);
+        if (expectedGuarantee == ComplexityGuarantee.Expected)
+        {
+            Assert.Contains(
+                mapping.Estimate.Assumptions,
+                assumption => assumption.Kind == ComplexityAssumptionKind.HashDistribution);
+            Assert.Contains(
+                mapping.Estimate.Assumptions,
+                assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);
+        }
+
         Assert.Equal(expectedEnumeratesReceiver, mapping.Metadata.EnumeratesReceiver);
         Assert.False(mapping.Metadata.Materializes);
         Assert.Equal(expectedOrders, mapping.Metadata.Orders);
         Assert.Equal(expectedLookupOperation, mapping.Metadata.IsLookupOperation);
     }
 
-    private static KnownOperationComplexityCase ParseComplexityCase(string value)
+    private static ComplexityGuarantee ParseGuarantee(string value)
     {
-        return Enum.TryParse(value, ignoreCase: false, out KnownOperationComplexityCase complexityCase)
-            ? complexityCase
-            : throw new ArgumentException("Unknown complexity case.", nameof(value));
+        return Enum.TryParse(value, ignoreCase: false, out ComplexityGuarantee guarantee)
+            ? guarantee
+            : throw new ArgumentException("Unknown complexity guarantee.", nameof(value));
     }
 
     private static KnownOperationExecutionKind ParseExecutionKind(string value)

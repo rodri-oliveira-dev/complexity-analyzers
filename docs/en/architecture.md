@@ -176,6 +176,31 @@ The model supports:
 
 When the analyzer cannot prove a safe result, the model preserves `Unknown` rather than coercing the operation to a guessed complexity class.
 
+### Estimate guarantees and assumptions
+
+A Big-O expression and the nature of its guarantee are separate model values:
+
+| Guarantee | Meaning | Required evidence |
+| --- | --- | --- |
+| Worst-case upper bound | The expression bounds every supported execution under any listed non-probabilistic assumptions. | A known expression; assumptions are optional and must state conditional operation or runtime costs. |
+| Expected | The expression is an expectation, not a bound for every execution. | A known expression and an explicit input or hash-distribution assumption. |
+| Amortized | The expression applies across a sequence of operations and need not bound each individual operation. | A known expression and an explicit operation-sequence assumption. |
+| `Unknown` | The available evidence does not prove a supported estimate. | The `Unknown` expression and no claimed assumptions. |
+
+The model rejects an expected estimate without a distribution assumption, an
+amortized estimate without an operation-sequence assumption, and any known
+guarantee paired with `Unknown`. Assumptions are immutable typed values so this
+contract is deterministic and testable without Roslyn.
+
+For compatibility, `ToBigONotation()` and existing diagnostics continue to
+render the expression as before. The guarantee metadata qualifies that text; it
+does not turn an expected or amortized signal into a universal mathematical
+proof. For example, hash-table lookup is expected `O(1)` only under adequate
+hash distribution and constant-cost hashing/equality, while an unsupported
+operation remains `Unknown` rather than inheriting that estimate. Linear list
+lookups and `O(n log n)` sorting similarly record constant-cost equality or
+comparison as an explicit condition.
+
 Cyclomatic Complexity, Maximum Control-Flow Nesting Depth, and Cognitive
 Complexity are separate integer structural metrics. Halstead metrics are a
 separate source-token classification capability with primitive and derived

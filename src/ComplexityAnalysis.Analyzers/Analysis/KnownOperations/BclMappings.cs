@@ -93,12 +93,11 @@ internal static class BclMappings
 
         mappings.Add(new KnownOperationMapping(
             InstanceMethod(dictionary, "ContainsKey", Parameters(keyTypeParameter)),
-            ComplexityFactory.Constant(),
+            ExpectedHashLookup(),
             KnownOperationExecutionKind.Immediate,
             Documentation(
-                "learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2.containskey; approaches O(1), recorded average-case"),
-            LookupMetadata("dictionary-contains-key", enumeratesReceiver: false),
-            KnownOperationComplexityCase.Average));
+                "learn.microsoft.com/dotnet/api/system.collections.generic.dictionary-2.containskey; approaches O(1), recorded as expected under explicit hashing assumptions"),
+            LookupMetadata("dictionary-contains-key", enumeratesReceiver: false)));
         mappings.Add(LinearLookup(
             dictionary,
             "ContainsValue",
@@ -114,12 +113,11 @@ internal static class BclMappings
 
         mappings.Add(new KnownOperationMapping(
             InstanceMethod(hashSet, "Contains", Parameters(typeParameter)),
-            ComplexityFactory.Constant(),
+            ExpectedHashLookup(),
             KnownOperationExecutionKind.Immediate,
             Documentation(
-                "learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1.contains; O(1) lookup recorded average-case"),
-            LookupMetadata("hashset-contains", enumeratesReceiver: false),
-            KnownOperationComplexityCase.Average));
+                "learn.microsoft.com/dotnet/api/system.collections.generic.hashset-1.contains; O(1) lookup recorded as expected under explicit hashing assumptions"),
+            LookupMetadata("hashset-contains", enumeratesReceiver: false)));
     }
 
     private static void AddArrayMappings(ImmutableArray<KnownOperationMapping>.Builder mappings)
@@ -173,7 +171,9 @@ internal static class BclMappings
     {
         return new KnownOperationMapping(
             InstanceMethod(containingType, methodMetadataName, parameterTypes),
-            ComplexityFactory.Linear(ComplexityVariable.N),
+            ComplexityEstimate.WorstCaseUpperBound(
+                ComplexityFactory.Linear(ComplexityVariable.N),
+                ConstantElementOperation("Equality checks have constant cost.")),
             KnownOperationExecutionKind.Immediate,
             provenance,
             LookupMetadata(operationFamily, enumeratesReceiver: true));
@@ -186,7 +186,9 @@ internal static class BclMappings
     {
         return new KnownOperationMapping(
             InstanceMethod(containingType, "Sort", parameterTypes),
-            ComplexityFactory.NLogN(ComplexityVariable.N),
+            ComplexityEstimate.WorstCaseUpperBound(
+                ComplexityFactory.NLogN(ComplexityVariable.N),
+                ConstantElementOperation("Element comparisons have constant cost.")),
             KnownOperationExecutionKind.Immediate,
             provenance,
             new KnownOperationMetadata(
@@ -218,6 +220,23 @@ internal static class BclMappings
             materializes: false,
             orders: false,
             isLookupOperation: true);
+    }
+
+    private static ComplexityEstimate ExpectedHashLookup()
+    {
+        return ComplexityEstimate.Expected(
+            ComplexityFactory.Constant(),
+            new ComplexityAssumption(
+                ComplexityAssumptionKind.HashDistribution,
+                "Hash codes are sufficiently distributed across buckets."),
+            ConstantElementOperation("Hashing and equality checks have constant cost."));
+    }
+
+    private static ComplexityAssumption ConstantElementOperation(string description)
+    {
+        return new ComplexityAssumption(
+            ComplexityAssumptionKind.ElementOperationCost,
+            description);
     }
 
     private static KnownOperationTypeIdentity Named(string namespaceName, string metadataName)

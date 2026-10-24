@@ -177,6 +177,31 @@ O modelo suporta:
 
 Quando o analyzer não consegue comprovar um resultado seguro, o modelo preserva `Unknown` em vez de forçar uma classe de complexidade estimada.
 
+### Garantias e hipóteses das estimativas
+
+Uma expressão Big-O e a natureza de sua garantia são valores separados no modelo:
+
+| Garantia | Significado | Evidência exigida |
+| --- | --- | --- |
+| Upper bound de pior caso | A expressão limita toda execução suportada sob eventuais hipóteses não probabilísticas registradas. | Uma expressão conhecida; hipóteses são opcionais e devem registrar custos condicionais de operação ou runtime. |
+| Esperado | A expressão é uma expectativa, não um limite para toda execução. | Uma expressão conhecida e uma hipótese explícita sobre distribuição de entrada ou de hash. |
+| Amortizado | A expressão vale ao longo de uma sequência de operações e não precisa limitar cada operação individual. | Uma expressão conhecida e uma hipótese explícita sobre a sequência de operações. |
+| `Unknown` | A evidência disponível não comprova uma estimativa suportada. | A expressão `Unknown`, sem hipóteses alegadas. |
+
+O modelo rejeita uma estimativa esperada sem hipótese de distribuição, uma
+estimativa amortizada sem hipótese de sequência de operações e qualquer
+garantia conhecida associada a `Unknown`. As hipóteses são valores tipados e
+imutáveis, portanto esse contrato é determinístico e testável sem Roslyn.
+
+Por compatibilidade, `ToBigONotation()` e os diagnósticos existentes continuam
+renderizando a expressão como antes. A metadata de garantia qualifica esse
+texto; ela não transforma um sinal esperado ou amortizado em prova matemática
+universal. Por exemplo, lookup em tabela hash é `O(1)` esperado somente sob
+distribuição de hash adequada e hashing/igualdade de custo constante, enquanto
+uma operação não suportada permanece `Unknown` em vez de herdar essa estimativa.
+Lookups lineares em listas e ordenação `O(n log n)` também registram igualdade
+ou comparação de custo constante como condição explícita.
+
 Cyclomatic Complexity, Maximum Control-Flow Nesting Depth e Cognitive Complexity
 são métricas estruturais inteiras separadas. Métricas Halstead são uma
 capacidade separada de classificação de tokens de fonte, com valores primitivos

@@ -119,6 +119,14 @@ Implemented examples include:
 - LINQ `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max`, and `Aggregate`.
 - Deferred LINQ operations including `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct`, and `GroupBy`.
 
+Each known-operation estimate records whether its Big-O expression is a
+worst-case upper bound, expected cost, amortized cost, or `Unknown`, together
+with the assumptions required by that classification. In particular,
+`Dictionary<TKey,TValue>.ContainsKey` and `HashSet<T>.Contains` are modeled as
+expected `O(1)` only when hash codes are sufficiently distributed and hashing
+and equality have constant cost; they are not unconditional worst-case
+guarantees. Existing Big-O text remains unchanged for compatibility.
+
 Deferred LINQ pipeline creation is not charged as a full enumeration. Enumeration cost is counted when a supported terminal operation or `foreach` consumes the pipeline.
 
 ### Interprocedural analysis
