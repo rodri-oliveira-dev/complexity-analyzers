@@ -112,7 +112,7 @@ Known operations are mapped by Roslyn symbol identity. Custom methods named `Con
 
 Implemented examples include:
 
-- `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count`, and the `List<T>` indexer.
+- `List<T>.Add`, `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count`, and the `List<T>` indexer.
 - `Dictionary<TKey,TValue>.ContainsKey` and `Dictionary<TKey,TValue>.ContainsValue`.
 - `HashSet<T>.Contains`.
 - Array and string `Length`.
@@ -126,6 +126,12 @@ with the assumptions required by that classification. In particular,
 expected `O(1)` only when hash codes are sufficiently distributed and hashing
 and equality have constant cost; they are not unconditional worst-case
 guarantees. Existing Big-O text remains unchanged for compatibility.
+
+`List<T>.Add` is amortized `O(1)` across an append sequence under geometric
+capacity growth and constant-cost element assignment; one append that grows
+the backing storage can still take `O(n)`. Calls resolved only through generic
+collection interfaces remain `Unknown` because interface contracts do not prove
+the runtime implementation or its complexity.
 
 Deferred LINQ pipeline creation is not charged as a full enumeration. Enumeration cost is counted when a supported terminal operation or `foreach` consumes the pipeline.
 

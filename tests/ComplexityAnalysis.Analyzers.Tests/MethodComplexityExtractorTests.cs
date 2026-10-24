@@ -422,6 +422,17 @@ public sealed class MethodComplexityExtractorTests
 
     [Theory]
     [InlineData(
+        "list-add",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            void M(List<int> values) => values.Add(42);
+        }
+        """,
+        "O(1)")]
+    [InlineData(
         "list-contains",
         """
         using System.Collections.Generic;
@@ -594,6 +605,39 @@ public sealed class MethodComplexityExtractorTests
             }
             """,
             "O(1)");
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(ICollection<int> values) => values.Contains(42);
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(IDictionary<int, string> values) => values.ContainsKey(42);
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(IReadOnlyCollection<int> values) => values.Count;
+        }
+        """)]
+    public void Interface_typed_collection_operations_remain_unknown(string source)
+    {
+        AssertMethodComplexity(source, "Unknown");
     }
 
     [Fact]

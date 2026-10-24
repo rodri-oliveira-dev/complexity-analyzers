@@ -282,6 +282,14 @@ Operações LINQ deferred como `Where` e `OrderBy` não são contabilizadas como
 
 Operações não suportadas ou não resolvidas permanecem `Unknown`.
 
+Os mappings de coleções usam o símbolo declarador resolvido estaticamente.
+Operações concretas e não virtuais de `List<T>`, `Dictionary<TKey,TValue>` e
+`HashSet<T>` podem, portanto, carregar garantias e hipóteses documentadas,
+enquanto uma operação homônima alcançada por `ICollection<T>`, `IList<T>`,
+`ISet<T>`, `IDictionary<TKey,TValue>` ou uma interface somente leitura permanece
+`Unknown`. O analyzer não especula sobre a implementação de runtime por trás do
+dispatch de interface.
+
 ## Chamadas interprocedurais a métodos-fonte
 
 A análise interprocedural pode incluir o custo de um callee fonte suportado na estimativa do caller. O resultado do callee pode ser representado como um template relativo aos seus parâmetros e depois substituído usando os argumentos do caller.

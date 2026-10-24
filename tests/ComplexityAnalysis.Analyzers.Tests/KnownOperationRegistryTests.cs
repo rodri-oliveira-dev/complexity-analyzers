@@ -362,6 +362,21 @@ public sealed class KnownOperationRegistryTests
 
     [Theory]
     [InlineData(
+        "list-add",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            void M(List<int> values) => values.Add(1);
+        }
+        """,
+        "O(1)",
+        "Amortized",
+        false,
+        false,
+        false)]
+    [InlineData(
         "list-contains",
         """
         using System.Collections.Generic;
@@ -634,6 +649,171 @@ public sealed class KnownOperationRegistryTests
         KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
 
         Assert.False(resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out _));
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        namespace MyCompany
+        {
+            public sealed class Dictionary<TKey, TValue>
+            {
+                public bool ContainsKey(TKey key) => true;
+            }
+
+            public sealed class Sample
+            {
+                bool M(Dictionary<int, string> values) => values.ContainsKey(1);
+            }
+        }
+        """)]
+    [InlineData(
+        """
+        namespace MyCompany
+        {
+            public sealed class HashSet<T>
+            {
+                public bool Contains(T value) => true;
+            }
+
+            public sealed class Sample
+            {
+                bool M(HashSet<int> values) => values.Contains(1);
+            }
+        }
+        """)]
+    public void Bcl_registry_does_not_match_other_custom_homonymous_collections(string source)
+    {
+        InvocationFacts facts = CreateInvocationFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        Assert.False(resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out _));
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(ICollection<int> values) => values.Contains(1);
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(ISet<int> values) => values.Contains(1);
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(IDictionary<int, string> values) => values.ContainsKey(1);
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(IReadOnlyDictionary<int, string> values) => values.ContainsKey(1);
+        }
+        """)]
+    public void Bcl_registry_keeps_interface_method_dispatch_unknown(string source)
+    {
+        InvocationFacts facts = CreateInvocationFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        Assert.False(resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out _));
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(ICollection<int> values) => values.Count;
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(IReadOnlyCollection<int> values) => values.Count;
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(IList<int> values) => values[0];
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(IReadOnlyList<int> values) => values[0];
+        }
+        """)]
+    public void Bcl_registry_keeps_interface_property_dispatch_unknown(string source)
+    {
+        PropertyFacts facts = CreatePropertyFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        Assert.False(resolver.TryResolve(facts.PropertySymbol, CancellationToken.None, out _));
+    }
+
+    [Fact]
+    public void Bcl_registry_matches_inherited_list_symbol_but_not_hidden_member()
+    {
+        KnownOperationMapping inherited = ResolveBclInvocation(
+            """
+            using System.Collections.Generic;
+
+            public sealed class DerivedList<T> : List<T>
+            {
+            }
+
+            public sealed class Sample
+            {
+                bool M(DerivedList<int> values) => values.Contains(1);
+            }
+            """);
+        InvocationFacts hiddenFacts = CreateInvocationFacts(
+            """
+            using System.Collections.Generic;
+
+            public sealed class DerivedList<T> : List<T>
+            {
+                public new bool Contains(T value) => true;
+            }
+
+            public sealed class Sample
+            {
+                bool M(DerivedList<int> values) => values.Contains(1);
+            }
+            """);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        Assert.Equal("list-contains", inherited.Metadata.OperationFamily);
+        Assert.False(resolver.TryResolve(hiddenFacts.MethodSymbol, CancellationToken.None, out _));
     }
 
     [Fact]
@@ -927,6 +1107,15 @@ public sealed class KnownOperationRegistryTests
             Assert.Contains(
                 mapping.Estimate.Assumptions,
                 assumption => assumption.Kind == ComplexityAssumptionKind.HashDistribution);
+            Assert.Contains(
+                mapping.Estimate.Assumptions,
+                assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);
+        }
+        else if (expectedGuarantee == ComplexityGuarantee.Amortized)
+        {
+            Assert.Contains(
+                mapping.Estimate.Assumptions,
+                assumption => assumption.Kind == ComplexityAssumptionKind.OperationSequence);
             Assert.Contains(
                 mapping.Estimate.Assumptions,
                 assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);

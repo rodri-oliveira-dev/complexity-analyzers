@@ -256,7 +256,8 @@ foreach (var customer in customers)
 ```
 
 Se `blockedCustomers` é um `HashSet<T>` suportado, a busca é registrada como
-`O(1)` médio e esta regra não reporta.
+`O(1)` esperado sob hipóteses explícitas de distribuição de hash e custo
+constante de hashing/igualdade, e esta regra não reporta.
 
 ### Raciocínio de Complexidade
 
@@ -1174,6 +1175,23 @@ Exemplos BCL incluem operações selecionadas de:
 - `HashSet<T>`;
 - arrays;
 - strings.
+
+As classificações BCL auditadas são deliberadamente condicionais:
+
+| Operações | Classificação | Hipóteses exigidas |
+| --- | --- | --- |
+| `Length` de array/string, `List<T>.Count`, indexer de `List<T>` | Upper bound de pior caso `O(1)` | Símbolo concreto suportado. |
+| `List<T>.Contains`, `List<T>.IndexOf` | Upper bound de pior caso `O(n)` | Igualdade com custo constante. |
+| `List<T>.Sort` | Upper bound de pior caso `O(n log n)` | Comparação com custo constante. |
+| `List<T>.Add` | `O(1)` amortizado | Crescimento geométrico da capacidade ao longo de uma sequência de appends e atribuição com custo constante; um crescimento individual pode ser `O(n)`. |
+| `Dictionary<TKey,TValue>.ContainsKey`, `HashSet<T>.Contains` | `O(1)` esperado | Distribuição suficiente de hash e hashing/igualdade com custo constante; sem alegar pior caso constante. |
+| `Dictionary<TKey,TValue>.ContainsValue` | Upper bound de pior caso `O(n)` | Igualdade com custo constante. |
+
+Interfaces genéricas de coleção como `ICollection<T>`, `IList<T>`, `ISet<T>`,
+`IDictionary<TKey,TValue>` e suas equivalentes somente leitura não garantem um
+custo específico de implementação. O dispatch tipado pela interface permanece
+`Unknown`, salvo quando o próprio símbolo resolvido pertence ao subconjunto
+concreto suportado.
 
 Operações LINQ imediatas/terminais suportadas incluem:
 

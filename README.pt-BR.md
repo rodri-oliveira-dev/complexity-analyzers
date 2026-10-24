@@ -112,7 +112,7 @@ As operações conhecidas são mapeadas por identidade de símbolo do Roslyn. M�
 
 Exemplos implementados incluem:
 
-- `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count` e o indexer de `List<T>`.
+- `List<T>.Add`, `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count` e o indexer de `List<T>`.
 - `Dictionary<TKey,TValue>.ContainsKey` e `Dictionary<TKey,TValue>.ContainsValue`.
 - `HashSet<T>.Contains`.
 - `Length` de arrays e strings.
@@ -126,6 +126,13 @@ das hipóteses exigidas pela classificação. Em particular,
 `O(1)` esperado somente quando os hash codes possuem distribuição suficiente e
 hashing e igualdade têm custo constante; eles não são garantias incondicionais
 de pior caso. O texto Big-O existente permanece inalterado por compatibilidade.
+
+`List<T>.Add` possui custo amortizado `O(1)` ao longo de uma sequência de
+appends sob crescimento geométrico da capacidade e atribuição de elemento com
+custo constante; um append que aumenta o armazenamento interno ainda pode
+custar `O(n)`. Chamadas resolvidas apenas por interfaces genéricas de coleção
+permanecem `Unknown`, pois o contrato da interface não comprova a implementação
+de runtime nem sua complexidade.
 
 A criação de uma pipeline LINQ deferred não é contabilizada como uma enumeração completa. O custo de enumeração é considerado quando uma operação terminal suportada ou um `foreach` consome a pipeline.
 

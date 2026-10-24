@@ -43,6 +43,18 @@ internal static class BclMappings
             Parameters(int32),
             "list-indexer",
             Documentation("learn.microsoft.com/dotnet/api/system.collections.generic.list-1.item")));
+        mappings.Add(new KnownOperationMapping(
+            InstanceMethod(list, "Add", Parameters(typeParameter)),
+            AmortizedListAppend(),
+            KnownOperationExecutionKind.Immediate,
+            Conservative(
+                "learn.microsoft.com/dotnet/api/system.collections.generic.list-1.add documents O(1) without growth and O(n) when capacity grows; dotnet/runtime List.cs grows capacity geometrically; conservative amortized classification across append sequences"),
+            new KnownOperationMetadata(
+                "list-add",
+                enumeratesReceiver: false,
+                materializes: false,
+                orders: false,
+                isLookupOperation: false)));
         mappings.Add(LinearLookup(
             list,
             "Contains",
@@ -230,6 +242,16 @@ internal static class BclMappings
                 ComplexityAssumptionKind.HashDistribution,
                 "Hash codes are sufficiently distributed across buckets."),
             ConstantElementOperation("Hashing and equality checks have constant cost."));
+    }
+
+    private static ComplexityEstimate AmortizedListAppend()
+    {
+        return ComplexityEstimate.Amortized(
+            ComplexityFactory.Constant(),
+            new ComplexityAssumption(
+                ComplexityAssumptionKind.OperationSequence,
+                "Capacity growth is distributed across a sequence of append operations."),
+            ConstantElementOperation("Element assignment has constant cost."));
     }
 
     private static ComplexityAssumption ConstantElementOperation(string description)

@@ -280,6 +280,14 @@ Deferred LINQ operations such as `Where` and `OrderBy` are not charged as full e
 
 Unsupported or unresolved operations remain `Unknown`.
 
+Collection mappings are keyed to the statically resolved declaring symbol.
+Concrete non-virtual `List<T>`, `Dictionary<TKey,TValue>`, and `HashSet<T>`
+operations can therefore carry documented guarantees and assumptions, while a
+same-name operation reached through `ICollection<T>`, `IList<T>`, `ISet<T>`,
+`IDictionary<TKey,TValue>`, or a read-only interface remains `Unknown`. The
+analyzer does not speculate about the runtime implementation behind interface
+dispatch.
+
 ## Interprocedural source calls
 
 Interprocedural analysis can include the cost of a supported source callee in the caller estimate. Callee results can be represented as templates relative to the callee parameters and then substituted using caller arguments.

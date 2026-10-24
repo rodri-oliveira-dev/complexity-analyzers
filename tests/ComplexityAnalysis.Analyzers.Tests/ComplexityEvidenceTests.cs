@@ -100,6 +100,34 @@ public sealed class ComplexityEvidenceTests
     }
 
     [Fact]
+    public void List_append_evidence_retains_amortized_guarantee_and_sequence_assumption()
+    {
+        MethodFacts facts = CreateFacts(
+            "M",
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                void M(List<int> values, int value) => values.Add(value);
+            }
+            """);
+
+        ComplexityAnalysisWithEvidenceResult result = Analyze(facts);
+        ComplexityEvidenceStep evidence = Assert.Single(result.Evidence.Steps);
+
+        Assert.Equal("O(1)", result.Complexity.ToBigONotation());
+        Assert.Equal("list-add", evidence.Operation);
+        Assert.Equal(ComplexityGuarantee.Amortized, evidence.Estimate.Guarantee);
+        Assert.Contains(
+            evidence.Estimate.Assumptions,
+            assumption => assumption.Kind == ComplexityAssumptionKind.OperationSequence);
+        Assert.Contains(
+            evidence.Estimate.Assumptions,
+            assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);
+    }
+
+    [Fact]
     public void Unknown_loop_retains_typed_reason_without_file_path()
     {
         MethodFacts facts = CreateFacts(
