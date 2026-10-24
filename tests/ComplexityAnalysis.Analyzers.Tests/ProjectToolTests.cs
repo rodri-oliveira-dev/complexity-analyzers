@@ -11,6 +11,11 @@ namespace ComplexityAnalysis.Analyzers.Tests;
 
 public sealed class ProjectToolTests
 {
+    private static readonly JsonSerializerOptions GoldenJsonOptions = new()
+    {
+        WriteIndented = true,
+    };
+
     [Fact]
     public async Task Cli_analyzes_csproj_and_writes_deterministic_json()
     {
@@ -54,10 +59,67 @@ public sealed class ProjectToolTests
             .GetProperty("Projects")[0]
             .GetProperty("Files")[0]
             .GetProperty("Members")[0];
+        Assert.Equal("1.0", document.RootElement.GetProperty("SchemaVersion").GetString());
+        Assert.False(member.TryGetProperty("Evidence", out _));
         Assert.Equal("Sum", member.GetProperty("DisplayName").GetString());
         Assert.Equal("known", member.GetProperty("CyclomaticComplexity").GetProperty("Status").GetString());
         Assert.Equal("known", member.GetProperty("Nloc").GetProperty("Status").GetString());
         Assert.Equal("known", member.GetProperty("Halstead").GetProperty("Status").GetString());
+    }
+
+    [Fact]
+    public async Task Cli_opt_in_evidence_json_matches_versioned_golden_contract()
+    {
+        string repositoryRoot = RepositoryTestSupport.FindRepositoryRoot();
+        string fixtureRoot = Path.Combine(repositoryRoot, "tests", "TestAssets", "EvidenceReport");
+        string solutionPath = Path.Combine(fixtureRoot, "EvidenceReport.slnx");
+
+        (int exitCode, string output, string error) = await RunCliAsync(
+            "analyze",
+            solutionPath,
+            "--format",
+            "json",
+            "--include-evidence");
+        (int secondExitCode, string secondOutput, _) = await RunCliAsync(
+            "analyze",
+            solutionPath,
+            "--format",
+            "json",
+            "--include-evidence");
+
+        Assert.Equal(ToolExitCodes.Success, exitCode);
+        Assert.Equal(ToolExitCodes.Success, secondExitCode);
+        Assert.Equal(string.Empty, error);
+        Assert.Equal(output, secondOutput);
+        Assert.Contains("Donn\\u00E9es\\u0026Known.cs", output, StringComparison.Ordinal);
+
+        using JsonDocument document = JsonDocument.Parse(output);
+        string displayRoot = PathUtilities.ToDisplayPath(fixtureRoot, Directory.GetCurrentDirectory());
+        string snapshot = CreateEvidenceGoldenSnapshot(document.RootElement, displayRoot);
+        string goldenPath = Path.Combine(fixtureRoot, "evidence-report.golden.json");
+        string expected = File.ReadAllText(goldenPath).ReplaceLineEndings("\n");
+
+        Assert.Equal(expected, snapshot);
+        AssertEvidencePathsAreRelative(document.RootElement);
+    }
+
+    [Fact]
+    public void Tool_options_require_json_when_evidence_is_requested()
+    {
+        Assert.True(ToolOptions.TryParse(
+            ["analyze", "Fixture.csproj", "--format", "json", "--include-evidence"],
+            out ToolOptions? options,
+            out string? error));
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.IncludeEvidence);
+
+        Assert.False(ToolOptions.TryParse(
+            ["analyze", "Fixture.csproj", "--include-evidence"],
+            out ToolOptions? invalidOptions,
+            out string? invalidError));
+        Assert.Null(invalidOptions);
+        Assert.Equal("--include-evidence requires --format json.", invalidError);
     }
 
     [Fact]
@@ -1216,6 +1278,62 @@ public sealed class ProjectToolTests
         project.Files.Add(file);
         report.Projects.Add(project);
         return report;
+    }
+
+    private static string CreateEvidenceGoldenSnapshot(JsonElement root, string displayRoot)
+    {
+        object snapshot = new
+        {
+            SchemaVersion = root.GetProperty("SchemaVersion").GetString(),
+            EntryPoint = NormalizeFixturePath(root.GetProperty("EntryPoint").GetString()!, displayRoot),
+            Projects = root.GetProperty("Projects").EnumerateArray().Select(project => new
+            {
+                Name = project.GetProperty("Name").GetString(),
+                Path = NormalizeFixturePath(project.GetProperty("Path").GetString()!, displayRoot),
+                Files = project.GetProperty("Files").EnumerateArray().Select(file => new
+                {
+                    Path = NormalizeFixturePath(file.GetProperty("Path").GetString()!, displayRoot),
+                    Members = file.GetProperty("Members").EnumerateArray().Select(member => new
+                    {
+                        DisplayName = member.GetProperty("DisplayName").GetString(),
+                        BigO = member.GetProperty("BigO").Clone(),
+                        Evidence = member.GetProperty("Evidence").Clone(),
+                    }).ToArray(),
+                }).ToArray(),
+            }).ToArray(),
+        };
+        return (JsonSerializer.Serialize(snapshot, GoldenJsonOptions) + "\n").ReplaceLineEndings("\n");
+    }
+
+    private static string NormalizeFixturePath(string path, string displayRoot)
+    {
+        return path.StartsWith(displayRoot, StringComparison.Ordinal)
+            ? "<fixture>" + path[displayRoot.Length..]
+            : path;
+    }
+
+    private static void AssertEvidencePathsAreRelative(JsonElement root)
+    {
+        Assert.False(Path.IsPathFullyQualified(root.GetProperty("EntryPoint").GetString()!));
+        foreach (JsonElement project in root.GetProperty("Projects").EnumerateArray())
+        {
+            Assert.False(Path.IsPathFullyQualified(project.GetProperty("Path").GetString()!));
+            foreach (JsonElement file in project.GetProperty("Files").EnumerateArray())
+            {
+                Assert.False(Path.IsPathFullyQualified(file.GetProperty("Path").GetString()!));
+                foreach (JsonElement member in file.GetProperty("Members").EnumerateArray())
+                {
+                    JsonElement location = member.GetProperty("Location");
+                    Assert.False(Path.IsPathFullyQualified(location.GetProperty("FilePath").GetString()!));
+                    foreach (JsonElement step in member.GetProperty("Evidence").GetProperty("Steps").EnumerateArray())
+                    {
+                        JsonElement evidenceLocation = step.GetProperty("Location");
+                        Assert.False(evidenceLocation.TryGetProperty("FilePath", out _));
+                        Assert.True(evidenceLocation.GetProperty("RelativeStart").GetInt32() >= 0);
+                    }
+                }
+            }
+        }
     }
 
     private static SourceLocationReport Location(string path)

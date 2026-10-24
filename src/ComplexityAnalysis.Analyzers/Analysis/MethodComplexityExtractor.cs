@@ -32,10 +32,86 @@ internal sealed class MethodComplexityExtractor
             throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
         }
 
+        return AnalyzeMemberWithEvidence(
+            member,
+            semanticModel,
+            cancellationToken,
+            maximumEvidenceDepth,
+            maximumEvidenceSteps);
+    }
+
+    internal static ComplexityAnalysisWithEvidenceResult AnalyzeMemberWithEvidence(
+        ExecutableMember member,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        int maximumEvidenceDepth = ComplexityEvidenceCollector.DefaultMaximumDepth,
+        int maximumEvidenceSteps = ComplexityEvidenceCollector.DefaultMaximumSteps)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
         ComplexityAnalyzerOptions options = ComplexityAnalyzerOptions.Default;
         InterproceduralAnalysisContext interproceduralContext = InterproceduralAnalysisContext.Create(
             semanticModel.Compilation,
             cancellationToken);
+
+        return AnalyzeMemberWithEvidence(
+            member,
+            semanticModel,
+            interproceduralContext,
+            options,
+            cancellationToken,
+            maximumEvidenceDepth,
+            maximumEvidenceSteps);
+    }
+
+    internal static ComplexityAnalysisWithEvidenceResult AnalyzeMemberWithEvidence(
+        ExecutableMember member,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
+        CancellationToken cancellationToken,
+        int maximumEvidenceDepth = ComplexityEvidenceCollector.DefaultMaximumDepth,
+        int maximumEvidenceSteps = ComplexityEvidenceCollector.DefaultMaximumSteps)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ComplexityAnalyzerOptions options = interproceduralContext.GetAnalysisOptions(
+            member.SyntaxTree,
+            interproceduralContext.Budget,
+            cancellationToken);
+
+        return AnalyzeMemberWithEvidence(
+            member,
+            semanticModel,
+            interproceduralContext,
+            options,
+            cancellationToken,
+            maximumEvidenceDepth,
+            maximumEvidenceSteps);
+    }
+
+    internal static ComplexityAnalysisWithEvidenceResult AnalyzeMemberWithEvidence(
+        ExecutableMember member,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
+        ComplexityAnalyzerOptions options,
+        CancellationToken cancellationToken,
+        int maximumEvidenceDepth = ComplexityEvidenceCollector.DefaultMaximumDepth,
+        int maximumEvidenceSteps = ComplexityEvidenceCollector.DefaultMaximumSteps)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
+        _ = options ?? throw new ArgumentNullException(nameof(options));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
         InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
             member.Symbol,
             options,

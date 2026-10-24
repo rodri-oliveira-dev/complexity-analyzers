@@ -33,6 +33,12 @@ internal sealed class ToolOptions
         private set;
     }
 
+    internal bool IncludeEvidence
+    {
+        get;
+        private set;
+    }
+
     internal bool IncludeGenerated
     {
         get;
@@ -153,6 +159,12 @@ internal sealed class ToolOptions
             }
         }
 
+        if (parsed.IncludeEvidence && parsed.Format != ReportFormat.Json)
+        {
+            error = "--include-evidence requires --format json.";
+            return false;
+        }
+
         options = parsed;
         return true;
     }
@@ -170,6 +182,9 @@ internal sealed class ToolOptions
                 break;
             case "--include-build-output":
                 parsed.IncludeBuildOutput = true;
+                break;
+            case "--include-evidence":
+                parsed.IncludeEvidence = true;
                 break;
             case "--detect-duplicates":
                 parsed.DetectDuplicates = true;

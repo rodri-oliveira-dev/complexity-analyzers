@@ -40,6 +40,21 @@ JSON está disponível para automação:
 dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --output artifacts/project-report.json
 ```
 
+O contrato JSON padrão permanece no schema `1.0`. Evidências determinísticas
+de complexidade são opt-in e usam o schema `1.1`:
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --include-evidence
+```
+
+`--include-evidence` é válido somente com `--format json`. Cada membro passa a
+incluir o trace limitado produzido pelo core de análise: identidade estável do
+passo, operação e origem, intervalo relativo no código-fonte, dimensões de
+entrada, garantia e hipóteses da estimativa, composição, estado de truncamento e
+um motivo explícito quando o resultado final é `Unknown`. As localizações das
+evidências são relativas ao membro analisado e nunca contêm um path absoluto do
+filesystem.
+
 Os dois formatos são ordenados por path de projeto, path de arquivo, localização
 do membro e localização de clone. O JSON mantém métricas `Unknown` explícitas em
 vez de transformar ausência de informação em `0` ou `O(1)`.

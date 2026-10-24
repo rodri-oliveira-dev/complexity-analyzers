@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace ComplexityAnalysis.Tool.Reporting;
 
@@ -130,6 +131,13 @@ internal sealed class MemberReport
     }
 
     public required BigOReport BigO
+    {
+        get;
+        init;
+    }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ComplexityEvidenceReport? Evidence
     {
         get;
         init;
