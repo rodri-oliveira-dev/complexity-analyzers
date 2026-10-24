@@ -56,7 +56,7 @@ internal static class BigONotationParser
 
         expression = logSeparator < 0
             ? ComplexityFactory.Polynomial(polynomialVariable, degree)
-            : degree == 1
+            : Math.Abs(degree - 1d) <= double.Epsilon
                 ? ComplexityFactory.NLogN(polynomialVariable)
                 : new PolynomialLogComplexity(polynomialVariable, degree, logExponent: 1);
         return true;

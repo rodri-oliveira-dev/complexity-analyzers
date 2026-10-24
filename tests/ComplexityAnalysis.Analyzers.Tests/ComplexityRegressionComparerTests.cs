@@ -11,6 +11,7 @@ public sealed class ComplexityRegressionComparerTests
     [InlineData("O(n)", "O(n²)", "regression")]
     [InlineData("O(n²)", "O(n)", "improvement")]
     [InlineData("O(n)", "O(n)", "equivalent")]
+    [InlineData("O(n^1)", "O(n log n)", "regression")]
     [InlineData("O(n)", "O(m)", "incomparable")]
     public void Compare_classifies_supported_growth_conservatively(string before, string after, string expected)
     {
