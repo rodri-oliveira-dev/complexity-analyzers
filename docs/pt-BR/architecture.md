@@ -177,6 +177,50 @@ O modelo suporta:
 
 Quando o analyzer não consegue comprovar um resultado seguro, o modelo preserva `Unknown` em vez de forçar uma classe de complexidade estimada.
 
+### Garantias e hipóteses das estimativas
+
+Uma expressão Big-O e a natureza de sua garantia são valores separados no modelo:
+
+| Garantia | Significado | Evidência exigida |
+| --- | --- | --- |
+| Upper bound de pior caso | A expressão limita toda execução suportada sob eventuais hipóteses não probabilísticas registradas. | Uma expressão conhecida; hipóteses são opcionais e devem registrar custos condicionais de operação ou runtime. |
+| Esperado | A expressão é uma expectativa, não um limite para toda execução. | Uma expressão conhecida e uma hipótese explícita sobre distribuição de entrada ou de hash. |
+| Amortizado | A expressão vale ao longo de uma sequência de operações e não precisa limitar cada operação individual. | Uma expressão conhecida e uma hipótese explícita sobre a sequência de operações. |
+| `Unknown` | A evidência disponível não comprova uma estimativa suportada. | A expressão `Unknown`, sem hipóteses alegadas. |
+
+O modelo rejeita uma estimativa esperada sem hipótese de distribuição, uma
+estimativa amortizada sem hipótese de sequência de operações e qualquer
+garantia conhecida associada a `Unknown`. As hipóteses são valores tipados e
+imutáveis, portanto esse contrato é determinístico e testável sem Roslyn.
+
+Por compatibilidade, `ToBigONotation()` e os diagnósticos existentes continuam
+renderizando a expressão como antes. A metadata de garantia qualifica esse
+texto; ela não transforma um sinal esperado ou amortizado em prova matemática
+universal. Por exemplo, lookup em tabela hash é `O(1)` esperado somente sob
+distribuição de hash adequada e hashing/igualdade de custo constante, enquanto
+uma operação não suportada permanece `Unknown` em vez de herdar essa estimativa.
+Lookups lineares em listas e ordenação `O(n log n)` também registram igualdade
+ou comparação de custo constante como condição explícita.
+
+### Evidências estruturadas da análise
+
+Um fluxo interno e opt-in de análise pode acompanhar o resultado de complexidade
+com um trace determinístico de evidências. Cada etapa registra a categoria e a
+origem da operação, uma localização no fonte relativa ao executable member
+atual, as dimensões de entrada, a estimativa qualificada e suas hipóteses, a
+regra de composição e um motivo tipado de inconclusão quando a etapa é
+`Unknown`. O recorte vertical inicial cobre limites de loops, invocações
+BCL/LINQ mapeadas e chamadas propagadas para métodos-fonte.
+
+A coleta de evidências é isolada do fluxo normal de diagnósticos, não realiza
+I/O ou telemetria e nunca armazena paths de arquivos. Ela é limitada por padrão
+a 8 níveis e 64 etapas, com máximos absolutos de 16 níveis e 256 etapas. Atingir
+um desses limites marca o trace como truncado sem alterar a complexidade
+calculada. Ordenação estável, localizações relativas e ownership por análise
+mantêm snapshots determinísticos sob análise concorrente. O trace é um contrato
+interno da análise; as mensagens de diagnóstico e os formatos públicos de
+relatório existentes permanecem inalterados.
+
 Cyclomatic Complexity, Maximum Control-Flow Nesting Depth e Cognitive Complexity
 são métricas estruturais inteiras separadas. Métricas Halstead são uma
 capacidade separada de classificação de tokens de fonte, com valores primitivos
@@ -236,7 +280,23 @@ src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/
 
 Operações LINQ deferred como `Where` e `OrderBy` não são contabilizadas como enumeração completa apenas por serem criadas. O custo de enumeração ou ordenação é aplicado quando o consumo suportado é comprovado, por exemplo por uma operação terminal ou `foreach`.
 
+A análise limitada de sequências deferred pode acompanhar uma pipeline por um
+inicializador local não alterado. Ela resolve locais e alvos de delegate por
+identidade de símbolo Roslyn, rejeita escritas intermediárias e reaplica o plano
+da pipeline a cada consumo comprovado. O custo do corpo do delegate só é
+propagado a partir de delegates inline, delegates locais estáveis sem estado
+capturado mutável ou alvos fonte/locais seguros disponíveis na mesma syntax
+tree; outros alvos tornam a pipeline consumida `Unknown`.
+
 Operações não suportadas ou não resolvidas permanecem `Unknown`.
+
+Os mappings de coleções usam o símbolo declarador resolvido estaticamente.
+Operações concretas e não virtuais de `List<T>`, `Dictionary<TKey,TValue>` e
+`HashSet<T>` podem, portanto, carregar garantias e hipóteses documentadas,
+enquanto uma operação homônima alcançada por `ICollection<T>`, `IList<T>`,
+`ISet<T>`, `IDictionary<TKey,TValue>` ou uma interface somente leitura permanece
+`Unknown`. O analyzer não especula sobre a implementação de runtime por trás do
+dispatch de interface.
 
 ## Chamadas interprocedurais a métodos-fonte
 

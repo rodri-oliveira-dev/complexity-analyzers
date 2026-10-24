@@ -622,11 +622,11 @@ public sealed class PerformanceSyntheticCorpusTests
                         CultureInfo.InvariantCulture,
                         $"    public int LinqHeavy{index:D2}(IEnumerable<int> values)"));
                 builder.AppendLine("    {");
-                builder.AppendLine("        return values");
+                builder.AppendLine("        var query = values");
                 builder.AppendLine("            .Where(value => value >= 0)");
                 builder.AppendLine("            .OrderBy(value => value)");
-                builder.AppendLine("            .Select(value => value + 1)");
-                builder.AppendLine("            .ToList()");
+                builder.AppendLine("            .Select(value => value + 1);");
+                builder.AppendLine("        return query.ToList()");
                 builder.AppendLine("            .Count;");
                 builder.AppendLine("    }");
             }

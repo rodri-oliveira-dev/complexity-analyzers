@@ -112,14 +112,34 @@ Known operations are mapped by Roslyn symbol identity. Custom methods named `Con
 
 Implemented examples include:
 
-- `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count`, and the `List<T>` indexer.
+- `List<T>.Add`, `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count`, and the `List<T>` indexer.
 - `Dictionary<TKey,TValue>.ContainsKey` and `Dictionary<TKey,TValue>.ContainsValue`.
 - `HashSet<T>.Contains`.
 - Array and string `Length`.
 - LINQ `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max`, and `Aggregate`.
 - Deferred LINQ operations including `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct`, and `GroupBy`.
 
-Deferred LINQ pipeline creation is not charged as a full enumeration. Enumeration cost is counted when a supported terminal operation or `foreach` consumes the pipeline.
+Each known-operation estimate records whether its Big-O expression is a
+worst-case upper bound, expected cost, amortized cost, or `Unknown`, together
+with the assumptions required by that classification. In particular,
+`Dictionary<TKey,TValue>.ContainsKey` and `HashSet<T>.Contains` are modeled as
+expected `O(1)` only when hash codes are sufficiently distributed and hashing
+and equality have constant cost; they are not unconditional worst-case
+guarantees. Existing Big-O text remains unchanged for compatibility.
+
+`List<T>.Add` is amortized `O(1)` across an append sequence under geometric
+capacity growth and constant-cost element assignment; one append that grows
+the backing storage can still take `O(n)`. Calls resolved only through generic
+collection interfaces remain `Unknown` because interface contracts do not prove
+the runtime implementation or its complexity.
+
+Deferred LINQ pipeline creation is not charged as a full enumeration. Direct
+chains and stable local pipelines retain their known cardinality and are charged
+when a supported terminal operation or `foreach` consumes them, including each
+proven re-enumeration. Predicate and selector cost is included only for inline
+delegates, stable local delegates, or safe source/local targets whose body is
+available; unresolved or reassigned delegate targets and delegates with mutable
+captured state remain `Unknown` when the pipeline is consumed.
 
 ### Interprocedural analysis
 
@@ -191,7 +211,43 @@ JSON reports, opt-in quality gates, generated/build-output exclusions, and
 normalized duplicate-code detection. It is separate from the packaged Roslyn
 analyzer; no project scanning is added to `DiagnosticAnalyzer` hot paths.
 
+To create and install the CLI as a local .NET Tool without publishing it:
+
+```bash
+dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
+dotnet tool install ComplexityAnalysis.Tool --version 0.0.0-local --add-source artifacts/local-packages --tool-path artifacts/local-tools
+artifacts/local-tools/complexity-analysis analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
+```
+
+The tool package is independent from `ComplexityAnalysis.Analyzers`; installing
+the analyzer does not install the CLI, and analyzer consumers gain no runtime
+dependency on it.
+
 See [Project-Level Tooling](docs/en/project-tooling.md).
+
+## Local MCP server
+
+`ComplexityAnalysis.Mcp` exposes the CLI analysis contracts to local MCP clients
+over `stdio`. Its three tools are read-only: analyze a project, query evidence
+for a stable member identity, and compare two snapshots. Build the solution,
+then configure the client to run the host with an explicit allowed root:
+
+```json
+{
+  "command": "dotnet",
+  "args": [
+    "./src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
+    "--root",
+    "."
+  ]
+}
+```
+
+The host rejects paths outside that root, symbolic-link traversal, unsupported
+inputs, and workloads beyond its configured timeout, byte, and file limits. It
+does not expose shell, write, network, or arbitrary process operations.
+
+See [Local MCP Server](docs/en/mcp-server.md).
 
 ## Configuration
 
@@ -269,12 +325,14 @@ See [Architecture](docs/en/architecture.md).
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md)
 - [Getting Started](docs/en/getting-started.md)
 - [Analyzer Catalog](docs/en/analyzers.md)
 - [Architecture](docs/en/architecture.md)
 - [Configuration](docs/en/configuration.md)
 - [C# Halstead Metrics](docs/en/halstead-metrics.md)
 - [Project-Level Tooling](docs/en/project-tooling.md)
+- [Local MCP Server](docs/en/mcp-server.md)
 - [Runnable sample](samples/ComplexityAnalysis.Sample/README.md)
 - [Release Quality Governance](docs/en/development/quality-gates.md)
 - [Documentação em português](README.pt-BR.md)

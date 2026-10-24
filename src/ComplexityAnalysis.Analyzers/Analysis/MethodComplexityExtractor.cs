@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 
+using ComplexityAnalysis.Analyzers.Analysis.Evidence;
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Analysis.Recursion;
 using ComplexityAnalysis.Analyzers.Configuration;
@@ -14,6 +15,140 @@ namespace ComplexityAnalysis.Analyzers.Analysis;
 
 internal sealed class MethodComplexityExtractor
 {
+    internal static ComplexityAnalysisWithEvidenceResult AnalyzeMethodWithEvidence(
+        MethodDeclarationSyntax methodDeclaration,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        int maximumEvidenceDepth = ComplexityEvidenceCollector.DefaultMaximumDepth,
+        int maximumEvidenceSteps = ComplexityEvidenceCollector.DefaultMaximumSteps)
+    {
+        _ = methodDeclaration ?? throw new ArgumentNullException(nameof(methodDeclaration));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!TryCreateMember(methodDeclaration, semanticModel, cancellationToken, out ExecutableMember member))
+        {
+            throw new InvalidOperationException("The method declaration must resolve to a method symbol.");
+        }
+
+        return AnalyzeMemberWithEvidence(
+            member,
+            semanticModel,
+            cancellationToken,
+            maximumEvidenceDepth,
+            maximumEvidenceSteps);
+    }
+
+    internal static ComplexityAnalysisWithEvidenceResult AnalyzeMemberWithEvidence(
+        ExecutableMember member,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        int maximumEvidenceDepth = ComplexityEvidenceCollector.DefaultMaximumDepth,
+        int maximumEvidenceSteps = ComplexityEvidenceCollector.DefaultMaximumSteps)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ComplexityAnalyzerOptions options = ComplexityAnalyzerOptions.Default;
+        InterproceduralAnalysisContext interproceduralContext = InterproceduralAnalysisContext.Create(
+            semanticModel.Compilation,
+            cancellationToken);
+
+        return AnalyzeMemberWithEvidence(
+            member,
+            semanticModel,
+            interproceduralContext,
+            options,
+            cancellationToken,
+            maximumEvidenceDepth,
+            maximumEvidenceSteps);
+    }
+
+    internal static ComplexityAnalysisWithEvidenceResult AnalyzeMemberWithEvidence(
+        ExecutableMember member,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
+        CancellationToken cancellationToken,
+        int maximumEvidenceDepth = ComplexityEvidenceCollector.DefaultMaximumDepth,
+        int maximumEvidenceSteps = ComplexityEvidenceCollector.DefaultMaximumSteps)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ComplexityAnalyzerOptions options = interproceduralContext.GetAnalysisOptions(
+            member.SyntaxTree,
+            interproceduralContext.Budget,
+            cancellationToken);
+
+        return AnalyzeMemberWithEvidence(
+            member,
+            semanticModel,
+            interproceduralContext,
+            options,
+            cancellationToken,
+            maximumEvidenceDepth,
+            maximumEvidenceSteps);
+    }
+
+    internal static ComplexityAnalysisWithEvidenceResult AnalyzeMemberWithEvidence(
+        ExecutableMember member,
+        SemanticModel semanticModel,
+        InterproceduralAnalysisContext interproceduralContext,
+        ComplexityAnalyzerOptions options,
+        CancellationToken cancellationToken,
+        int maximumEvidenceDepth = ComplexityEvidenceCollector.DefaultMaximumDepth,
+        int maximumEvidenceSteps = ComplexityEvidenceCollector.DefaultMaximumSteps)
+    {
+        _ = member ?? throw new ArgumentNullException(nameof(member));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+        _ = interproceduralContext ?? throw new ArgumentNullException(nameof(interproceduralContext));
+        _ = options ?? throw new ArgumentNullException(nameof(options));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        InterproceduralRootAnalysisState rootState = InterproceduralAnalysisContext.CreateRootState(
+            member.Symbol,
+            options,
+            cancellationToken);
+        ComplexityEvidenceCollector collector = new(
+            member.Declaration,
+            maximumEvidenceDepth,
+            maximumEvidenceSteps);
+        MethodAnalysisContext context = MethodAnalysisContext.Create(
+                semanticModel,
+                member.Symbol,
+                options.WithAnalysisBudget(rootState.Budget),
+                interproceduralContext,
+                rootState,
+                cancellationToken)
+            .WithEvidenceCollector(collector);
+
+        ComplexityExpression complexity = AnalyzeMemberCore(member, context);
+        ComplexityEvidenceTrace trace = collector.CreateTrace(complexity);
+        if (complexity is UnknownComplexity
+            && !trace.HasExplicitUnknownReason)
+        {
+            collector.Record(
+                ComplexityEvidenceKind.Analysis,
+                ComplexityEvidenceOrigin.Syntax,
+                "method-analysis",
+                member.Declaration,
+                ComplexityEstimate.Unknown(),
+                composition: null,
+                ComplexityUnknownReason.SourceAnalysisUnknown,
+                cancellationToken);
+            trace = collector.CreateTrace(complexity);
+        }
+
+        return new ComplexityAnalysisWithEvidenceResult(complexity, trace);
+    }
+
     internal static ComplexityExpression AnalyzeMethod(
         MethodDeclarationSyntax methodDeclaration,
         SemanticModel semanticModel,
@@ -121,7 +256,8 @@ internal sealed class MethodComplexityExtractor
         InterproceduralAnalysisContext interproceduralContext,
         InterproceduralRootAnalysisState rootState,
         ComplexityAnalyzerOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ComplexityEvidenceCollector? evidenceCollector = null)
     {
         _ = member ?? throw new ArgumentNullException(nameof(member));
         _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
@@ -138,7 +274,21 @@ internal sealed class MethodComplexityExtractor
             interproceduralContext,
             rootState,
             cancellationToken);
-        ComplexityExpression complexity = AnalyzeMemberCore(member, context);
+        if (evidenceCollector is not null)
+        {
+            context = context.WithEvidenceCollector(evidenceCollector);
+        }
+
+        ComplexityEvidenceCollector.Scope? evidenceScope = evidenceCollector?.EnterScope(member.Declaration);
+        ComplexityExpression complexity;
+        try
+        {
+            complexity = AnalyzeMemberCore(member, context);
+        }
+        finally
+        {
+            evidenceScope?.Dispose();
+        }
 
         return complexity is UnknownComplexity
             ? InterproceduralAnalysisResult.Unknown("The source method complexity is unknown.")
@@ -430,11 +580,16 @@ internal sealed class MethodComplexityExtractor
         MethodAnalysisContext context)
     {
         LoopBoundAnalysisResult loopBound = new LoopBoundAnalyzer(context).AnalyzeFor(forStatement);
-        return loopBound.IsAnalyzable
-            ? ComplexityComposer.Nested(
-                loopBound.IterationComplexity,
-                AnalyzeLoopBody(forStatement.Statement, context))
-            : ComplexityFactory.Unknown();
+        RecordLoopEvidence("for-loop", forStatement, loopBound, context);
+        if (!loopBound.IsAnalyzable)
+        {
+            return ComplexityFactory.Unknown();
+        }
+
+        using ComplexityEvidenceCollector.Scope? scope = context.EvidenceCollector?.EnterScope(forStatement);
+        return ComplexityComposer.Nested(
+            loopBound.IterationComplexity,
+            AnalyzeLoopBody(forStatement.Statement, context));
     }
 
     private static ComplexityExpression AnalyzeForEachStatement(
@@ -442,14 +597,19 @@ internal sealed class MethodComplexityExtractor
         MethodAnalysisContext context)
     {
         LoopBoundAnalysisResult loopBound = new LoopBoundAnalyzer(context).AnalyzeForEach(forEachStatement);
+        RecordLoopEvidence("foreach-loop", forEachStatement, loopBound, context);
         if (!loopBound.IsAnalyzable)
         {
             return ComplexityFactory.Unknown();
         }
 
-        ComplexityExpression bodyComplexity = ComplexityComposer.Nested(
-            loopBound.IterationComplexity,
-            AnalyzeLoopBody(forEachStatement.Statement, context));
+        ComplexityExpression bodyComplexity;
+        using (context.EvidenceCollector?.EnterScope(forEachStatement))
+        {
+            bodyComplexity = ComplexityComposer.Nested(
+                loopBound.IterationComplexity,
+                AnalyzeLoopBody(forEachStatement.Statement, context));
+        }
 
         return ComplexityComposer.Sequential(
             loopBound.EnumerationComplexity,
@@ -461,11 +621,16 @@ internal sealed class MethodComplexityExtractor
         MethodAnalysisContext context)
     {
         LoopBoundAnalysisResult loopBound = new LoopBoundAnalyzer(context).AnalyzeWhile(whileStatement);
-        return loopBound.IsAnalyzable
-            ? ComplexityComposer.Nested(
-                loopBound.IterationComplexity,
-                AnalyzeLoopBody(whileStatement.Statement, context))
-            : ComplexityFactory.Unknown();
+        RecordLoopEvidence("while-loop", whileStatement, loopBound, context);
+        if (!loopBound.IsAnalyzable)
+        {
+            return ComplexityFactory.Unknown();
+        }
+
+        using ComplexityEvidenceCollector.Scope? scope = context.EvidenceCollector?.EnterScope(whileStatement);
+        return ComplexityComposer.Nested(
+            loopBound.IterationComplexity,
+            AnalyzeLoopBody(whileStatement.Statement, context));
     }
 
     private static ComplexityExpression AnalyzeDoWhileStatement(
@@ -473,11 +638,49 @@ internal sealed class MethodComplexityExtractor
         MethodAnalysisContext context)
     {
         LoopBoundAnalysisResult loopBound = new LoopBoundAnalyzer(context).AnalyzeDoWhile(doStatement);
-        return loopBound.IsAnalyzable
-            ? ComplexityComposer.Nested(
-                loopBound.IterationComplexity,
-                AnalyzeLoopBody(doStatement.Statement, context))
+        RecordLoopEvidence("do-while-loop", doStatement, loopBound, context);
+        if (!loopBound.IsAnalyzable)
+        {
+            return ComplexityFactory.Unknown();
+        }
+
+        using ComplexityEvidenceCollector.Scope? scope = context.EvidenceCollector?.EnterScope(doStatement);
+        return ComplexityComposer.Nested(
+            loopBound.IterationComplexity,
+            AnalyzeLoopBody(doStatement.Statement, context));
+    }
+
+    private static void RecordLoopEvidence(
+        string operation,
+        StatementSyntax statement,
+        LoopBoundAnalysisResult loopBound,
+        MethodAnalysisContext context)
+    {
+        ComplexityEvidenceCollector? collector = context.EvidenceCollector;
+        if (collector is null)
+        {
+            return;
+        }
+
+        ComplexityExpression loopComplexity = loopBound.IsAnalyzable
+            ? ComplexityComposer.Sequential(
+                loopBound.EnumerationComplexity,
+                loopBound.IterationComplexity)
             : ComplexityFactory.Unknown();
+        ComplexityEstimate estimate = loopBound.IsAnalyzable
+            ? ComplexityEstimate.WorstCaseUpperBound(loopComplexity)
+            : ComplexityEstimate.Unknown();
+        collector.Record(
+            ComplexityEvidenceKind.Loop,
+            ComplexityEvidenceOrigin.Syntax,
+            operation,
+            statement,
+            estimate,
+            ComplexityOperation.Nested,
+            loopBound.IsAnalyzable
+                ? ComplexityUnknownReason.None
+                : ComplexityUnknownReason.UnprovenLoopBound,
+            context.CancellationToken);
     }
 
     private static ComplexityExpression AnalyzeIfStatement(

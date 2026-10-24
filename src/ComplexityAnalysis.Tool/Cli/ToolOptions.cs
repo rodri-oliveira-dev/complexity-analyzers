@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 
 using ComplexityAnalysis.Analyzers.Configuration;
 
@@ -28,6 +25,18 @@ internal sealed class ToolOptions
     } = ReportFormat.Console;
 
     internal string? OutputPath
+    {
+        get;
+        private set;
+    }
+
+    internal bool IncludeEvidence
+    {
+        get;
+        private set;
+    }
+
+    internal bool Snapshot
     {
         get;
         private set;
@@ -153,6 +162,18 @@ internal sealed class ToolOptions
             }
         }
 
+        if (parsed.IncludeEvidence && parsed.Format is not (ReportFormat.Json or ReportFormat.Sarif))
+        {
+            error = "--include-evidence requires --format json or sarif.";
+            return false;
+        }
+
+        if (parsed.Snapshot && parsed.Format != ReportFormat.Json)
+        {
+            error = "--snapshot requires --format json.";
+            return false;
+        }
+
         options = parsed;
         return true;
     }
@@ -170,6 +191,13 @@ internal sealed class ToolOptions
                 break;
             case "--include-build-output":
                 parsed.IncludeBuildOutput = true;
+                break;
+            case "--include-evidence":
+                parsed.IncludeEvidence = true;
+                break;
+            case "--snapshot":
+                parsed.Snapshot = true;
+                parsed.IncludeEvidence = true;
                 break;
             case "--detect-duplicates":
                 parsed.DetectDuplicates = true;
@@ -211,7 +239,7 @@ internal sealed class ToolOptions
                 if (!TryReadValue(args, ref index, current, out string? formatValue, out error)
                     || !TryParseFormat(formatValue, out ReportFormat format))
                 {
-                    error ??= "Format must be 'console' or 'json'.";
+                    error ??= "Format must be 'console', 'json', or 'sarif'.";
                     return false;
                 }
 
@@ -224,6 +252,8 @@ internal sealed class ToolOptions
                 }
 
                 parsed.OutputPath = Path.GetFullPath(outputPath);
+                break;
+            default:
                 break;
         }
 
@@ -275,6 +305,8 @@ internal sealed class ToolOptions
 
                 parsed.MaximumDuplicateTokens = maximumDuplicateTokens;
                 parsed.DetectDuplicates = true;
+                break;
+            default:
                 break;
         }
 
@@ -361,6 +393,8 @@ internal sealed class ToolOptions
 
                 parsed.MaximumCognitiveComplexity = maximumCognitiveComplexity;
                 break;
+            default:
+                break;
         }
 
         return true;
@@ -377,6 +411,12 @@ internal sealed class ToolOptions
         if (StringComparer.OrdinalIgnoreCase.Equals(value, "console"))
         {
             format = ReportFormat.Console;
+            return true;
+        }
+
+        if (StringComparer.OrdinalIgnoreCase.Equals(value, "sarif"))
+        {
+            format = ReportFormat.Sarif;
             return true;
         }
 
@@ -503,4 +543,5 @@ internal enum ReportFormat
 {
     Console,
     Json,
+    Sarif,
 }

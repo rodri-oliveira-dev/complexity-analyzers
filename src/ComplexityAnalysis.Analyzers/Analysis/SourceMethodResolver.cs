@@ -64,6 +64,30 @@ internal sealed class SourceMethodResolver
             : CallTargetResolution.Unsupported();
     }
 
+    internal bool TryResolveDelegateTarget(
+        ExpressionSyntax expression,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out ExecutableMember? member)
+    {
+        _ = expression ?? throw new ArgumentNullException(nameof(expression));
+        _ = semanticModel ?? throw new ArgumentNullException(nameof(semanticModel));
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(expression, cancellationToken);
+        if (symbolInfo.Symbol is not IMethodSymbol targetMethodSymbol)
+        {
+            member = null;
+            return false;
+        }
+
+        IMethodSymbol sourceMethodDefinition = GetSourceMethodDefinition(targetMethodSymbol);
+        member = null;
+        return IsSafeSourceDispatch(targetMethodSymbol, sourceMethodDefinition)
+            && TryGetSourceMethodDeclaration(sourceMethodDefinition, cancellationToken, out member);
+    }
+
     private static IMethodSymbol GetSourceMethodDefinition(IMethodSymbol methodSymbol)
     {
         IMethodSymbol sourceMethod = methodSymbol.ReducedFrom ?? methodSymbol;

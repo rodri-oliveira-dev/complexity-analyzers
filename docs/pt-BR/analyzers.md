@@ -185,6 +185,12 @@ A estimativa pode incluir limites de loop suportados, operações BCL/LINQ
 conhecidas, callees de métodos-fonte ou local functions seguros na mesma
 compilation e formatos selecionados de recursão direta resolvida.
 
+Estimativas de limites de loop exigem que a variável de controle e o bound
+permaneçam estáveis, exceto pela progressão reconhecida. Mutações diretas
+relevantes, aliases `ref` simples, chamadas `ref`/`out` e local functions
+invocadas que alterem qualquer um desses valores tornam a estimativa do loop
+`Unknown`.
+
 ### Orientação
 
 Use `BIG0001` quando quiser visibilidade das estimativas conhecidas ao ajustar
@@ -250,7 +256,8 @@ foreach (var customer in customers)
 ```
 
 Se `blockedCustomers` é um `HashSet<T>` suportado, a busca é registrada como
-`O(1)` médio e esta regra não reporta.
+`O(1)` esperado sob hipóteses explícitas de distribuição de hash e custo
+constante de hashing/igualdade, e esta regra não reporta.
 
 ### Raciocínio de Complexidade
 
@@ -1169,6 +1176,23 @@ Exemplos BCL incluem operações selecionadas de:
 - arrays;
 - strings.
 
+As classificações BCL auditadas são deliberadamente condicionais:
+
+| Operações | Classificação | Hipóteses exigidas |
+| --- | --- | --- |
+| `Length` de array/string, `List<T>.Count`, indexer de `List<T>` | Upper bound de pior caso `O(1)` | Símbolo concreto suportado. |
+| `List<T>.Contains`, `List<T>.IndexOf` | Upper bound de pior caso `O(n)` | Igualdade com custo constante. |
+| `List<T>.Sort` | Upper bound de pior caso `O(n log n)` | Comparação com custo constante. |
+| `List<T>.Add` | `O(1)` amortizado | Crescimento geométrico da capacidade ao longo de uma sequência de appends e atribuição com custo constante; um crescimento individual pode ser `O(n)`. |
+| `Dictionary<TKey,TValue>.ContainsKey`, `HashSet<T>.Contains` | `O(1)` esperado | Distribuição suficiente de hash e hashing/igualdade com custo constante; sem alegar pior caso constante. |
+| `Dictionary<TKey,TValue>.ContainsValue` | Upper bound de pior caso `O(n)` | Igualdade com custo constante. |
+
+Interfaces genéricas de coleção como `ICollection<T>`, `IList<T>`, `ISet<T>`,
+`IDictionary<TKey,TValue>` e suas equivalentes somente leitura não garantem um
+custo específico de implementação. O dispatch tipado pela interface permanece
+`Unknown`, salvo quando o próprio símbolo resolvido pertence ao subconjunto
+concreto suportado.
+
 Operações LINQ imediatas/terminais suportadas incluem:
 
 - `Any`, `All`, `Contains`, `Count`, `LongCount`;
@@ -1185,7 +1209,14 @@ Mappings são baseados nos símbolos resolvidos. Métodos do usuário com o mesm
 nome não são mapeados automaticamente.
 
 A criação de uma pipeline deferred é tratada como trabalho de setup. O custo de
-enumeração ou ordenação só é cobrado quando consumo suportado é comprovado.
+enumeração ou ordenação só é cobrado quando consumo suportado é comprovado. Uma
+pipeline armazenada em um local estável preserva a cardinalidade conhecida da
+fonte e os custos das operações, e cada consumo terminal ou reenumeração por
+`foreach` comprovado é analisado. Corpos de predicates e selectors só contribuem
+quando o delegate é uma lambda ou anonymous method inline, um delegate local
+estável ou um alvo de método fonte/local seguro com corpo disponível. Parâmetros
+delegate, method groups externos, locais reatribuídos e estado capturado mutável
+permanecem `Unknown` no consumo.
 
 ## Escopo de Chamadas-Fonte Suportadas
 

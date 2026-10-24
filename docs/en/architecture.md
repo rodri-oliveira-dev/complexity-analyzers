@@ -176,6 +176,50 @@ The model supports:
 
 When the analyzer cannot prove a safe result, the model preserves `Unknown` rather than coercing the operation to a guessed complexity class.
 
+### Estimate guarantees and assumptions
+
+A Big-O expression and the nature of its guarantee are separate model values:
+
+| Guarantee | Meaning | Required evidence |
+| --- | --- | --- |
+| Worst-case upper bound | The expression bounds every supported execution under any listed non-probabilistic assumptions. | A known expression; assumptions are optional and must state conditional operation or runtime costs. |
+| Expected | The expression is an expectation, not a bound for every execution. | A known expression and an explicit input or hash-distribution assumption. |
+| Amortized | The expression applies across a sequence of operations and need not bound each individual operation. | A known expression and an explicit operation-sequence assumption. |
+| `Unknown` | The available evidence does not prove a supported estimate. | The `Unknown` expression and no claimed assumptions. |
+
+The model rejects an expected estimate without a distribution assumption, an
+amortized estimate without an operation-sequence assumption, and any known
+guarantee paired with `Unknown`. Assumptions are immutable typed values so this
+contract is deterministic and testable without Roslyn.
+
+For compatibility, `ToBigONotation()` and existing diagnostics continue to
+render the expression as before. The guarantee metadata qualifies that text; it
+does not turn an expected or amortized signal into a universal mathematical
+proof. For example, hash-table lookup is expected `O(1)` only under adequate
+hash distribution and constant-cost hashing/equality, while an unsupported
+operation remains `Unknown` rather than inheriting that estimate. Linear list
+lookups and `O(n log n)` sorting similarly record constant-cost equality or
+comparison as an explicit condition.
+
+### Structured analysis evidence
+
+An opt-in internal analysis path can accompany a complexity result with a
+deterministic evidence trace. Each step records the operation category and
+origin, a source location relative to the current executable member, input
+dimensions, the qualified estimate and its assumptions, the composition rule,
+and a typed inconclusion reason when the step is `Unknown`. The initial vertical
+slice covers loop bounds, mapped BCL/LINQ invocations, and propagated calls to
+source methods.
+
+Evidence collection is isolated from the normal diagnostic path, performs no
+I/O or telemetry, and never stores file paths. It is bounded to 8 levels and 64
+steps by default, with hard maximums of 16 levels and 256 steps. Reaching either
+limit marks the trace as truncated without changing the calculated complexity.
+Stable ordering, relative locations, and per-analysis ownership keep snapshots
+deterministic under concurrent analysis. The trace is an internal analysis
+contract; existing diagnostic messages and public report formats remain
+unchanged.
+
 Cyclomatic Complexity, Maximum Control-Flow Nesting Depth, and Cognitive
 Complexity are separate integer structural metrics. Halstead metrics are a
 separate source-token classification capability with primitive and derived
@@ -234,7 +278,23 @@ src/ComplexityAnalysis.Analyzers/Analysis/KnownOperations/
 
 Deferred LINQ operations such as `Where` and `OrderBy` are not charged as full enumeration merely when created. Enumeration or sorting cost is applied when supported consumption is proven, such as through a terminal operation or `foreach`.
 
+The bounded deferred-sequence analysis can follow a pipeline through an
+unchanged local initializer. It resolves locals and delegate targets by Roslyn
+symbol identity, rejects intervening writes, and replays the pipeline plan for
+each proven consumption. Delegate-body cost is propagated only from inline
+delegates, stable local delegates without mutable captured state, or safe
+source/local targets available in the same syntax tree; other targets make the
+consumed pipeline `Unknown`.
+
 Unsupported or unresolved operations remain `Unknown`.
+
+Collection mappings are keyed to the statically resolved declaring symbol.
+Concrete non-virtual `List<T>`, `Dictionary<TKey,TValue>`, and `HashSet<T>`
+operations can therefore carry documented guarantees and assumptions, while a
+same-name operation reached through `ICollection<T>`, `IList<T>`, `ISet<T>`,
+`IDictionary<TKey,TValue>`, or a read-only interface remains `Unknown`. The
+analyzer does not speculate about the runtime implementation behind interface
+dispatch.
 
 ## Interprocedural source calls
 

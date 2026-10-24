@@ -38,6 +38,31 @@ JSON output is available for automation:
 dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --output artifacts/project-report.json
 ```
 
+For a comparison baseline, add `--snapshot`. This emits the independent
+`complexity-snapshot/1.0` contract, includes deterministic evidence, and records
+normalized origin and analysis configuration. Members use Roslyn documentation
+IDs, so overloads remain distinct and source line or file moves do not change
+identity. Renames are represented as removal plus addition; duplicate identities
+are ambiguous and are never matched heuristically.
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj --format json --snapshot --output artifacts/baseline.json
+```
+
+The default JSON contract remains schema `1.0`. Deterministic complexity
+evidence is opt-in and uses schema `1.1`:
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --include-evidence
+```
+
+`--include-evidence` is valid only with `--format json`. Each member then
+includes the bounded evidence trace produced by the analysis core: stable step
+identity, operation and origin, relative source span, input dimensions,
+estimate guarantee and assumptions, composition, truncation state, and an
+explicit reason when the final result is `Unknown`. Evidence locations are
+relative to the analyzed member and never contain an absolute filesystem path.
+
 Both formats are sorted by project path, file path, member source location, and
 clone location. JSON keeps `Unknown` metrics explicit instead of converting
 missing information to `0` or `O(1)`.
@@ -98,6 +123,53 @@ Exit codes:
 - `1`: command-line, project-loading, parsing, or report-writing error;
 - `2`: at least one explicitly configured quality gate failed;
 - `130`: cancellation was requested.
+
+## Compare Snapshots
+
+Compare two previously generated snapshots without invoking Git or an external
+service:
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- compare artifacts/base.json artifacts/head.json --format json
+```
+
+Use `--format console` (the default) or `--format json`, plus `--output <path>`
+when needed. Findings distinguish regressions, improvements, equivalent,
+incomparable, added, removed, and ambiguous members. `--fail-on-regression` is
+opt-in and returns exit code `2` only for proven regressions. `Unknown` and
+incompatible guarantees, assumptions, configurations, or input dimensions do
+not fail the gate.
+
+### Opt-in CI regression check
+
+The `Complexity Analyzers CI` workflow exposes the boolean
+`run_complexity_regression` input for manual runs. When enabled, it generates a
+fresh snapshot for the runnable sample, compares it with the reviewed snapshot
+in `performance/baselines`, fails only on proven regressions, uploads the
+baseline/current/comparison JSON files as the `complexity-regression` artifact,
+and writes classification counts to the job summary.
+
+This job is intentionally opt-in and read-only. It does not comment on pull
+requests, mutate the repository, publish packages, or request permissions beyond
+`contents: read`. Update the reviewed baseline only when an intentional analysis
+change has been validated and explained in the pull request.
+
+## SARIF 2.1.0
+
+Both `analyze` and `compare` accept `--format sarif`. The output follows SARIF
+2.1.0, uses relative percent-encoded artifact URIs, stable SHA-256 partial
+fingerprints, declared rules, source regions, and deterministic result order.
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj --format sarif --include-evidence --output artifacts/complexity.sarif
+dotnet run --project src/ComplexityAnalysis.Tool -- compare artifacts/base.json artifacts/head.json --format sarif --output artifacts/comparison.sarif
+```
+
+Known member estimates are notes. A member with `Unknown` complexity is emitted
+only when evidence contains a legitimate explicit reason. Proven comparison
+regressions are warnings; other comparison findings are notes. Selecting SARIF
+does not enable a quality gate or change exit codes—`--fail-on-regression`
+remains a separate opt-in switch.
 
 ## Duplicate Detection
 

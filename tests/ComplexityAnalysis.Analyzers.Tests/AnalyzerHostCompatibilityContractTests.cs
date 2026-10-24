@@ -98,6 +98,45 @@ public sealed class AnalyzerHostCompatibilityContractTests
     }
 
     [Fact]
+    public void Ci_complexity_regression_is_opt_in_read_only_and_retains_evidence()
+    {
+        string root = RepositoryTestSupport.FindRepositoryRoot();
+        string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "complexity-analyzers-ci.yml"));
+        int regressionIndex = workflow.IndexOf("  regression:", StringComparison.Ordinal);
+        Assert.True(regressionIndex >= 0, "Expected to find the complexity regression job.");
+        string regressionJob = workflow[regressionIndex..];
+
+        Assert.Contains("run_complexity_regression:", workflow, StringComparison.Ordinal);
+        Assert.Contains("github.event_name == 'workflow_dispatch' && inputs.run_complexity_regression", regressionJob, StringComparison.Ordinal);
+        Assert.Contains("contents: read", regressionJob, StringComparison.Ordinal);
+        Assert.Contains("--fail-on-regression", regressionJob, StringComparison.Ordinal);
+        Assert.Contains("GITHUB_STEP_SUMMARY", regressionJob, StringComparison.Ordinal);
+        Assert.Contains("name: complexity-regression", regressionJob, StringComparison.Ordinal);
+        Assert.DoesNotContain("pull-requests: write", regressionJob, StringComparison.Ordinal);
+        Assert.DoesNotContain("issues: write", regressionJob, StringComparison.Ordinal);
+        Assert.DoesNotContain("continue-on-error", regressionJob, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Reviewed_complexity_baseline_uses_the_supported_deterministic_schema()
+    {
+        string root = RepositoryTestSupport.FindRepositoryRoot();
+        string baselinePath = Path.Combine(
+            root,
+            "performance",
+            "baselines",
+            "ComplexityAnalysis.Sample.snapshot.json");
+        using JsonDocument baseline = JsonDocument.Parse(File.ReadAllText(baselinePath));
+
+        Assert.Equal("complexity-snapshot/1.0", baseline.RootElement.GetProperty("SchemaVersion").GetString());
+        Assert.True(baseline.RootElement.GetProperty("Deterministic").GetBoolean());
+        Assert.Equal(
+            "samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj",
+            baseline.RootElement.GetProperty("EntryPoint").GetString());
+        Assert.DoesNotContain(root, File.ReadAllText(baselinePath), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Dependabot_policy_keeps_roslyn_updates_conservative()
     {
         string root = RepositoryTestSupport.FindRepositoryRoot();

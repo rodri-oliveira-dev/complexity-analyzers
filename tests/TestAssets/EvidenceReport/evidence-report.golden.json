@@ -1,0 +1,129 @@
+{
+  "SchemaVersion": "1.1",
+  "EntryPoint": "\u003Cfixture\u003E/EvidenceReport.slnx",
+  "Projects": [
+    {
+      "Name": "Known",
+      "Path": "\u003Cfixture\u003E/Known/Known.csproj",
+      "Files": [
+        {
+          "Path": "\u003Cfixture\u003E/Known/Donn\u00E9es\u0026Known.cs",
+          "Members": [
+            {
+              "DisplayName": "CountMatches",
+              "BigO": {
+                "Status": "known",
+                "Value": "O(n \u00B7 m)",
+                "IsUnknown": false
+              },
+              "Evidence": {
+                "IsTruncated": false,
+                "MaximumDepth": 8,
+                "MaximumSteps": 64,
+                "UnknownReason": null,
+                "Steps": [
+                  {
+                    "Identity": "0000:Loop:0:92:141:foreach-loop",
+                    "Kind": "loop",
+                    "Origin": "syntax",
+                    "Operation": "foreach-loop",
+                    "Location": {
+                      "RelativeStart": 92,
+                      "Length": 141
+                    },
+                    "Depth": 0,
+                    "Dimensions": [
+                      "n"
+                    ],
+                    "Estimate": {
+                      "Status": "known",
+                      "Value": "O(n)",
+                      "Guarantee": "worstCaseUpperBound",
+                      "Assumptions": []
+                    },
+                    "Composition": "nested",
+                    "UnknownReason": null
+                  },
+                  {
+                    "Identity": "0001:KnownOperation:1:56:21:list-contains",
+                    "Kind": "knownOperation",
+                    "Origin": "knownOperationRegistry",
+                    "Operation": "list-contains",
+                    "Location": {
+                      "RelativeStart": 56,
+                      "Length": 21
+                    },
+                    "Depth": 1,
+                    "Dimensions": [
+                      "m"
+                    ],
+                    "Estimate": {
+                      "Status": "known",
+                      "Value": "O(m)",
+                      "Guarantee": "worstCaseUpperBound",
+                      "Assumptions": [
+                        {
+                          "Kind": "elementOperationCost",
+                          "Description": "Equality checks have constant cost."
+                        }
+                      ]
+                    },
+                    "Composition": null,
+                    "UnknownReason": null
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Name": "Unknown",
+      "Path": "\u003Cfixture\u003E/Unknown/Unknown.csproj",
+      "Files": [
+        {
+          "Path": "\u003Cfixture\u003E/Unknown/Unknown.cs",
+          "Members": [
+            {
+              "DisplayName": "WaitForClock",
+              "BigO": {
+                "Status": "unknown",
+                "Value": null,
+                "IsUnknown": true
+              },
+              "Evidence": {
+                "IsTruncated": false,
+                "MaximumDepth": 8,
+                "MaximumSteps": 64,
+                "UnknownReason": "unprovenLoopBound",
+                "Steps": [
+                  {
+                    "Identity": "0000:Loop:0:63:78:while-loop",
+                    "Kind": "loop",
+                    "Origin": "syntax",
+                    "Operation": "while-loop",
+                    "Location": {
+                      "RelativeStart": 63,
+                      "Length": 78
+                    },
+                    "Depth": 0,
+                    "Dimensions": [],
+                    "Estimate": {
+                      "Status": "unknown",
+                      "Value": null,
+                      "Guarantee": "unknown",
+                      "Assumptions": []
+                    },
+                    "Composition": "nested",
+                    "UnknownReason": "unprovenLoopBound"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

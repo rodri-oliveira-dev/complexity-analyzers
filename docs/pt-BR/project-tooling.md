@@ -40,6 +40,32 @@ JSON está disponível para automação:
 dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --output artifacts/project-report.json
 ```
 
+Para criar um baseline de comparação, adicione `--snapshot`. Esse modo emite o
+contrato independente `complexity-snapshot/1.0`, inclui evidências determinísticas
+e registra origem e configuração normalizadas. Os membros usam IDs de documentação
+do Roslyn, portanto overloads permanecem distintos e mudanças de linha ou arquivo
+não alteram a identidade. Renames aparecem como remoção e adição; identidades
+duplicadas são ambíguas e nunca são associadas por heurística.
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj --format json --snapshot --output artifacts/baseline.json
+```
+
+O contrato JSON padrão permanece no schema `1.0`. Evidências determinísticas
+de complexidade são opt-in e usam o schema `1.1`:
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --include-evidence
+```
+
+`--include-evidence` é válido somente com `--format json`. Cada membro passa a
+incluir o trace limitado produzido pelo core de análise: identidade estável do
+passo, operação e origem, intervalo relativo no código-fonte, dimensões de
+entrada, garantia e hipóteses da estimativa, composição, estado de truncamento e
+um motivo explícito quando o resultado final é `Unknown`. As localizações das
+evidências são relativas ao membro analisado e nunca contêm um path absoluto do
+filesystem.
+
 Os dois formatos são ordenados por path de projeto, path de arquivo, localização
 do membro e localização de clone. O JSON mantém métricas `Unknown` explícitas em
 vez de transformar ausência de informação em `0` ou `O(1)`.
@@ -100,6 +126,53 @@ Exit codes:
   relatório;
 - `2`: pelo menos um quality gate explicitamente configurado falhou;
 - `130`: cancelamento solicitado.
+
+## Comparar Snapshots
+
+Compare dois snapshots gerados anteriormente sem invocar Git ou serviço externo:
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- compare artifacts/base.json artifacts/head.json --format json
+```
+
+Use `--format console` (padrão) ou `--format json`, além de `--output <path>`
+quando necessário. Os findings distinguem regressões, melhorias, equivalência,
+incomparabilidade e membros adicionados, removidos ou ambíguos.
+`--fail-on-regression` é opt-in e retorna o exit code `2` somente para regressões
+comprovadas. `Unknown` e garantias, hipóteses, configurações ou dimensões de
+entrada incompatíveis não falham o gate.
+
+### Check opt-in de regressão no CI
+
+O workflow `Complexity Analyzers CI` expõe a entrada booleana
+`run_complexity_regression` para execuções manuais. Quando habilitada, ela gera
+um snapshot novo do sample executável, compara com o snapshot revisado em
+`performance/baselines`, falha somente para regressões comprovadas, envia os
+arquivos JSON de baseline/atual/comparação no artefato
+`complexity-regression` e escreve as contagens por classificação no resumo do
+job.
+
+Esse job é intencionalmente opt-in e somente leitura. Ele não comenta em pull
+requests, não altera o repositório, não publica pacotes e não solicita permissão
+além de `contents: read`. Atualize o baseline revisado somente quando uma
+mudança intencional da análise tiver sido validada e explicada no pull request.
+
+## SARIF 2.1.0
+
+Tanto `analyze` quanto `compare` aceitam `--format sarif`. A saída segue SARIF
+2.1.0 e usa URIs de artefatos relativas e percent-encoded, partial fingerprints
+SHA-256 estáveis, regras declaradas, regiões de código-fonte e ordem determinística.
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj --format sarif --include-evidence --output artifacts/complexity.sarif
+dotnet run --project src/ComplexityAnalysis.Tool -- compare artifacts/base.json artifacts/head.json --format sarif --output artifacts/comparison.sarif
+```
+
+Estimativas conhecidas de membros são notes. Um membro com complexidade `Unknown`
+só é emitido quando a evidência contém um motivo explícito legítimo. Regressões
+comprovadas da comparação são warnings; os demais findings são notes. Selecionar
+SARIF não habilita quality gate nem altera exit codes: `--fail-on-regression`
+continua sendo uma opção separada e opt-in.
 
 ## Detecção De Duplicação
 

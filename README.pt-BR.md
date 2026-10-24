@@ -112,14 +112,36 @@ As operações conhecidas são mapeadas por identidade de símbolo do Roslyn. M�
 
 Exemplos implementados incluem:
 
-- `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count` e o indexer de `List<T>`.
+- `List<T>.Add`, `List<T>.Contains`, `List<T>.IndexOf`, `List<T>.Sort`, `List<T>.Count` e o indexer de `List<T>`.
 - `Dictionary<TKey,TValue>.ContainsKey` e `Dictionary<TKey,TValue>.ContainsValue`.
 - `HashSet<T>.Contains`.
 - `Length` de arrays e strings.
 - LINQ `Any`, `All`, `Contains`, `Count`, `LongCount`, `ToList`, `ToArray`, `ToDictionary`, `ToHashSet`, `Sum`, `Min`, `Max` e `Aggregate`.
 - Operações LINQ deferred como `Where`, `Select`, `SelectMany`, `OrderBy`, `OrderByDescending`, `ThenBy`, `ThenByDescending`, `Distinct` e `GroupBy`.
 
-A criação de uma pipeline LINQ deferred não é contabilizada como uma enumeração completa. O custo de enumeração é considerado quando uma operação terminal suportada ou um `foreach` consome a pipeline.
+Cada estimativa de operação conhecida registra se sua expressão Big-O é um
+upper bound de pior caso, custo esperado, custo amortizado ou `Unknown`, junto
+das hipóteses exigidas pela classificação. Em particular,
+`Dictionary<TKey,TValue>.ContainsKey` e `HashSet<T>.Contains` são modelados como
+`O(1)` esperado somente quando os hash codes possuem distribuição suficiente e
+hashing e igualdade têm custo constante; eles não são garantias incondicionais
+de pior caso. O texto Big-O existente permanece inalterado por compatibilidade.
+
+`List<T>.Add` possui custo amortizado `O(1)` ao longo de uma sequência de
+appends sob crescimento geométrico da capacidade e atribuição de elemento com
+custo constante; um append que aumenta o armazenamento interno ainda pode
+custar `O(n)`. Chamadas resolvidas apenas por interfaces genéricas de coleção
+permanecem `Unknown`, pois o contrato da interface não comprova a implementação
+de runtime nem sua complexidade.
+
+A criação de uma pipeline LINQ deferred não é contabilizada como uma enumeração
+completa. Cadeias diretas e pipelines locais estáveis preservam sua cardinalidade
+conhecida e são cobradas quando uma operação terminal suportada ou um `foreach`
+as consome, inclusive em cada reenumeração comprovada. O custo de predicates e
+selectors só é incluído para delegates inline, delegates locais estáveis ou
+alvos fonte/locais seguros cujo corpo esteja disponível; alvos não resolvidos ou
+reatribuídos e delegates com estado capturado mutável permanecem `Unknown` quando
+a pipeline é consumida.
 
 ### Análise interprocedural
 
@@ -192,7 +214,45 @@ build e detecção normalizada de código duplicado. Ela é separada do pacote
 Roslyn analyzer; nenhum scan de projeto é adicionado aos hot paths de
 `DiagnosticAnalyzer`.
 
+Para criar e instalar a CLI como .NET Tool local sem publicá-la:
+
+```bash
+dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
+dotnet tool install ComplexityAnalysis.Tool --version 0.0.0-local --add-source artifacts/local-packages --tool-path artifacts/local-tools
+artifacts/local-tools/complexity-analysis analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
+```
+
+O pacote da ferramenta é independente de `ComplexityAnalysis.Analyzers`;
+instalar o analyzer não instala a CLI, e seus consumidores não recebem uma
+dependência runtime da ferramenta.
+
 Veja [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md).
+
+## Servidor MCP local
+
+`ComplexityAnalysis.Mcp` expõe os contratos de análise da CLI para clientes MCP
+locais por `stdio`. Suas três ferramentas são somente leitura: analisar um
+projeto, consultar evidências por identidade estável de membro e comparar dois
+snapshots. Compile a solution e configure o cliente para executar o host com
+uma raiz permitida explícita:
+
+```json
+{
+  "command": "dotnet",
+  "args": [
+    "./src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
+    "--root",
+    "."
+  ]
+}
+```
+
+O host rejeita caminhos fora dessa raiz, traversal por links simbólicos,
+entradas não suportadas e cargas acima dos limites configurados de timeout,
+bytes e arquivos. Ele não expõe operações de shell, escrita, rede ou execução
+arbitrária de processos.
+
+Veja [Servidor MCP Local](docs/pt-BR/mcp-server.md).
 
 ## Configuração
 
@@ -270,12 +330,14 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 
 ## Documentação
 
+- [Changelog](CHANGELOG.md)
 - [Primeiros Passos](docs/pt-BR/getting-started.md)
 - [Catálogo de Analyzers](docs/pt-BR/analyzers.md)
 - [Arquitetura](docs/pt-BR/architecture.md)
 - [Configuração](docs/pt-BR/configuration.md)
 - [Métricas Halstead para C#](docs/pt-BR/halstead-metrics.md)
 - [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md)
+- [Servidor MCP Local](docs/pt-BR/mcp-server.md)
 - [Sample executável](samples/ComplexityAnalysis.Sample/README.md)
 - [Governança de Qualidade de Release](docs/pt-BR/development/quality-gates.md)
 - [Documentation in English](README.md)

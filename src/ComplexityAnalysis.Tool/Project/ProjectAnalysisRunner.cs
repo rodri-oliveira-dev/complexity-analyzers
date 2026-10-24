@@ -1,12 +1,7 @@
-using System;
 using System.Collections.Immutable;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 using ComplexityAnalysis.Analyzers.Analysis;
+using ComplexityAnalysis.Analyzers.Analysis.Evidence;
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Model;
 using ComplexityAnalysis.Tool.Cli;
@@ -27,22 +22,52 @@ internal static class ProjectAnalysisRunner
 
     internal static async Task<ProjectReport> AnalyzeAsync(
         ToolOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<string>? validatePath = null)
     {
         _ = options ?? throw new ArgumentNullException(nameof(options));
         cancellationToken.ThrowIfCancellationRequested();
+        validatePath?.Invoke(options.EntryPath);
 
         string baseDirectory = Directory.GetCurrentDirectory();
         ProjectReport report = new()
         {
             EntryPoint = PathUtilities.ToDisplayPath(options.EntryPath, baseDirectory),
+            SchemaVersion = options.Snapshot ? "complexity-snapshot/1.0" : options.IncludeEvidence ? "1.1" : "1.0",
+            Origin = options.Snapshot
+                ? new SnapshotOriginReport
+                {
+                    Kind = "projectAnalysis",
+                    EntryPoint = PathUtilities.ToDisplayPath(options.EntryPath, baseDirectory),
+                }
+                : null,
+            Configuration = options.Snapshot
+                ? new SnapshotConfigurationReport
+                {
+                    IncludeGenerated = options.IncludeGenerated,
+                    IncludeBuildOutput = options.IncludeBuildOutput,
+                    IncludeEvidence = options.IncludeEvidence,
+                    DetectDuplicates = options.DetectDuplicates,
+                    MinimumDuplicateTokens = options.MinimumDuplicateTokens,
+                    MinimumDuplicateLines = options.MinimumDuplicateLines,
+                }
+                : null,
         };
 
         foreach (string projectPath in ProjectEntryResolver.ResolveProjectPaths(options.EntryPath))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            CSharpProjectSource project = await CSharpProjectLoader.LoadAsync(projectPath, options, cancellationToken);
-            report.Projects.Add(AnalyzeProject(project, baseDirectory, cancellationToken));
+            validatePath?.Invoke(projectPath);
+            CSharpProjectSource project = await CSharpProjectLoader.LoadAsync(
+                projectPath,
+                options,
+                cancellationToken,
+                validatePath);
+            report.Projects.Add(AnalyzeProject(
+                project,
+                baseDirectory,
+                options.IncludeEvidence,
+                cancellationToken));
         }
 
         report.Projects.Sort((left, right) => StringComparer.Ordinal.Compare(left.Path, right.Path));
@@ -59,6 +84,7 @@ internal static class ProjectAnalysisRunner
     private static AnalyzedProjectReport AnalyzeProject(
         CSharpProjectSource project,
         string baseDirectory,
+        bool includeEvidence,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -106,6 +132,7 @@ internal static class ProjectAnalysisRunner
                         semanticModel,
                         interproceduralContext,
                         baseDirectory,
+                        includeEvidence,
                         cancellationToken));
                 }
             }
@@ -123,15 +150,31 @@ internal static class ProjectAnalysisRunner
         SemanticModel semanticModel,
         InterproceduralAnalysisContext interproceduralContext,
         string baseDirectory,
+        bool includeEvidence,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        ComplexityExpression complexity = MethodComplexityExtractor.AnalyzeMember(
-            member,
-            semanticModel,
-            interproceduralContext,
-            cancellationToken);
+        ComplexityExpression complexity;
+        ComplexityEvidenceReport? evidence = null;
+        if (includeEvidence)
+        {
+            ComplexityAnalysisWithEvidenceResult result = MethodComplexityExtractor.AnalyzeMemberWithEvidence(
+                member,
+                semanticModel,
+                interproceduralContext,
+                cancellationToken);
+            complexity = result.Complexity;
+            evidence = CreateEvidenceReport(result.Evidence);
+        }
+        else
+        {
+            complexity = MethodComplexityExtractor.AnalyzeMember(
+                member,
+                semanticModel,
+                interproceduralContext,
+                cancellationToken);
+        }
 
         MetricReport<int> cyclomatic = new CyclomaticComplexityAnalyzer().TryAnalyze(
             member,
@@ -183,6 +226,8 @@ internal static class ProjectAnalysisRunner
 
         return new MemberReport
         {
+            StableId = member.Symbol.GetDocumentationCommentId()
+                ?? member.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             DisplayName = member.DisplayName,
             Kind = member.Kind.ToString(),
             SymbolId = member.Symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
@@ -190,6 +235,7 @@ internal static class ProjectAnalysisRunner
             BigO = complexity is UnknownComplexity
                 ? BigOReport.Unknown()
                 : BigOReport.Known(complexity.ToString()),
+            Evidence = evidence,
             CyclomaticComplexity = cyclomatic,
             MaximumNestingDepth = nesting,
             Nloc = nloc,
@@ -198,6 +244,140 @@ internal static class ProjectAnalysisRunner
             ParameterCount = parameterCount,
             CognitiveComplexity = cognitive,
             Halstead = halstead,
+        };
+    }
+
+    private static ComplexityEvidenceReport CreateEvidenceReport(ComplexityEvidenceTrace trace)
+    {
+        ComplexityEvidenceReport report = new()
+        {
+            IsTruncated = trace.IsTruncated,
+            MaximumDepth = trace.MaximumDepth,
+            MaximumSteps = trace.MaximumSteps,
+            UnknownReason = trace.UnknownReason == ComplexityUnknownReason.None
+                ? null
+                : FormatUnknownReason(trace.UnknownReason),
+        };
+
+        foreach (ComplexityEvidenceStep step in trace.Steps)
+        {
+            ComplexityEstimateReport estimate = new()
+            {
+                Status = step.Estimate.Complexity is UnknownComplexity ? "unknown" : "known",
+                Value = step.Estimate.Complexity is UnknownComplexity
+                    ? null
+                    : step.Estimate.Complexity.ToString(),
+                Guarantee = FormatGuarantee(step.Estimate.Guarantee),
+            };
+            foreach (ComplexityAssumption assumption in step.Estimate.Assumptions)
+            {
+                estimate.Assumptions.Add(new ComplexityAssumptionReport
+                {
+                    Kind = FormatAssumptionKind(assumption.Kind),
+                    Description = assumption.Description,
+                });
+            }
+
+            ComplexityEvidenceStepReport stepReport = new()
+            {
+                Identity = step.Identity,
+                Kind = FormatEvidenceKind(step.Kind),
+                Origin = FormatEvidenceOrigin(step.Origin),
+                Operation = step.Operation,
+                Location = new ComplexityEvidenceLocationReport
+                {
+                    RelativeStart = step.Location.RelativeStart,
+                    Length = step.Location.Length,
+                },
+                Depth = step.Depth,
+                Estimate = estimate,
+                Composition = step.Composition is null
+                    ? null
+                    : FormatComposition(step.Composition.Value),
+                UnknownReason = step.UnknownReason == ComplexityUnknownReason.None
+                    ? null
+                    : FormatUnknownReason(step.UnknownReason),
+            };
+            stepReport.Dimensions.AddRange(step.Dimensions);
+            report.Steps.Add(stepReport);
+        }
+
+        return report;
+    }
+
+    private static string FormatEvidenceKind(ComplexityEvidenceKind kind)
+    {
+        return kind switch
+        {
+            ComplexityEvidenceKind.Analysis => "analysis",
+            ComplexityEvidenceKind.Loop => "loop",
+            ComplexityEvidenceKind.KnownOperation => "knownOperation",
+            ComplexityEvidenceKind.SourceCall => "sourceCall",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+    }
+
+    private static string FormatEvidenceOrigin(ComplexityEvidenceOrigin origin)
+    {
+        return origin switch
+        {
+            ComplexityEvidenceOrigin.Syntax => "syntax",
+            ComplexityEvidenceOrigin.KnownOperationRegistry => "knownOperationRegistry",
+            ComplexityEvidenceOrigin.SourceAnalysis => "sourceAnalysis",
+            _ => throw new ArgumentOutOfRangeException(nameof(origin)),
+        };
+    }
+
+    private static string FormatGuarantee(ComplexityGuarantee guarantee)
+    {
+        return guarantee switch
+        {
+            ComplexityGuarantee.WorstCaseUpperBound => "worstCaseUpperBound",
+            ComplexityGuarantee.Expected => "expected",
+            ComplexityGuarantee.Amortized => "amortized",
+            ComplexityGuarantee.Unknown => "unknown",
+            _ => throw new ArgumentOutOfRangeException(nameof(guarantee)),
+        };
+    }
+
+    private static string FormatAssumptionKind(ComplexityAssumptionKind kind)
+    {
+        return kind switch
+        {
+            ComplexityAssumptionKind.InputDistribution => "inputDistribution",
+            ComplexityAssumptionKind.HashDistribution => "hashDistribution",
+            ComplexityAssumptionKind.OperationSequence => "operationSequence",
+            ComplexityAssumptionKind.ElementOperationCost => "elementOperationCost",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+    }
+
+    private static string FormatComposition(ComplexityOperation operation)
+    {
+        return operation switch
+        {
+            ComplexityOperation.Sequential => "sequential",
+            ComplexityOperation.Nested => "nested",
+            ComplexityOperation.Maximum => "maximum",
+            _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+        };
+    }
+
+    private static string FormatUnknownReason(ComplexityUnknownReason reason)
+    {
+        return reason switch
+        {
+            ComplexityUnknownReason.UnsupportedOperation => "unsupportedOperation",
+            ComplexityUnknownReason.UnresolvedSymbol => "unresolvedSymbol",
+            ComplexityUnknownReason.UnprovenLoopBound => "unprovenLoopBound",
+            ComplexityUnknownReason.UnresolvedInputDimension => "unresolvedInputDimension",
+            ComplexityUnknownReason.SourceAnalysisUnknown => "sourceAnalysisUnknown",
+            ComplexityUnknownReason.InterproceduralAnalysisDisabled => "interproceduralAnalysisDisabled",
+            ComplexityUnknownReason.BudgetExceeded => "budgetExceeded",
+            ComplexityUnknownReason.CycleBoundary => "cycleBoundary",
+            ComplexityUnknownReason.EvidenceLimitExceeded => "evidenceLimitExceeded",
+            ComplexityUnknownReason.None => throw new ArgumentOutOfRangeException(nameof(reason)),
+            _ => throw new ArgumentOutOfRangeException(nameof(reason)),
         };
     }
 
@@ -245,12 +425,7 @@ internal static class ProjectAnalysisRunner
         }
 
         int startComparison = left.Location.Start.CompareTo(right.Location.Start);
-        if (startComparison != 0)
-        {
-            return startComparison;
-        }
-
-        return StringComparer.Ordinal.Compare(left.DisplayName, right.DisplayName);
+        return startComparison != 0 ? startComparison : StringComparer.Ordinal.Compare(left.DisplayName, right.DisplayName);
     }
 
     private static ImmutableArray<MetadataReference> TrustedPlatformReferences
