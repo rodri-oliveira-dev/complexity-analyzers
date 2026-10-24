@@ -202,6 +202,25 @@ uma operação não suportada permanece `Unknown` em vez de herdar essa estimati
 Lookups lineares em listas e ordenação `O(n log n)` também registram igualdade
 ou comparação de custo constante como condição explícita.
 
+### Evidências estruturadas da análise
+
+Um fluxo interno e opt-in de análise pode acompanhar o resultado de complexidade
+com um trace determinístico de evidências. Cada etapa registra a categoria e a
+origem da operação, uma localização no fonte relativa ao executable member
+atual, as dimensões de entrada, a estimativa qualificada e suas hipóteses, a
+regra de composição e um motivo tipado de inconclusão quando a etapa é
+`Unknown`. O recorte vertical inicial cobre limites de loops, invocações
+BCL/LINQ mapeadas e chamadas propagadas para métodos-fonte.
+
+A coleta de evidências é isolada do fluxo normal de diagnósticos, não realiza
+I/O ou telemetria e nunca armazena paths de arquivos. Ela é limitada por padrão
+a 8 níveis e 64 etapas, com máximos absolutos de 16 níveis e 256 etapas. Atingir
+um desses limites marca o trace como truncado sem alterar a complexidade
+calculada. Ordenação estável, localizações relativas e ownership por análise
+mantêm snapshots determinísticos sob análise concorrente. O trace é um contrato
+interno da análise; as mensagens de diagnóstico e os formatos públicos de
+relatório existentes permanecem inalterados.
+
 Cyclomatic Complexity, Maximum Control-Flow Nesting Depth e Cognitive Complexity
 são métricas estruturais inteiras separadas. Métricas Halstead são uma
 capacidade separada de classificação de tokens de fonte, com valores primitivos

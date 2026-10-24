@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 
+using ComplexityAnalysis.Analyzers.Analysis.Evidence;
 using ComplexityAnalysis.Analyzers.Analysis.KnownOperations;
 using ComplexityAnalysis.Analyzers.Model;
 
@@ -32,6 +33,7 @@ internal sealed class KnownOperationComplexityAnalyzer
             || methodSymbol is null
             || mapping is null)
         {
+            RecordUnknownOperation(invocation, ComplexityUnknownReason.UnresolvedSymbol);
             return ComplexityFactory.Unknown();
         }
 
@@ -49,14 +51,14 @@ internal sealed class KnownOperationComplexityAnalyzer
 
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        if (mapping.ExecutionKind == KnownOperationExecutionKind.Deferred)
-        {
-            return ComplexityFactory.Constant();
-        }
-
-        return IsLinqMapping(mapping)
+        ComplexityExpression complexity = mapping.ExecutionKind == KnownOperationExecutionKind.Deferred
+            ? ComplexityFactory.Constant()
+            : IsLinqMapping(mapping)
             ? AnalyzeImmediateLinqInvocation(invocation, methodSymbol, mapping)
             : AnalyzeImmediateKnownInvocation(invocation, methodSymbol, mapping);
+
+        RecordKnownOperation(invocation, mapping, complexity);
+        return complexity;
     }
 
     internal ComplexityExpression AnalyzeMemberAccess(MemberAccessExpressionSyntax memberAccess)
@@ -611,6 +613,45 @@ internal sealed class KnownOperationComplexityAnalyzer
         return namespaceSymbol.IsGlobalNamespace
             ? string.Empty
             : namespaceSymbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+    }
+
+    private void RecordKnownOperation(
+        InvocationExpressionSyntax invocation,
+        KnownOperationMapping mapping,
+        ComplexityExpression complexity)
+    {
+        ComplexityEvidenceCollector? collector = context.EvidenceCollector;
+        if (collector is null)
+        {
+            return;
+        }
+
+        collector.Record(
+            ComplexityEvidenceKind.KnownOperation,
+            ComplexityEvidenceOrigin.KnownOperationRegistry,
+            mapping.Metadata.OperationFamily,
+            invocation,
+            mapping.Estimate.WithComplexity(complexity),
+            composition: null,
+            complexity is UnknownComplexity
+                ? ComplexityUnknownReason.UnresolvedInputDimension
+                : ComplexityUnknownReason.None,
+            context.CancellationToken);
+    }
+
+    private void RecordUnknownOperation(
+        InvocationExpressionSyntax invocation,
+        ComplexityUnknownReason reason)
+    {
+        context.EvidenceCollector?.Record(
+            ComplexityEvidenceKind.KnownOperation,
+            ComplexityEvidenceOrigin.KnownOperationRegistry,
+            "unresolved-operation",
+            invocation,
+            ComplexityEstimate.Unknown(),
+            composition: null,
+            reason,
+            context.CancellationToken);
     }
 
     private static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)

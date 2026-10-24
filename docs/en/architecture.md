@@ -201,6 +201,25 @@ operation remains `Unknown` rather than inheriting that estimate. Linear list
 lookups and `O(n log n)` sorting similarly record constant-cost equality or
 comparison as an explicit condition.
 
+### Structured analysis evidence
+
+An opt-in internal analysis path can accompany a complexity result with a
+deterministic evidence trace. Each step records the operation category and
+origin, a source location relative to the current executable member, input
+dimensions, the qualified estimate and its assumptions, the composition rule,
+and a typed inconclusion reason when the step is `Unknown`. The initial vertical
+slice covers loop bounds, mapped BCL/LINQ invocations, and propagated calls to
+source methods.
+
+Evidence collection is isolated from the normal diagnostic path, performs no
+I/O or telemetry, and never stores file paths. It is bounded to 8 levels and 64
+steps by default, with hard maximums of 16 levels and 256 steps. Reaching either
+limit marks the trace as truncated without changing the calculated complexity.
+Stable ordering, relative locations, and per-analysis ownership keep snapshots
+deterministic under concurrent analysis. The trace is an internal analysis
+contract; existing diagnostic messages and public report formats remain
+unchanged.
+
 Cyclomatic Complexity, Maximum Control-Flow Nesting Depth, and Cognitive
 Complexity are separate integer structural metrics. Halstead metrics are a
 separate source-token classification capability with primitive and derived

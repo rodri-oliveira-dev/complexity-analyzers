@@ -75,6 +75,17 @@ internal sealed class ComplexityEstimate : IEquatable<ComplexityEstimate>
             []);
     }
 
+    internal ComplexityEstimate WithComplexity(ComplexityExpression complexity)
+    {
+        _ = complexity ?? throw new ArgumentNullException(nameof(complexity));
+
+        return complexity is UnknownComplexity
+            ? Unknown()
+            : Guarantee == ComplexityGuarantee.Unknown
+            ? WorstCaseUpperBound(complexity)
+            : new ComplexityEstimate(complexity, Guarantee, Assumptions);
+    }
+
     public bool Equals(ComplexityEstimate? other)
     {
         return other is not null
