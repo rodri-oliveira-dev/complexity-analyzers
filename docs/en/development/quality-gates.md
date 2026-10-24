@@ -126,6 +126,7 @@ The active `main` ruleset requires these status checks by exact name:
 | Core solution validation | `Quality` | Restore, Release build, broad test suite excluding focused package/performance suites. |
 | Package contract | `Package` | Pack, run package contract tests, upload local `.nupkg` artifact. |
 | Performance | `Performance` | Structural performance suite and compiler `ReportAnalyzer=true` reporting path. |
+| Optional project regression evidence | `Complexity regression` | Manual snapshot generation/comparison, artifact retention, and job summary; not a required check. |
 | Host compatibility | `Compatibility (8.0.x)` | Real package consumer smoke under .NET 8 SDK host. |
 | Host compatibility | `Compatibility (9.0.x)` | Real package consumer smoke under .NET 9 SDK host. |
 | Host compatibility | `Compatibility (10.0.x)` | Real package consumer smoke under .NET 10 SDK host. |

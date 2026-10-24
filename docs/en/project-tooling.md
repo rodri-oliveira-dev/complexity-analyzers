@@ -140,6 +140,20 @@ opt-in and returns exit code `2` only for proven regressions. `Unknown` and
 incompatible guarantees, assumptions, configurations, or input dimensions do
 not fail the gate.
 
+### Opt-in CI regression check
+
+The `Complexity Analyzers CI` workflow exposes the boolean
+`run_complexity_regression` input for manual runs. When enabled, it generates a
+fresh snapshot for the runnable sample, compares it with the reviewed snapshot
+in `performance/baselines`, fails only on proven regressions, uploads the
+baseline/current/comparison JSON files as the `complexity-regression` artifact,
+and writes classification counts to the job summary.
+
+This job is intentionally opt-in and read-only. It does not comment on pull
+requests, mutate the repository, publish packages, or request permissions beyond
+`contents: read`. Update the reviewed baseline only when an intentional analysis
+change has been validated and explained in the pull request.
+
 ## SARIF 2.1.0
 
 Both `analyze` and `compare` accept `--format sarif`. The output follows SARIF

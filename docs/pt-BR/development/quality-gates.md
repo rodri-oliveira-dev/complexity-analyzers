@@ -129,6 +129,7 @@ A ruleset ativa de `main` exige estes status checks pelo nome exato:
 | Validação central da solution | `Quality` | Restore, build Release, suite ampla excluindo suites focadas de package/performance. |
 | Contrato de package | `Package` | Pack, package contract tests e upload do `.nupkg` local. |
 | Performance | `Performance` | Suite estrutural de performance e caminho `ReportAnalyzer=true` do compiler. |
+| Evidência opcional de regressão de projeto | `Complexity regression` | Geração/comparação manual de snapshots, retenção de artefato e resumo do job; não é check obrigatório. |
 | Compatibilidade de host | `Compatibility (8.0.x)` | Smoke de consumer real com package no host SDK .NET 8. |
 | Compatibilidade de host | `Compatibility (9.0.x)` | Smoke de consumer real com package no host SDK .NET 9. |
 | Compatibilidade de host | `Compatibility (10.0.x)` | Smoke de consumer real com package no host SDK .NET 10. |

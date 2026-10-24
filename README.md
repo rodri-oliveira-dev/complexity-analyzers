@@ -325,6 +325,7 @@ See [Architecture](docs/en/architecture.md).
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md)
 - [Getting Started](docs/en/getting-started.md)
 - [Analyzer Catalog](docs/en/analyzers.md)
 - [Architecture](docs/en/architecture.md)

@@ -330,6 +330,7 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 
 ## Documentação
 
+- [Changelog](CHANGELOG.md)
 - [Primeiros Passos](docs/pt-BR/getting-started.md)
 - [Catálogo de Analyzers](docs/pt-BR/analyzers.md)
 - [Arquitetura](docs/pt-BR/architecture.md)

@@ -142,6 +142,21 @@ incomparabilidade e membros adicionados, removidos ou ambíguos.
 comprovadas. `Unknown` e garantias, hipóteses, configurações ou dimensões de
 entrada incompatíveis não falham o gate.
 
+### Check opt-in de regressão no CI
+
+O workflow `Complexity Analyzers CI` expõe a entrada booleana
+`run_complexity_regression` para execuções manuais. Quando habilitada, ela gera
+um snapshot novo do sample executável, compara com o snapshot revisado em
+`performance/baselines`, falha somente para regressões comprovadas, envia os
+arquivos JSON de baseline/atual/comparação no artefato
+`complexity-regression` e escreve as contagens por classificação no resumo do
+job.
+
+Esse job é intencionalmente opt-in e somente leitura. Ele não comenta em pull
+requests, não altera o repositório, não publica pacotes e não solicita permissão
+além de `contents: read`. Atualize o baseline revisado somente quando uma
+mudança intencional da análise tiver sido validada e explicada no pull request.
+
 ## SARIF 2.1.0
 
 Tanto `analyze` quanto `compare` aceitam `--format sarif`. A saída segue SARIF

@@ -8,6 +8,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_complexity_regression:
+        description: Compare the sample against its reviewed complexity snapshot
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -212,4 +218,85 @@ jobs:
         with:
           name: analyzer-reporting
           path: artifacts/performance/report-analyzer.log
+          if-no-files-found: error
+
+  regression:
+    name: Complexity regression
+    if: github.event_name == 'workflow_dispatch' && inputs.run_complexity_regression
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    timeout-minutes: 15
+    needs: quality
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore ComplexityAnalysis.Analyzers.slnx
+
+      - name: Build
+        run: >
+          dotnet build ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-restore
+
+      - name: Generate current snapshot
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/regression -Force | Out-Null
+          dotnet run --project ./src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj `
+            --configuration Release `
+            --no-build `
+            -- analyze ./samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj `
+            --format json `
+            --snapshot `
+            --output ./artifacts/regression/current.json
+
+      - name: Compare reviewed baseline
+        shell: pwsh
+        run: |
+          dotnet run --project ./src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj `
+            --configuration Release `
+            --no-build `
+            -- compare ./performance/baselines/ComplexityAnalysis.Sample.snapshot.json `
+            ./artifacts/regression/current.json `
+            --format json `
+            --output ./artifacts/regression/comparison.json `
+            --fail-on-regression
+
+      - name: Write regression summary
+        if: always()
+        shell: pwsh
+        run: |
+          "## Complexity regression" >> $env:GITHUB_STEP_SUMMARY
+          if (Test-Path ./artifacts/regression/comparison.json) {
+            $report = Get-Content ./artifacts/regression/comparison.json -Raw | ConvertFrom-Json
+            $counts = $report.Findings | Group-Object Classification | Sort-Object Name
+            "" >> $env:GITHUB_STEP_SUMMARY
+            "| Classification | Count |" >> $env:GITHUB_STEP_SUMMARY
+            "| --- | ---: |" >> $env:GITHUB_STEP_SUMMARY
+            foreach ($count in $counts) {
+              "| $($count.Name) | $($count.Count) |" >> $env:GITHUB_STEP_SUMMARY
+            }
+          }
+          else {
+            "" >> $env:GITHUB_STEP_SUMMARY
+            "Comparison output was not produced." >> $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Upload regression evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: complexity-regression
+          path: |
+            performance/baselines/ComplexityAnalysis.Sample.snapshot.json
+            artifacts/regression/*.json
           if-no-files-found: error
