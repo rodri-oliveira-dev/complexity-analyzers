@@ -36,7 +36,7 @@ internal sealed class ComparisonOptions
         error = null;
         if (args.Length < 3 || !StringComparer.Ordinal.Equals(args[0], "compare"))
         {
-            error = "Usage: complexity compare <baseline.json> <current.json> [--format console|json] [--output <path>] [--fail-on-regression]";
+            error = "Usage: complexity compare <baseline.json> <current.json> [--format console|json|sarif] [--output <path>] [--fail-on-regression]";
             return false;
         }
 
@@ -63,9 +63,13 @@ internal sealed class ComparisonOptions
                     {
                         parsed.Format = ReportFormat.Console;
                     }
+                    else if (StringComparer.OrdinalIgnoreCase.Equals(value, "sarif"))
+                    {
+                        parsed.Format = ReportFormat.Sarif;
+                    }
                     else
                     {
-                        error = "Format must be 'console' or 'json'.";
+                        error = "Format must be 'console', 'json', or 'sarif'.";
                         return false;
                     }
 

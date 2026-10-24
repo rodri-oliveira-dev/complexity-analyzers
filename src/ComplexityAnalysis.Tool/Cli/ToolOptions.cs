@@ -162,9 +162,9 @@ internal sealed class ToolOptions
             }
         }
 
-        if (parsed.IncludeEvidence && parsed.Format != ReportFormat.Json)
+        if (parsed.IncludeEvidence && parsed.Format is not (ReportFormat.Json or ReportFormat.Sarif))
         {
-            error = "--include-evidence requires --format json.";
+            error = "--include-evidence requires --format json or sarif.";
             return false;
         }
 
@@ -239,7 +239,7 @@ internal sealed class ToolOptions
                 if (!TryReadValue(args, ref index, current, out string? formatValue, out error)
                     || !TryParseFormat(formatValue, out ReportFormat format))
                 {
-                    error ??= "Format must be 'console' or 'json'.";
+                    error ??= "Format must be 'console', 'json', or 'sarif'.";
                     return false;
                 }
 
@@ -414,6 +414,12 @@ internal sealed class ToolOptions
             return true;
         }
 
+        if (StringComparer.OrdinalIgnoreCase.Equals(value, "sarif"))
+        {
+            format = ReportFormat.Sarif;
+            return true;
+        }
+
         format = ReportFormat.Console;
         return false;
     }
@@ -537,4 +543,5 @@ internal enum ReportFormat
 {
     Console,
     Json,
+    Sarif,
 }

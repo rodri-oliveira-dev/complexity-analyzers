@@ -140,6 +140,23 @@ opt-in and returns exit code `2` only for proven regressions. `Unknown` and
 incompatible guarantees, assumptions, configurations, or input dimensions do
 not fail the gate.
 
+## SARIF 2.1.0
+
+Both `analyze` and `compare` accept `--format sarif`. The output follows SARIF
+2.1.0, uses relative percent-encoded artifact URIs, stable SHA-256 partial
+fingerprints, declared rules, source regions, and deterministic result order.
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj --format sarif --include-evidence --output artifacts/complexity.sarif
+dotnet run --project src/ComplexityAnalysis.Tool -- compare artifacts/base.json artifacts/head.json --format sarif --output artifacts/comparison.sarif
+```
+
+Known member estimates are notes. A member with `Unknown` complexity is emitted
+only when evidence contains a legitimate explicit reason. Proven comparison
+regressions are warnings; other comparison findings are notes. Selecting SARIF
+does not enable a quality gate or change exit codes—`--fail-on-regression`
+remains a separate opt-in switch.
+
 ## Duplicate Detection
 
 Duplicate detection is also opt-in:

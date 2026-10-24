@@ -36,10 +36,13 @@ internal static class ComplexityToolApplication
             ProjectReport report = await ProjectAnalysisRunner.AnalyzeAsync(options, cancellationToken);
             QualityGateEvaluator.Evaluate(report, options);
 
-            IReportWriter writer = options.Format == ReportFormat.Json
-                ? new JsonReportWriter()
-                : new ConsoleReportWriter();
-            string rendered = writer.Write(report);
+            string rendered = options.Format switch
+            {
+                ReportFormat.Json => new JsonReportWriter().Write(report),
+                ReportFormat.Sarif => SarifReportWriter.Write(report),
+                ReportFormat.Console => new ConsoleReportWriter().Write(report),
+                _ => new ConsoleReportWriter().Write(report),
+            };
 
             if (options.OutputPath is null)
             {
@@ -82,9 +85,13 @@ internal static class ComplexityToolApplication
         ProjectReport baseline = await SnapshotReader.ReadAsync(options.BaselinePath, cancellationToken);
         ProjectReport current = await SnapshotReader.ReadAsync(options.CurrentPath, cancellationToken);
         ComplexityComparisonReport comparison = ComplexityRegressionComparer.Compare(baseline, current);
-        string rendered = options.Format == ReportFormat.Json
-            ? ComparisonReportWriter.WriteJson(comparison)
-            : ComparisonReportWriter.WriteConsole(comparison);
+        string rendered = options.Format switch
+        {
+            ReportFormat.Json => ComparisonReportWriter.WriteJson(comparison),
+            ReportFormat.Sarif => SarifReportWriter.Write(comparison),
+            ReportFormat.Console => ComparisonReportWriter.WriteConsole(comparison),
+            _ => ComparisonReportWriter.WriteConsole(comparison),
+        };
 
         if (options.OutputPath is null)
         {

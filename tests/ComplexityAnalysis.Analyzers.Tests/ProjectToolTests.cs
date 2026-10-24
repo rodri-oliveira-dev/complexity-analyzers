@@ -119,7 +119,7 @@ public sealed class ProjectToolTests
             out ToolOptions? invalidOptions,
             out string? invalidError));
         Assert.Null(invalidOptions);
-        Assert.Equal("--include-evidence requires --format json.", invalidError);
+        Assert.Equal("--include-evidence requires --format json or sarif.", invalidError);
     }
 
     [Fact]
@@ -419,7 +419,7 @@ public sealed class ProjectToolTests
     }
 
     [Theory]
-    [InlineData("--format", "xml", "Format must be 'console' or 'json'.")]
+    [InlineData("--format", "xml", "Format must be 'console', 'json', or 'sarif'.")]
     [InlineData("--min-duplicate-tokens", "0", "--min-duplicate-tokens must be greater than zero.")]
     [InlineData("--min-duplicate-lines", "-1", "--min-duplicate-lines must be a non-negative integer.")]
     [InlineData("--max-cyclomatic-complexity", "0", "--max-cyclomatic-complexity must be greater than zero.")]

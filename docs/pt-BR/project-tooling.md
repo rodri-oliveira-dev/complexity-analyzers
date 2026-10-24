@@ -142,6 +142,23 @@ incomparabilidade e membros adicionados, removidos ou ambíguos.
 comprovadas. `Unknown` e garantias, hipóteses, configurações ou dimensões de
 entrada incompatíveis não falham o gate.
 
+## SARIF 2.1.0
+
+Tanto `analyze` quanto `compare` aceitam `--format sarif`. A saída segue SARIF
+2.1.0 e usa URIs de artefatos relativas e percent-encoded, partial fingerprints
+SHA-256 estáveis, regras declaradas, regiões de código-fonte e ordem determinística.
+
+```bash
+dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj --format sarif --include-evidence --output artifacts/complexity.sarif
+dotnet run --project src/ComplexityAnalysis.Tool -- compare artifacts/base.json artifacts/head.json --format sarif --output artifacts/comparison.sarif
+```
+
+Estimativas conhecidas de membros são notes. Um membro com complexidade `Unknown`
+só é emitido quando a evidência contém um motivo explícito legítimo. Regressões
+comprovadas da comparação são warnings; os demais findings são notes. Selecionar
+SARIF não habilita quality gate nem altera exit codes: `--fail-on-regression`
+continua sendo uma opção separada e opt-in.
+
 ## Detecção De Duplicação
 
 A detecção de duplicação também é opt-in:
