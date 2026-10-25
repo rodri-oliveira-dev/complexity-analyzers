@@ -181,8 +181,8 @@ jobs:
           set -euo pipefail
           archive="mcp-publisher_linux_amd64.tar.gz"
           base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
-          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
-          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          curl --proto '=https' --proto-redir '=https' --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --proto '=https' --proto-redir '=https' --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
           cosign verify-blob \
             --bundle "$archive.sigstore.json" \
             --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
@@ -523,7 +523,7 @@ jobs:
           expected_marker="<!-- mcp-name: ${MCP_SERVER_NAME} -->"
 
           for attempt in {1..30}; do
-            status="$(curl --silent --show-error --location --output package-readme.md --write-out '%{http_code}' "$readme_url")"
+            status="$(curl --proto '=https' --proto-redir '=https' --silent --show-error --location --output package-readme.md --write-out '%{http_code}' "$readme_url")"
             if [[ "$status" == "200" ]]; then
               if grep -Fxq "$expected_marker" package-readme.md; then
                 exit 0
@@ -551,8 +551,8 @@ jobs:
           set -euo pipefail
           archive="mcp-publisher_linux_amd64.tar.gz"
           base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
-          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
-          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          curl --proto '=https' --proto-redir '=https' --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --proto '=https' --proto-redir '=https' --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
           cosign verify-blob \
             --bundle "$archive.sigstore.json" \
             --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
