@@ -1,76 +1,156 @@
 # Servidor MCP Local
 
-`ComplexityAnalysis.Mcp` é um host MCP separado e somente local que expõe a
-análise de complexidade de projetos por entrada/saída padrão. Ele não altera o
-pacote do Roslyn analyzer nem adiciona dependências MCP aos consumidores do
-analyzer.
+[English](../en/mcp-server.md) | Português (Brasil)
 
-## Compilação e configuração
+`ComplexityAnalysis.Mcp` é a superfície stdio local, com versão independente,
+para a análise de projetos do repositório. Ele fornece ferramentas a agentes
+externos compatíveis; não é um agente autônomo. Compartilha relatórios,
+evidências, StableId e comparação com `ComplexityAnalysis.Tool` e não adiciona
+dependências MCP aos consumidores do analyzer.
 
-Compile o repositório antes de iniciar o servidor:
+Consulte o [README do pacote](../../src/ComplexityAnalysis.Mcp/README.pt-BR.md)
+para instalação global/local, atualização, desinstalação, configurações de
+clientes, exemplos, orientação de PATH por sistema e limitações conhecidas.
+
+## Distribuição e inicialização
+
+O pacote independente é `ComplexityAnalysis.Mcp`; a versão `1.0.0` instala o
+comando .NET 10 `complexity-mcp`:
 
 ```bash
-dotnet build ./ComplexityAnalysis.Analyzers.slnx --configuration Release
+dotnet tool install --global ComplexityAnalysis.Mcp --version 1.0.0
+complexity-mcp --root /caminho/absoluto/para/projeto
 ```
 
-Use o assembly resultante como subprocesso do cliente MCP. Clientes MCP podem
-iniciá-lo a partir de outro diretório de trabalho; portanto, configure o
-assembly e a raiz permitida com caminhos absolutos. Substitua os placeholders
-abaixo pelo caminho absoluto do repositório na sua máquina:
+Para instalação por manifest local:
+
+```bash
+dotnet new tool-manifest
+dotnet tool install ComplexityAnalysis.Mcp --version 1.0.0
+dotnet tool run complexity-mcp --root /caminho/absoluto/para/projeto
+```
+
+Comandos informativos encerram antes do protocolo:
+
+```bash
+complexity-mcp --help
+complexity-mcp --version
+```
+
+O servidor aceita `--root` (diretório atual), `--timeout-seconds` (`30`, faixa
+`1..300`), `--max-input-bytes` (50 MiB, faixa `1..1073741824`) e `--max-files`
+(`2000`, faixa `1..100000`). Configuração inválida retorna código `2` e mensagem
+sanitizada no stderr.
+
+## Contrato de protocolo
+
+As três ferramentas anunciam anotação MCP de somente leitura, conteúdo
+estruturado, schemas de entrada descritos e schemas de saída.
+
+| Ferramenta | Entradas | Resultado |
+| --- | --- | --- |
+| `analyze_project` | Path de projeto/solution; `responseMode` e `maxMembers` opcionais | Snapshot determinístico completo ou resumo limitado explícito, mais `analysisId` |
+| `query_member_evidence` | Path, `StableId` exato e `analysisId` opcional | Membro/evidência correspondente ou `found: false` |
+| `compare_snapshots` | JSON baseline/current | Relatório determinístico de comparação |
+
+O padrão de `analyze_project` permanece compatível: `responseMode` é `full` e
+`report` contém o `complexity-snapshot/1.0` completo. O modo summary retorna até
+100 entradas por padrão (configurável de 1 a 500) e informa `isTruncated`, total
+e quantidade retornada. Ele não omite evidência silenciosamente alegando um
+relatório completo.
+
+Cada análise produz um `analysisId` pelo hash do snapshot serializado exato. O
+processo retém até quatro snapshots e 16 MiB. Passar o ID a
+`query_member_evidence` evita repetir a análise e identifica a origem como
+`cachedSnapshot`. Isso reutiliza um snapshot, não um cache dos arquivos atuais:
+o servidor nunca trata o ID como prova de que o filesystem não mudou. Omitir o
+ID preserva a análise fresca original. IDs ausentes ou removidos falham com
+orientação para executar `analyze_project` novamente.
+
+`Unknown` continua sendo resultado conservador explícito. Resumos usam
+`complexityStatus: "unknown"` e `complexity: null`; evidências preservam um
+`UnknownReason` tipado quando disponível. Comparação classifica evidência
+Unknown como incomparável, nunca como regressão comprovada.
+
+## Limite de segurança
+
+O host é local, somente stdio e somente leitura. Não oferece ferramenta de
+escrita, shell, rede, telemetria, transporte remoto ou execução arbitrária.
+
+- Toda entrada deve estar abaixo de `--root` e ter extensão suportada.
+- Referências de projeto/solution e fontes descobertos são validados antes da
+  leitura.
+- Traversal por links simbólicos e reparse points é rejeitado ou ignorado na
+  enumeração.
+- Contagem de arquivos e bytes é isolada por requisição.
+- Cancelamento e timeout propagam por loading, Roslyn, comparação e serialização.
+- Paths do relatório são relativos a `--root`; erros não repetem paths absolutos.
+- stdout fica reservado ao JSON-RPC após o startup; logs vão para stderr.
+
+O loader interpreta os arquivos suportados diretamente; não executa MSBuild,
+restore, build nem tasks arbitrárias. Os controles reduzem exposição acidental,
+mas não tornam confiável um repositório local não confiável.
+
+## Configurações de clientes
+
+VS Code / GitHub Copilot usa `.vscode/mcp.json` com `servers`:
 
 ```json
 {
-  "command": "dotnet",
-  "args": [
-    "/caminho/absoluto/complexity-analyzers/src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
-    "--root",
-    "/caminho/absoluto/complexity-analyzers"
-  ]
+  "servers": {
+    "complexity-analysis": {
+      "type": "stdio",
+      "command": "complexity-mcp",
+      "args": ["--root", "${workspaceFolder}"]
+    }
+  }
 }
 ```
 
-No Windows, use os caminhos absolutos equivalentes com barras invertidas
-escapadas ou barras normais no JSON.
+Codex CLI:
 
-O host aceita estes limites na inicialização:
+```bash
+codex mcp add complexity-analysis -- complexity-mcp --root /caminho/absoluto/para/projeto
+codex mcp list
+```
 
-- `--root <diretório>`: somente arquivos abaixo desse diretório podem ser
-  lidos; o padrão é o diretório atual.
-- `--timeout-seconds <1..300>`: timeout por requisição; o padrão é `30`.
-- `--max-input-bytes <inteiro positivo>`: limite agregado de tamanho dos
-  arquivos por requisição; o padrão é 50 MiB.
-- `--max-files <inteiro positivo>`: limite de arquivos por requisição; o
-  padrão é `2000`.
+Ou em `~/.codex/config.toml` / `.codex/config.toml` de projeto confiável:
 
-## Ferramentas somente leitura
+```toml
+[mcp_servers.complexity-analysis]
+command = "complexity-mcp"
+args = ["--root", "/caminho/absoluto/para/projeto"]
+```
 
-| Ferramenta | Entrada | Resultado |
-| --- | --- | --- |
-| `analyze_project` | Caminho `.csproj`, `.sln` ou `.slnx` | Resposta tipada cujo `report` é um `complexity-snapshot/1.0` determinístico com evidências |
-| `query_member_evidence` | Caminho do projeto e `StableId` exato | Membro e evidências correspondentes, ou `Found: false` |
-| `compare_snapshots` | Caminhos dos snapshots `.json` baseline e atual | Resposta tipada cujo `comparison` é um relatório `complexity-comparison/1.0` determinístico |
+Claude Desktop usa `claude_desktop_config.json` com `mcpServers`:
 
-Todas as ferramentas anunciam a anotação MCP de somente leitura. O servidor
-não oferece ferramenta que escreva arquivos, execute comandos arbitrários,
-acesse a rede ou altere o código-fonte. As requisições rejeitam caminhos fora
-da raiz permitida, extensões não suportadas, traversal por links simbólicos,
-arquivos ausentes e violações dos limites configurados. Mensagens de erro não
-repetem caminhos absolutos.
+```json
+{
+  "mcpServers": {
+    "complexity-analysis": {
+      "command": "complexity-mcp",
+      "args": ["--root", "/caminho/absoluto/para/projeto"]
+    }
+  }
+}
+```
 
-O cancelamento do cliente MCP e o timeout por requisição são propagados para a
-análise do projeto e a leitura de snapshots. Complexidade inconclusiva continua
-como `Unknown`; a camada MCP não reinterpreta nem eleva o resultado da CLI.
+Os formatos seguem a
+[referência oficial do VS Code](https://code.visualstudio.com/docs/agents/reference/mcp-configuration),
+a [documentação MCP oficial do Codex](https://developers.openai.com/codex/extend/mcp)
+e o [guia de hosts do SDK MCP](https://py.sdk.modelcontextprotocol.io/get-started/real-host/).
 
-## Reproduzir resultados com a CLI
+## Reproduzir e validar
 
-As operações MCP usam as mesmas implementações de relatório, evidência,
-identidade e comparação da .NET tool. Reproduza-as com:
+As operações equivalentes da CLI são:
 
 ```bash
 dotnet run --project ./src/ComplexityAnalysis.Tool -- analyze <projeto-ou-solution> --format json --snapshot
 dotnet run --project ./src/ComplexityAnalysis.Tool -- compare <baseline.json> <current.json> --format json
 ```
 
-Use o `StableId` do primeiro relatório JSON para reproduzir uma consulta de
-evidência de membro. O membro retornado pelo MCP é o objeto correspondente
-desse snapshot.
+O workflow de release empacota um único artefato MCP, instala em tool path
+isolado e executa o teste de contrato com `ModelContextProtocol.Client` real
+contra o comando instalado. O teste faz inicialização, discovery e chamadas às
+três ferramentas. Também valida metadata, help/version, SBOM SPDX 2.3 e
+isolamento do pacote antes de qualquer job manual de publicação.

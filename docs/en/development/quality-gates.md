@@ -137,8 +137,9 @@ The active `main` ruleset requires these status checks by exact name:
 | Project regression evidence | `Complexity regression` | Manual snapshot generation/comparison, artifact retention, and job summary. |
 
 Additional branch rules require pull requests, linear history, thread resolution,
-code-scanning limits, and protected release tags matching `v*` for the analyzer
-and `tool-v*` for the independently versioned CLI.
+code-scanning limits, and protected release tags matching `v*` for the analyzer,
+`tool-v*` for the independently versioned CLI, and `mcp-v*` for the independently
+versioned MCP server.
 
 Do not rename required workflow or job names casually. If a check name must
 change, treat it as an explicit governance change and document the ruleset impact.

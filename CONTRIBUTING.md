@@ -99,7 +99,9 @@ Do not introduce `Microsoft.CodeAnalysis.Workspaces` or runtime dependencies unl
 
 ## Releases
 
-Production releases are created manually through the `Release` GitHub Actions workflow in `.github/workflows/release.yml`.
+Production analyzer releases are created manually through the `Release` GitHub
+Actions workflow in `.github/workflows/release.yml`; the CLI and MCP use the
+independent workflows documented below.
 
 Pull requests that change the release workflow or package-relevant files run only the `build-and-pack` path with a synthetic CI version. This dry run exercises package validation and SBOM generation without creating tags, publishing packages, generating attestations, or creating a GitHub Release.
 
@@ -179,6 +181,39 @@ Actions, choose `main`, enter `1.0.0`, and review the `release` environment
 deployment. Do not pre-create the tag. A safe retry accepts an existing
 `tool-v1.0.0` only when it points at the same validated commit; package pushes
 use skip-duplicate semantics and GitHub Release assets are never replaced.
+
+### ComplexityAnalysis.Mcp releases
+
+The MCP server has a third independent release line.
+`.github/workflows/release-mcp.yml` publishes only `ComplexityAnalysis.Mcp`,
+accepts a manual semantic version, and derives `mcp-v<version>` tags. Pull
+requests run its build, tests, package install, real MCP client contract, and
+SBOM path without publication. Production jobs require a manual dispatch from
+`main`. MCP GitHub Releases are explicitly not marked as the repository's
+generic latest release, so analyzer release identification remains stable.
+
+Before the first `1.0.0` release, complete these external settings:
+
+1. In NuGet.org Trusted Publishing, create a GitHub policy with owner
+   `rodri-oliveira-dev`, repository `complexity-analyzers`, workflow
+   `release-mcp.yml`, and environment `release`. Authorize exactly package ID
+   `ComplexityAnalysis.Mcp` with scope **Push new packages and package
+   versions**.
+2. Ensure the GitHub `release` environment permits deployments only from
+   `main` and uses the intended required reviewers. Do not add a long-lived
+   NuGet API key; the workflow exchanges GitHub OIDC for a temporary credential.
+3. Extend the tag ruleset to protect `mcp-v*` against deletion, force updates,
+   and recreation while allowing the workflow's post-validation tag creation.
+4. Confirm GitHub Packages is enabled and Actions may write packages with
+   `GITHUB_TOKEN`.
+5. Recheck the availability of `ComplexityAnalysis.Mcp` and version `1.0.0` on
+   NuGet.org immediately before the first publish.
+
+After approval and merge, select **Release ComplexityAnalysis.Mcp**, choose
+`main`, enter `1.0.0`, and review the protected deployment. Do not pre-create
+the tag. The workflow publishes the exact artifact validated and installed in
+the first job; it never generates release notes by comparing analyzer, CLI,
+and MCP tag namespaces.
 
 ## Pull requests
 

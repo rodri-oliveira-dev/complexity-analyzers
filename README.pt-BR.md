@@ -7,7 +7,7 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![NuGet](https://img.shields.io/nuget/v/ComplexityAnalysis.Analyzers?logo=nuget&label=NuGet)](https://www.nuget.org/packages/ComplexityAnalysis.Analyzers)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/ComplexityAnalysis.Analyzers?logo=nuget&label=Downloads)](https://www.nuget.org/packages/ComplexityAnalysis.Analyzers)
-[![GitHub Release](https://img.shields.io/github/v/release/rodri-oliveira-dev/complexity-analyzers?logo=github&label=Release)](https://github.com/rodri-oliveira-dev/complexity-analyzers/releases/latest)
+[![Analyzer Release](https://img.shields.io/github/v/tag/rodri-oliveira-dev/complexity-analyzers?filter=v%2A&sort=semver&logo=github&label=Analyzer%20Release)](https://github.com/rodri-oliveira-dev/complexity-analyzers/releases?q=v)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/mit)
 
@@ -243,21 +243,27 @@ dependência de runtime aos consumidores do analyzer.
 
 Veja [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md).
 
-## Servidor MCP local
+## Servidor MCP para agentes
 
 `ComplexityAnalysis.Mcp` expõe os contratos de análise da CLI para clientes MCP
-locais por `stdio`. Suas três ferramentas são somente leitura: analisar um
-projeto, consultar evidências por identidade estável de membro e comparar dois
-snapshots. Compile a solution e configure o cliente para executar o host com
-uma raiz permitida explícita:
+locais por `stdio`. Ele é empacotado independentemente como .NET Tool 10 e não é
+um agente autônomo. Depois da publicação de `1.0.0`, instale e inicie com:
+
+```bash
+dotnet tool install --global ComplexityAnalysis.Mcp --version 1.0.0
+complexity-mcp --root /caminho/absoluto/para/projeto
+```
+
+Suas três ferramentas são somente leitura: analisar projeto, consultar
+evidências por identidade estável e comparar snapshots. Configure clientes como
+VS Code, Codex ou Claude Desktop com o comando instalado:
 
 ```json
 {
-  "command": "dotnet",
+  "command": "complexity-mcp",
   "args": [
-    "./src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
     "--root",
-    "."
+    "/caminho/absoluto/para/projeto"
   ]
 }
 ```
@@ -265,9 +271,12 @@ uma raiz permitida explícita:
 O host rejeita caminhos fora dessa raiz, traversal por links simbólicos,
 entradas não suportadas e cargas acima dos limites configurados de timeout,
 bytes e arquivos. Ele não expõe operações de shell, escrita, rede ou execução
-arbitrária de processos.
+arbitrária de processos. Respostas completas continuam como padrão; um modo de
+resumo explícito reduz contexto e fornece `analysisId` para consulta eficiente
+de evidência exata.
 
-Veja [Servidor MCP Local](docs/pt-BR/mcp-server.md).
+Veja [Servidor MCP Local](docs/pt-BR/mcp-server.md) e o
+[README do pacote MCP](src/ComplexityAnalysis.Mcp/README.pt-BR.md).
 
 ## Configuração
 

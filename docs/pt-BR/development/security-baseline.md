@@ -37,11 +37,11 @@ O hardening de workflows não deve renomear jobs obrigatórios sem necessidade. 
 
 ## Provenance de release e SBOM
 
-O workflow `Release` do analyzer e o workflow independente `Release
-ComplexityAnalysis.Tool` geram uma SBOM SPDX 2.3 a partir do `.nupkg` exato
-produzido por seus jobs de build. Cada par package/SBOM é enviado como um
-artifact de workflow, e o mesmo `.nupkg` baixado é reutilizado para NuGet.org,
-GitHub Packages, attestations e GitHub Release.
+O workflow `Release` do analyzer e os workflows independentes `Release
+ComplexityAnalysis.Tool` e `Release ComplexityAnalysis.Mcp` geram uma SBOM SPDX
+2.3 a partir do `.nupkg` exato produzido por seus jobs de build. Cada par
+package/SBOM é enviado como um artifact de workflow, e o mesmo `.nupkg` baixado
+é reutilizado para NuGet.org, GitHub Packages, attestations e GitHub Release.
 
 O job `github-release` usa GitHub OIDC com permissões mínimas de attestation para criar:
 
@@ -76,3 +76,9 @@ signer workflow
 `rodri-oliveira-dev/complexity-analyzers/.github/workflows/release-tool.yml` nos
 comandos de verificação. As tags da CLI usam o namespace independente
 `tool-v<version>`.
+
+Para o MCP, substitua por `ComplexityAnalysis.Mcp.<version>.nupkg` e pelo signer
+workflow
+`rodri-oliveira-dev/complexity-analyzers/.github/workflows/release-mcp.yml`.
+As tags MCP usam `mcp-v<version>`, e suas GitHub Releases não são marcadas como a
+release genérica mais recente do repositório.

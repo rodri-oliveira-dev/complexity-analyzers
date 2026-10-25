@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### ComplexityAnalysis.Mcp 1.0.0
+
+- Prepared the first independently versioned public MCP .NET Tool package with
+  the `ComplexityAnalysis.Mcp` package ID and `complexity-mcp` command.
+- Added agent-oriented schemas and descriptions, deterministic full/summary
+  responses, explicit truncation metadata, bounded exact-snapshot reuse through
+  `analysisId`, and clearer conservative `Unknown` semantics.
+- Hardened root-relative path reporting, invalid-path sanitization, maximum
+  startup limits, concurrent request isolation, cancellation/timeout behavior,
+  stdout/stderr separation, and `--help` / `--version` handling.
+- Added bilingual package and technical documentation for global/local install,
+  VS Code / GitHub Copilot, Codex, and Claude Desktop.
+- Added a manual, main-only `mcp-v<version>` release workflow with isolated
+  package installation, real MCP client calls, SPDX 2.3 SBOM, NuGet Trusted
+  Publishing, GitHub Packages, attestations, and product-specific release notes.
+
 ### ComplexityAnalysis.Tool 1.0.0
 
 - Prepared the first independently versioned public .NET Tool release with the

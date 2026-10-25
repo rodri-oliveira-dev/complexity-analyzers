@@ -141,7 +141,8 @@ A ruleset ativa de `main` exige estes status checks pelo nome exato:
 
 Regras adicionais de branch exigem pull requests, histórico linear, resolução de
 threads, limites de code scanning e tags de release protegidas em `v*` para o
-analyzer e `tool-v*` para a CLI com versionamento independente.
+analyzer, `tool-v*` para a CLI e `mcp-v*` para o servidor MCP com versionamentos
+independentes.
 
 Não renomeie workflows ou jobs exigidos casualmente. Se um nome de check precisar
 mudar, trate como mudança explícita de governança e documente o impacto na ruleset.
