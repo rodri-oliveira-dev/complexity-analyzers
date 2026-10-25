@@ -1,0 +1,415 @@
+name: Release ComplexityAnalysis.Mcp
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release-mcp.yml
+      - README.md
+      - README.pt-BR.md
+      - CONTRIBUTING.md
+      - CONTRIBUTING.pt-BR.md
+      - CHANGELOG.md
+      - docs/en/mcp-server.md
+      - docs/pt-BR/mcp-server.md
+      - docs/en/releases/mcp-*.md
+      - resources/icon.png
+      - src/ComplexityAnalysis.Mcp/**
+      - src/ComplexityAnalysis.Tool/**
+      - src/ComplexityAnalysis.Analyzers/**
+      - tests/ComplexityAnalysis.Analyzers.Tests/**
+      - Directory.Build.props
+      - Directory.Build.targets
+      - Directory.Packages.props
+      - ComplexityAnalysis.Analyzers.slnx
+      - global.json
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version without the mcp-v prefix
+        required: true
+        default: '1.0.0'
+        type: string
+
+concurrency:
+  group: ${{ github.event_name == 'workflow_dispatch' && 'release-mcp' || format('release-mcp-validation-{0}', github.ref) }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build-and-pack:
+    name: Validate, build, test and pack MCP
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    outputs:
+      package-version: ${{ steps.version.outputs.package_version }}
+      release-tag: ${{ steps.version.outputs.release_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Validate release version and collisions
+        id: version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version || format('0.0.0-mcp-ci.{0}', github.run_number) }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::MCP releases must be started from the main branch. Current ref: $GITHUB_REF"
+            exit 1
+          fi
+
+          if [[ "$VERSION" == v* || "$VERSION" == tool-v* || "$VERSION" == mcp-v* ]]; then
+            echo "::error::Enter the semantic version without a tag prefix (for example 1.0.0)."
+            exit 1
+          fi
+
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$VERSION" =~ $semver ]]; then
+            echo "::error::Invalid semantic version '$VERSION'. Expected a value such as 1.0.0 or 1.1.0-beta.1."
+            exit 1
+          fi
+
+          release_tag="mcp-v$VERSION"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            git fetch --tags --force
+            tag_exists=false
+            if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+              tag_exists=true
+              tag_sha="$(git rev-list -n 1 "$release_tag")"
+              if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+                echo "::error::Tag '$release_tag' already exists and points to $tag_sha instead of $GITHUB_SHA."
+                exit 1
+              fi
+
+              echo "Tag '$release_tag' already exists on the validated commit; this run can be safely retried."
+            fi
+
+            package_url="https://api.nuget.org/v3-flatcontainer/complexityanalysis.mcp/${VERSION,,}/complexityanalysis.mcp.${VERSION,,}.nupkg"
+            package_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "$package_url")"
+            if [[ "$package_status" == "200" && "$tag_exists" != "true" ]]; then
+              echo "::error::ComplexityAnalysis.Mcp $VERSION already exists on NuGet.org without the expected release tag."
+              exit 1
+            fi
+            if [[ "$package_status" != "200" && "$package_status" != "404" ]]; then
+              echo "::error::NuGet.org availability check returned HTTP $package_status."
+              exit 1
+            fi
+          fi
+
+          echo "package_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore ComplexityAnalysis.Analyzers.slnx
+
+      - name: Build solution
+        run: >-
+          dotnet build ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-restore
+
+      - name: Run relevant tests
+        run: >-
+          dotnet test ComplexityAnalysis.Analyzers.slnx
+          --configuration Release
+          --no-build
+          --filter "FullyQualifiedName!~PerformanceSyntheticCorpusTests"
+
+      - name: Pack MCP release
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+        run: >-
+          dotnet pack src/ComplexityAnalysis.Mcp/ComplexityAnalysis.Mcp.csproj
+          --configuration Release
+          --no-restore
+          --output artifacts/packages
+          -p:Version="$PACKAGE_VERSION"
+          -p:PackageVersion="$PACKAGE_VERSION"
+
+      - name: Validate package identity, metadata and contents
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          package="artifacts/packages/ComplexityAnalysis.Mcp.${PACKAGE_VERSION}.nupkg"
+          test -s "$package"
+
+          package_id="$(dotnet msbuild src/ComplexityAnalysis.Mcp/ComplexityAnalysis.Mcp.csproj -nologo -getProperty:PackageId | tr -d '\r' | sed '/^[[:space:]]*$/d' | tail -n 1)"
+          tool_command="$(dotnet msbuild src/ComplexityAnalysis.Mcp/ComplexityAnalysis.Mcp.csproj -nologo -getProperty:ToolCommandName | tr -d '\r' | sed '/^[[:space:]]*$/d' | tail -n 1)"
+          target_framework="$(dotnet msbuild src/ComplexityAnalysis.Mcp/ComplexityAnalysis.Mcp.csproj -nologo -getProperty:TargetFramework | tr -d '\r' | sed '/^[[:space:]]*$/d' | tail -n 1)"
+          [[ "$package_id" == "ComplexityAnalysis.Mcp" ]]
+          [[ "$tool_command" == "complexity-mcp" ]]
+          [[ "$target_framework" == "net10.0" ]]
+          unzip -l "$package" | grep -F 'README.md'
+          unzip -l "$package" | grep -F 'README.pt-BR.md'
+          unzip -l "$package" | grep -F 'icon.png'
+          unzip -l "$package" | grep -F 'ComplexityAnalysis.Mcp.dll'
+          unzip -l "$package" | grep -F 'ComplexityAnalysis.Tool.dll'
+          unzip -l "$package" | grep -F 'ComplexityAnalysis.Analyzers.dll'
+
+      - name: Install and exercise packed MCP with a real client
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mcp-install
+          cat > artifacts/mcp-install.nuget.config <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="mcp-package" value="$GITHUB_WORKSPACE/artifacts/packages" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="mcp-package">
+                <package pattern="ComplexityAnalysis.Mcp" />
+              </packageSource>
+              <packageSource key="nuget.org">
+                <package pattern="Microsoft.*" />
+                <package pattern="ModelContextProtocol" />
+                <package pattern="NETStandard.Library" />
+                <package pattern="runtime.*" />
+                <package pattern="System.*" />
+              </packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+          dotnet tool install ComplexityAnalysis.Mcp \
+            --version "$PACKAGE_VERSION" \
+            --tool-path artifacts/mcp-install \
+            --configfile artifacts/mcp-install.nuget.config
+
+          mcp="$GITHUB_WORKSPACE/artifacts/mcp-install/complexity-mcp"
+          [[ "$($mcp --version)" == "$PACKAGE_VERSION" ]]
+          "$mcp" --help | grep -F 'complexity-mcp [options]'
+
+          COMPLEXITY_MCP_COMMAND="$mcp" dotnet test \
+            tests/ComplexityAnalysis.Analyzers.Tests/ComplexityAnalysis.Analyzers.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --filter 'FullyQualifiedName=ComplexityAnalysis.Analyzers.Tests.McpServerContractTests.Stdio_client_discovers_the_read_only_tool_surface'
+
+      - name: Extract package for SBOM generation
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/sbom-input
+          unzip -q "artifacts/packages/ComplexityAnalysis.Mcp.${PACKAGE_VERSION}.nupkg" -d artifacts/sbom-input
+
+      - name: Generate release SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: artifacts/sbom-input
+          format: spdx-json
+          output-file: artifacts/packages/ComplexityAnalysis.Mcp.${{ steps.version.outputs.package_version }}.sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Validate release SBOM
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          sbom="artifacts/packages/ComplexityAnalysis.Mcp.${PACKAGE_VERSION}.sbom.spdx.json"
+          test -s "$sbom"
+          jq -e '
+            .spdxVersion == "SPDX-2.3"
+            and .SPDXID == "SPDXRef-DOCUMENT"
+            and ((((.packages // []) | length) > 0) or (((.files // []) | length) > 0))
+          ' "$sbom" >/dev/null
+
+      - name: Upload MCP release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mcp-release-package
+          path: |
+            artifacts/packages/ComplexityAnalysis.Mcp.*.nupkg
+            artifacts/packages/ComplexityAnalysis.Mcp.*.sbom.spdx.json
+          if-no-files-found: error
+          retention-days: 7
+
+  ensure-release-tag:
+    name: Create MCP release tag
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: build-and-pack
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    environment: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Create or verify immutable tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
+          VALIDATED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            [[ "$(git rev-list -n 1 "$RELEASE_TAG")" == "$VALIDATED_SHA" ]]
+            exit 0
+          fi
+          git tag "$RELEASE_TAG" "$VALIDATED_SHA"
+          git push origin "refs/tags/$RELEASE_TAG"
+
+  publish-nuget:
+    name: Publish MCP to NuGet.org
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: [build-and-pack, ensure-release-tag]
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Download MCP package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mcp-release-package
+          path: artifacts/packages
+      - name: Exchange GitHub OIDC token for temporary NuGet API key
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: rodri-oliveira-dev
+      - name: Publish to NuGet.org without overwriting
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: >-
+          dotnet nuget push "artifacts/packages/ComplexityAnalysis.Mcp.${{ needs.build-and-pack.outputs.package-version }}.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "$NUGET_API_KEY"
+          --skip-duplicate
+
+  publish-github-packages:
+    name: Publish MCP to GitHub Packages
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: [build-and-pack, ensure-release-tag]
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Download MCP package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mcp-release-package
+          path: artifacts/packages
+      - name: Publish to GitHub Packages without overwriting
+        env:
+          GITHUB_PACKAGE_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          dotnet nuget push "artifacts/packages/ComplexityAnalysis.Mcp.${{ needs.build-and-pack.outputs.package-version }}.nupkg"
+          --source "$GITHUB_PACKAGE_SOURCE"
+          --api-key "$GITHUB_PACKAGE_TOKEN"
+          --skip-duplicate
+
+  github-release:
+    name: Attest and create MCP GitHub Release
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: [build-and-pack, ensure-release-tag, publish-nuget, publish-github-packages]
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+
+    steps:
+      - name: Checkout release notes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download MCP release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mcp-release-package
+          path: artifacts/packages
+      - name: Attest MCP release provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/packages/ComplexityAnalysis.Mcp.${{ needs.build-and-pack.outputs.package-version }}.nupkg
+            artifacts/packages/ComplexityAnalysis.Mcp.${{ needs.build-and-pack.outputs.package-version }}.sbom.spdx.json
+      - name: Attest MCP package SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: artifacts/packages/ComplexityAnalysis.Mcp.${{ needs.build-and-pack.outputs.package-version }}.nupkg
+          sbom-path: artifacts/packages/ComplexityAnalysis.Mcp.${{ needs.build-and-pack.outputs.package-version }}.sbom.spdx.json
+      - name: Create MCP GitHub Release without replacing assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
+          PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
+        run: |
+          set -euo pipefail
+          package="artifacts/packages/ComplexityAnalysis.Mcp.${PACKAGE_VERSION}.nupkg"
+          sbom="artifacts/packages/ComplexityAnalysis.Mcp.${PACKAGE_VERSION}.sbom.spdx.json"
+          notes="docs/en/releases/mcp-${PACKAGE_VERSION}.md"
+
+          if [[ ! -f "$notes" ]]; then
+            notes="artifacts/mcp-release-notes.md"
+            printf '%s\n' \
+              "# ComplexityAnalysis.Mcp ${PACKAGE_VERSION}" \
+              "" \
+              "See the package README and repository CHANGELOG for this independently versioned MCP release." \
+              > "$notes"
+          fi
+
+          if ! gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            release_args=(--verify-tag --latest=false --title "ComplexityAnalysis.Mcp $PACKAGE_VERSION" --notes-file "$notes")
+            if [[ "$PACKAGE_VERSION" == *-* ]]; then
+              release_args+=(--prerelease)
+            fi
+            gh release create "$RELEASE_TAG" "$package" "$sbom" --repo "$GH_REPO" "${release_args[@]}"
+            exit 0
+          fi
+
+          existing_assets="$(gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json assets --jq '.assets[].name')"
+          for asset in "$package" "$sbom"; do
+            asset_name="$(basename "$asset")"
+            if ! grep -Fxq "$asset_name" <<< "$existing_assets"; then
+              gh release upload "$RELEASE_TAG" "$asset" --repo "$GH_REPO"
+            fi
+          done
