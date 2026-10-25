@@ -273,7 +273,10 @@ responses remain the default; an explicit summary mode reduces agent context
 and returns an `analysisId` for efficient exact evidence lookup.
 
 See [Local MCP Server](docs/en/mcp-server.md) and the
-[MCP package README](src/ComplexityAnalysis.Mcp/README.md).
+[MCP package README](src/ComplexityAnalysis.Mcp/README.md). Published versions
+are also discoverable as `io.github.rodri-oliveira-dev/complexity-analysis` in
+the [Official MCP Registry](https://registry.modelcontextprotocol.io/), whose
+metadata points to the installable NuGet.org package.
 
 ## Configuration
 

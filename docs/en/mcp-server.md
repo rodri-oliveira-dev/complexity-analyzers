@@ -146,6 +146,41 @@ These formats are based on the official
 [Codex MCP documentation](https://developers.openai.com/codex/extend/mcp), and
 [MCP SDK real-host guide](https://py.sdk.modelcontextprotocol.io/get-started/real-host/).
 
+## Distribution and Registry publication
+
+NuGet.org is the executable distribution source for the `ComplexityAnalysis.Mcp`
+.NET tool. GitHub Packages receives the same validated package as an alternative
+repository feed. The Official MCP Registry contains only discovery metadata
+under `io.github.rodri-oliveira-dev/complexity-analysis` and resolves its
+`nuget` package to NuGet.org; it does not replace installation or stdio startup
+in VS Code/Copilot, Codex, or Claude Desktop.
+
+`.mcp/server.json` is the version-controlled baseline. For every manual release
+from `main`, `release-mcp.yml` replaces both manifest version fields with the
+validated workflow version, proving equality with `mcp-v<version>` and the
+NuGet package. After NuGet publication and GitHub Release completion, the
+Registry job waits for the NuGet README and its exact `mcp-name` ownership
+marker, verifies the pinned `mcp-publisher` artifact with Sigstore, validates
+the manifest, authenticates with GitHub OIDC, publishes, and verifies the API
+result. Pull requests execute validation only.
+
+Before the first release, configure NuGet Trusted Publishing as documented in
+the contribution guide, protect the GitHub `release` environment, and ensure
+the GitHub repository can authenticate its `io.github` namespace to the
+Registry with OIDC. No Registry PAT or persistent secret is required. Search
+the [Official Registry](https://registry.modelcontextprotocol.io/) by the exact
+name to verify publication.
+
+For failures, validate locally with `mcp-publisher validate .mcp/server.json`.
+An unavailable package normally means NuGet README indexing has not completed;
+retry the workflow after indexing. OIDC failures require checking `main`, the
+protected environment approval, repository identity, and `id-token: write`.
+Never overwrite a conflicting immutable NuGet or Registry version: correct the
+manifest source and release a new version. See the official
+[package specification](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/package-types.mdx),
+[Actions guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx), and
+[.NET guide](https://learn.microsoft.com/en-us/dotnet/ai/quickstarts/publish-mcp-registry).
+
 ## Reproduce and validate
 
 The equivalent CLI operations are:

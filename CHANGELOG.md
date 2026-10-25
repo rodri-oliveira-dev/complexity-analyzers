@@ -19,6 +19,9 @@ All notable changes to this project will be documented in this file.
 - Added a manual, main-only `mcp-v<version>` release workflow with isolated
   package installation, real MCP client calls, SPDX 2.3 SBOM, NuGet Trusted
   Publishing, GitHub Packages, attestations, and product-specific release notes.
+- Added an Official MCP Registry manifest and post-release publication using
+  GitHub OIDC, a pinned Sigstore-verified publisher, NuGet ownership proof, and
+  synchronized immutable versions.
 
 ### ComplexityAnalysis.Tool 1.0.0
 

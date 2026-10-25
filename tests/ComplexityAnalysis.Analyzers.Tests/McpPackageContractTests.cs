@@ -13,8 +13,62 @@ namespace ComplexityAnalysis.Analyzers.Tests;
 [Collection("Package contract tests")]
 public sealed class McpPackageContractTests
 {
+    private const string McpRegistryName = "io.github.rodri-oliveira-dev/complexity-analysis";
     private const string PackageId = "ComplexityAnalysis.Mcp";
     private const string PackageVersion = "0.0.0-mcp-contract";
+
+    [Fact]
+    public void Registry_manifest_matches_the_public_package_and_release_workflow()
+    {
+        string root = RepositoryTestSupport.FindRepositoryRoot();
+        using JsonDocument manifestDocument = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(root, ".mcp", "server.json")));
+        JsonElement manifest = manifestDocument.RootElement;
+
+        Assert.Equal(
+            "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+            manifest.GetProperty("$schema").GetString());
+        Assert.Equal(McpRegistryName, manifest.GetProperty("name").GetString());
+        Assert.Equal("Complexity Analysis", manifest.GetProperty("title").GetString());
+        Assert.InRange(manifest.GetProperty("description").GetString()!.Length, 1, 100);
+        string projectVersion = XDocument.Load(
+                Path.Combine(root, "src", "ComplexityAnalysis.Mcp", "ComplexityAnalysis.Mcp.csproj"))
+            .Descendants("VersionPrefix")
+            .Single()
+            .Value;
+        Assert.Equal(projectVersion, manifest.GetProperty("version").GetString());
+
+        JsonElement package = Assert.Single(manifest.GetProperty("packages").EnumerateArray());
+        Assert.Equal("nuget", package.GetProperty("registryType").GetString());
+        Assert.Equal(PackageId, package.GetProperty("identifier").GetString());
+        Assert.Equal(manifest.GetProperty("version").GetString(), package.GetProperty("version").GetString());
+        Assert.Equal("stdio", package.GetProperty("transport").GetProperty("type").GetString());
+        JsonElement rootArgument = Assert.Single(package.GetProperty("packageArguments").EnumerateArray());
+        Assert.Equal("named", rootArgument.GetProperty("type").GetString());
+        Assert.Equal("--root", rootArgument.GetProperty("name").GetString());
+        Assert.True(rootArgument.GetProperty("isRequired").GetBoolean());
+        Assert.Equal("filepath", rootArgument.GetProperty("format").GetString());
+
+        JsonElement repository = manifest.GetProperty("repository");
+        Assert.Equal("https://github.com/rodri-oliveira-dev/complexity-analyzers", repository.GetProperty("url").GetString());
+        Assert.Equal("github", repository.GetProperty("source").GetString());
+
+        string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "release-mcp.yml"));
+        int jobStart = workflow.IndexOf("  publish-mcp-registry:", StringComparison.Ordinal);
+        Assert.True(jobStart >= 0, "The independent MCP Registry publication job is required.");
+        string registryJob = workflow[jobStart..];
+        Assert.Contains("github.event_name == 'workflow_dispatch'", registryJob, StringComparison.Ordinal);
+        Assert.Contains("github.ref == 'refs/heads/main'", registryJob, StringComparison.Ordinal);
+        Assert.Contains("needs: [build-and-pack, publish-nuget, github-release]", registryJob, StringComparison.Ordinal);
+        Assert.Contains("environment: release", registryJob, StringComparison.Ordinal);
+        Assert.Contains("contents: read", registryJob, StringComparison.Ordinal);
+        Assert.Contains("id-token: write", registryJob, StringComparison.Ordinal);
+        Assert.Contains("MCP_PUBLISHER_VERSION: v1.8.4", workflow, StringComparison.Ordinal);
+        Assert.Contains("cosign verify-blob", registryJob, StringComparison.Ordinal);
+        Assert.Contains("mcp-publisher login github-oidc", registryJob, StringComparison.Ordinal);
+        Assert.Contains("mcp-publisher publish .mcp/server.json", registryJob, StringComparison.Ordinal);
+        Assert.DoesNotContain("MCP_GITHUB_TOKEN", registryJob, StringComparison.Ordinal);
+    }
 
     [Fact]
     public async Task Local_package_installs_and_serves_all_tools_as_isolated_dotnet_tool()
@@ -197,6 +251,7 @@ public sealed class McpPackageContractTests
             Assert.Contains("dotnet tool install --global ComplexityAnalysis.Mcp", readme, StringComparison.Ordinal);
             Assert.Contains("complexity-mcp --root", readme, StringComparison.Ordinal);
             Assert.Contains("query_member_evidence", readme, StringComparison.Ordinal);
+            Assert.Contains($"<!-- mcp-name: {McpRegistryName} -->", readme, StringComparison.Ordinal);
         }
 
         ZipArchiveEntry nuspecEntry = Assert.Single(package.Entries, entry => entry.FullName.EndsWith(".nuspec", StringComparison.Ordinal));

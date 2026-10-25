@@ -140,6 +140,41 @@ Os formatos seguem a
 a [documentação MCP oficial do Codex](https://developers.openai.com/codex/extend/mcp)
 e o [guia de hosts do SDK MCP](https://py.sdk.modelcontextprotocol.io/get-started/real-host/).
 
+## Distribuição e publicação no Registry
+
+O NuGet.org é a origem de distribuição executável da ferramenta .NET
+`ComplexityAnalysis.Mcp`. O GitHub Packages recebe o mesmo pacote validado como
+feed alternativo. O Official MCP Registry contém somente metadados de descoberta
+sob `io.github.rodri-oliveira-dev/complexity-analysis` e resolve o pacote
+`nuget` pelo NuGet.org; ele não substitui instalação nem inicialização stdio no
+VS Code/Copilot, Codex ou Claude Desktop.
+
+`.mcp/server.json` é a base versionada. Em cada release manual da `main`,
+`release-mcp.yml` substitui os dois campos de versão do manifesto pela versão
+validada no workflow, comprovando igualdade com `mcp-v<versão>` e o pacote
+NuGet. Depois da publicação NuGet e conclusão da GitHub Release, o job do
+Registry aguarda o README e o marcador exato de propriedade `mcp-name`, verifica
+o artefato fixado do `mcp-publisher` por Sigstore, valida o manifesto, autentica
+por GitHub OIDC, publica e verifica o resultado na API. Pull requests executam
+somente validação.
+
+Antes da primeira release, configure o Trusted Publishing do NuGet conforme o
+guia de contribuição, proteja o environment GitHub `release` e garanta que o
+repositório possa autenticar seu namespace `io.github` no Registry por OIDC.
+Não é necessário PAT nem secret persistente do Registry. Procure pelo nome exato
+no [Official Registry](https://registry.modelcontextprotocol.io/) para verificar
+a publicação.
+
+Em caso de falha, valide localmente com
+`mcp-publisher validate .mcp/server.json`. Pacote indisponível normalmente
+significa que a indexação do README no NuGet ainda não terminou; repita o
+workflow depois. Falhas OIDC exigem conferir `main`, aprovação do environment,
+identidade do repositório e `id-token: write`. Nunca substitua versão imutável
+conflitante no NuGet ou Registry: corrija a origem e publique nova versão.
+Consulte a [especificação de pacotes](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/package-types.mdx),
+o [guia de Actions](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx) e o
+[guia .NET](https://learn.microsoft.com/pt-br/dotnet/ai/quickstarts/publish-mcp-registry).
+
 ## Reproduzir e validar
 
 As operações equivalentes da CLI são:

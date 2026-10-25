@@ -2,6 +2,8 @@
 
 [Português (Brasil)](https://github.com/rodri-oliveira-dev/complexity-analyzers/blob/main/src/ComplexityAnalysis.Mcp/README.pt-BR.md)
 
+<!-- mcp-name: io.github.rodri-oliveira-dev/complexity-analysis -->
+
 `ComplexityAnalysis.Mcp` is a local, read-only MCP server that lets compatible
 agents analyze C# project complexity, inspect the evidence for a member, and
 compare deterministic snapshots. It exposes analysis tools to an external
@@ -232,6 +234,57 @@ On Windows the file is under `%APPDATA%\Claude`; on macOS it is under
   the client after installation or configure the absolute executable path.
 - `--root` should be absolute. The process working directory does not expand
   the read boundary.
+
+## Distribution and Official MCP Registry
+
+The three publication channels have different purposes:
+
+- **NuGet.org** hosts the installable .NET tool used by the commands above.
+- **GitHub Packages** mirrors the same validated `.nupkg` for consumers of the
+  repository package feed.
+- The **Official MCP Registry** stores discovery metadata for
+  `io.github.rodri-oliveira-dev/complexity-analysis`; its `nuget` package entry
+  points clients to `ComplexityAnalysis.Mcp` on NuGet.org. It does not host a
+  second executable or turn this server into a remote service.
+
+Registry discovery does not change the local client configurations above:
+clients still install or resolve the NuGet tool and start `complexity-mcp` over
+stdio with an explicit `--root`.
+
+Each manual `main` release derives the manifest and package versions from the
+validated workflow input. After NuGet.org and the GitHub Release succeed, the
+workflow waits for the NuGet README containing the ownership marker, validates
+the manifest with a fixed, Sigstore-verified `mcp-publisher`, authenticates with
+GitHub OIDC, publishes, and queries the Registry API to verify the exact name
+and version. Pull-request runs validate the package and versioned manifest but
+never authenticate or publish.
+
+To verify a release, search the [Official MCP Registry](https://registry.modelcontextprotocol.io/)
+for the full server name, or query its public API:
+
+```bash
+curl --get \
+  --data-urlencode "search=io.github.rodri-oliveira-dev/complexity-analysis" \
+  https://registry.modelcontextprotocol.io/v0.1/servers
+```
+
+Troubleshooting:
+
+- **OIDC login fails:** confirm the run is a manual deployment from `main`, the
+  protected `release` environment approved it, and `id-token: write` remains on
+  the Registry job. No PAT or persistent Registry secret is expected.
+- **Manifest validation fails:** run `mcp-publisher validate .mcp/server.json`
+  and keep the server name, NuGet identifier, stdio transport, and schema valid.
+- **Package is not available:** wait for NuGet.org flat-container and README
+  indexing, then rerun the same release workflow. Published package and release
+  artifacts remain intact.
+- **Version conflict:** Registry and NuGet versions are immutable. A retry is
+  accepted only for compatible metadata; otherwise correct the source and use
+  a new semantic version instead of attempting to replace the published one.
+
+See the official [package-type specification](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/package-types.mdx),
+[GitHub Actions publishing guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx),
+and [.NET publishing guide](https://learn.microsoft.com/en-us/dotnet/ai/quickstarts/publish-mcp-registry).
 
 ## Security and limitations
 

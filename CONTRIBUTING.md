@@ -208,12 +208,21 @@ Before the first `1.0.0` release, complete these external settings:
    `GITHUB_TOKEN`.
 5. Recheck the availability of `ComplexityAnalysis.Mcp` and version `1.0.0` on
    NuGet.org immediately before the first publish.
+6. Confirm that GitHub OIDC for this repository can claim the
+   `io.github.rodri-oliveira-dev/complexity-analysis` namespace in the Official
+   MCP Registry. The Registry job uses `id-token: write` in the same protected
+   `release` environment; do not configure a PAT or persistent Registry secret.
 
 After approval and merge, select **Release ComplexityAnalysis.Mcp**, choose
 `main`, enter `1.0.0`, and review the protected deployment. Do not pre-create
 the tag. The workflow publishes the exact artifact validated and installed in
 the first job; it never generates release notes by comparing analyzer, CLI,
-and MCP tag namespaces.
+and MCP tag namespaces. After NuGet.org and the GitHub Release complete, it
+publishes the synchronized `.mcp/server.json` through a pinned,
+Sigstore-verified `mcp-publisher` and verifies the resulting Registry entry.
+Registry failure is visible on the run but does not remove already published
+artifacts; retry the same version only when its immutable metadata is compatible.
+See the [official Registry Actions guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx).
 
 ## Pull requests
 

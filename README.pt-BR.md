@@ -276,7 +276,11 @@ resumo explícito reduz contexto e fornece `analysisId` para consulta eficiente
 de evidência exata.
 
 Veja [Servidor MCP Local](docs/pt-BR/mcp-server.md) e o
-[README do pacote MCP](src/ComplexityAnalysis.Mcp/README.pt-BR.md).
+[README do pacote MCP](src/ComplexityAnalysis.Mcp/README.pt-BR.md). Versões
+publicadas também podem ser descobertas como
+`io.github.rodri-oliveira-dev/complexity-analysis` no
+[Official MCP Registry](https://registry.modelcontextprotocol.io/), cujos
+metadados apontam para o pacote instalável no NuGet.org.
 
 ## Configuração
 

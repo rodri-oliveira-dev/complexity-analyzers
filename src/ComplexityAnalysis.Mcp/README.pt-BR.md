@@ -228,6 +228,58 @@ No Windows, o arquivo fica em `%APPDATA%\Claude`; no macOS, em
   cliente após instalar ou configure o executável absoluto.
 - `--root` deve ser absoluto; o `cwd` não amplia o limite de leitura.
 
+## Distribuição e Official MCP Registry
+
+Os três canais de publicação têm finalidades diferentes:
+
+- O **NuGet.org** hospeda a ferramenta .NET instalável usada pelos comandos
+  acima.
+- O **GitHub Packages** espelha o mesmo `.nupkg` validado para consumidores do
+  feed de pacotes do repositório.
+- O **Official MCP Registry** armazena metadados de descoberta para
+  `io.github.rodri-oliveira-dev/complexity-analysis`; sua entrada `nuget`
+  direciona clientes ao `ComplexityAnalysis.Mcp` no NuGet.org. Ele não hospeda
+  um segundo executável nem transforma este servidor em serviço remoto.
+
+A descoberta pelo Registry não muda as configurações locais acima: os clientes
+ainda instalam ou resolvem a ferramenta NuGet e iniciam `complexity-mcp` por
+stdio com `--root` explícito.
+
+Cada release manual da `main` deriva as versões do manifesto e do pacote da
+entrada validada do workflow. Depois do NuGet.org e da GitHub Release, o
+workflow aguarda o README no NuGet com o marcador de propriedade, valida o
+manifesto com uma versão fixa e verificada por Sigstore do `mcp-publisher`,
+autentica por GitHub OIDC, publica e consulta a API do Registry para confirmar
+nome e versão exatos. Execuções de pull request validam pacote e manifesto
+versionado, mas nunca autenticam nem publicam.
+
+Para verificar uma release, procure o nome completo no
+[Official MCP Registry](https://registry.modelcontextprotocol.io/) ou consulte
+sua API pública:
+
+```bash
+curl --get \
+  --data-urlencode "search=io.github.rodri-oliveira-dev/complexity-analysis" \
+  https://registry.modelcontextprotocol.io/v0.1/servers
+```
+
+Solução de problemas:
+
+- **Falha no login OIDC:** confirme que a execução é manual, parte da `main`,
+  foi aprovada no environment protegido `release` e que `id-token: write`
+  permanece no job do Registry. Não é esperado PAT ou secret persistente.
+- **Manifesto inválido:** execute `mcp-publisher validate .mcp/server.json` e
+  preserve nome, identificador NuGet, transporte stdio e schema válidos.
+- **Pacote indisponível:** aguarde a indexação do pacote e README no NuGet.org e
+  repita o mesmo workflow. Pacote e GitHub Release já publicados permanecem.
+- **Conflito de versão:** versões no Registry e NuGet são imutáveis. A repetição
+  só é aceita para metadados compatíveis; em outro caso, corrija a origem e use
+  nova versão semântica em vez de substituir a publicada.
+
+Consulte a [especificação oficial de tipos de pacote](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/package-types.mdx),
+o [guia de publicação com GitHub Actions](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx)
+e o [guia de publicação .NET](https://learn.microsoft.com/pt-br/dotnet/ai/quickstarts/publish-mcp-registry).
+
 ## Segurança e limitações
 
 O servidor é local, somente stdio e somente leitura. Não possui transporte HTTP,

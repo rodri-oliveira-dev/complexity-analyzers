@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - .github/workflows/release-mcp.yml
+      - .mcp/**
       - README.md
       - README.pt-BR.md
       - CONTRIBUTING.md
@@ -37,6 +38,12 @@ concurrency:
   cancel-in-progress: false
 
 permissions: {}
+
+env:
+  MCP_PACKAGE_ID: ComplexityAnalysis.Mcp
+  MCP_PUBLISHER_VERSION: v1.8.4
+  MCP_REPOSITORY_URL: https://github.com/rodri-oliveira-dev/complexity-analyzers
+  MCP_SERVER_NAME: io.github.rodri-oliveira-dev/complexity-analysis
 
 jobs:
   build-and-pack:
@@ -163,6 +170,52 @@ jobs:
           unzip -l "$package" | grep -F 'ComplexityAnalysis.Mcp.dll'
           unzip -l "$package" | grep -F 'ComplexityAnalysis.Tool.dll'
           unzip -l "$package" | grep -F 'ComplexityAnalysis.Analyzers.dll'
+          unzip -p "$package" README.md | grep -Fx '<!-- mcp-name: io.github.rodri-oliveira-dev/complexity-analysis -->'
+
+      - name: Install cosign for MCP Publisher verification
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Download and verify pinned MCP Publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+          rm -f "$archive" "$archive.sigstore.json"
+
+      - name: Validate versioned MCP Registry manifest
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mcp-registry
+          jq --arg version "$PACKAGE_VERSION" '
+            .version = $version
+            | .packages = (.packages | map(
+                if .registryType == "nuget" and .identifier == "ComplexityAnalysis.Mcp"
+                then .version = $version
+                else .
+                end))
+          ' .mcp/server.json > artifacts/mcp-registry/server.json
+          jq -e --arg name "$MCP_SERVER_NAME" --arg package "$MCP_PACKAGE_ID" --arg version "$PACKAGE_VERSION" '
+            .name == $name
+            and .version == $version
+            and ([.packages[] | select(
+              .registryType == "nuget"
+              and .identifier == $package
+              and .version == $version
+              and .transport.type == "stdio")] | length) == 1
+          ' artifacts/mcp-registry/server.json >/dev/null
+          ./mcp-publisher validate artifacts/mcp-registry/server.json
 
       - name: Install and exercise packed MCP with a real client
         shell: bash
@@ -413,3 +466,180 @@ jobs:
               gh release upload "$RELEASE_TAG" "$asset" --repo "$GH_REPO"
             fi
           done
+
+  publish-mcp-registry:
+    name: Publish metadata to the Official MCP Registry
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    needs: [build-and-pack, publish-nuget, github-release]
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout validated manifest
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Synchronize and validate release manifest metadata
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
+          RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" == "mcp-v${PACKAGE_VERSION}" ]]
+          jq --arg version "$PACKAGE_VERSION" '
+            .version = $version
+            | .packages = (.packages | map(
+                if .registryType == "nuget" and .identifier == "ComplexityAnalysis.Mcp"
+                then .version = $version
+                else .
+                end))
+          ' .mcp/server.json > .mcp/server.release.json
+          mv .mcp/server.release.json .mcp/server.json
+          jq -e --arg name "$MCP_SERVER_NAME" --arg package "$MCP_PACKAGE_ID" --arg version "$PACKAGE_VERSION" '
+            .name == $name
+            and .version == $version
+            and ([.packages[] | select(
+              .registryType == "nuget"
+              and .identifier == $package
+              and .version == $version
+              and .transport.type == "stdio")] | length) == 1
+          ' .mcp/server.json >/dev/null
+
+      - name: Wait for NuGet package and verify ownership marker
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
+        run: |
+          set -euo pipefail
+          package_id="${MCP_PACKAGE_ID,,}"
+          package_version="${PACKAGE_VERSION,,}"
+          readme_url="https://api.nuget.org/v3-flatcontainer/${package_id}/${package_version}/readme"
+          expected_marker="<!-- mcp-name: ${MCP_SERVER_NAME} -->"
+
+          for attempt in {1..30}; do
+            status="$(curl --silent --show-error --location --output package-readme.md --write-out '%{http_code}' "$readme_url")"
+            if [[ "$status" == "200" ]]; then
+              if grep -Fxq "$expected_marker" package-readme.md; then
+                exit 0
+              fi
+              echo "::error::NuGet package ${MCP_PACKAGE_ID} ${PACKAGE_VERSION} does not contain the expected MCP ownership marker."
+              exit 1
+            fi
+            if [[ "$status" != "404" && "$status" != 5* ]]; then
+              echo "::error::NuGet.org README availability check returned HTTP $status."
+              exit 1
+            fi
+            echo "NuGet README is not indexed yet (attempt ${attempt}/30, HTTP $status)."
+            sleep 10
+          done
+
+          echo "::error::NuGet package README was not available after five minutes. The package and GitHub Release remain published; retry this workflow after indexing completes."
+          exit 1
+
+      - name: Install cosign for MCP Publisher verification
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Download and verify pinned MCP Publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+          rm -f "$archive" "$archive.sigstore.json"
+
+      - name: Validate release manifest with MCP Publisher
+        run: ./mcp-publisher validate .mcp/server.json
+
+      - name: Detect a compatible existing Registry version
+        id: registry-state
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --get \
+            --data-urlencode "search=${MCP_SERVER_NAME}" \
+            --data-urlencode 'limit=100' \
+            --output registry-before.json \
+            https://registry.modelcontextprotocol.io/v0.1/servers
+
+          existing="$(jq -c --arg name "$MCP_SERVER_NAME" --arg version "$PACKAGE_VERSION" '
+            [.servers[] | select(.server.name == $name and .server.version == $version)] | first // empty
+          ' registry-before.json)"
+          if [[ -z "$existing" ]]; then
+            echo 'already_published=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! jq -e --arg package "$MCP_PACKAGE_ID" --arg repository "$MCP_REPOSITORY_URL" --arg version "$PACKAGE_VERSION" '
+            .server.version == $version
+            and .server.repository.url == $repository
+            and ([.server.packages[] | select(
+              .registryType == "nuget"
+              and .identifier == $package
+              and .version == $version
+              and .transport.type == "stdio")] | length) == 1
+          ' <<< "$existing" >/dev/null; then
+            echo "::error::The Registry already contains this immutable name/version with incompatible package metadata."
+            exit 1
+          fi
+
+          echo 'already_published=true' >> "$GITHUB_OUTPUT"
+          echo "The compatible Registry version already exists; publication will be skipped."
+
+      - name: Authenticate to the Official MCP Registry with GitHub OIDC
+        if: ${{ steps.registry-state.outputs.already_published != 'true' }}
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish versioned manifest
+        if: ${{ steps.registry-state.outputs.already_published != 'true' }}
+        run: ./mcp-publisher publish .mcp/server.json
+
+      - name: Verify published Registry metadata
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            curl --fail --silent --show-error --get \
+              --data-urlencode "search=${MCP_SERVER_NAME}" \
+              --data-urlencode 'limit=100' \
+              --output registry-after.json \
+              https://registry.modelcontextprotocol.io/v0.1/servers
+            if jq -e --arg name "$MCP_SERVER_NAME" --arg package "$MCP_PACKAGE_ID" --arg repository "$MCP_REPOSITORY_URL" --arg version "$PACKAGE_VERSION" '
+              any(.servers[];
+                .server.name == $name
+                and .server.version == $version
+                and .server.repository.url == $repository
+                and ([.server.packages[] | select(
+                  .registryType == "nuget"
+                  and .identifier == $package
+                  and .version == $version
+                  and .transport.type == "stdio")] | length) == 1)
+            ' registry-after.json >/dev/null; then
+              jq --arg name "$MCP_SERVER_NAME" --arg version "$PACKAGE_VERSION" '
+                [.servers[] | select(.server.name == $name and .server.version == $version)] | first
+              ' registry-after.json
+              exit 0
+            fi
+            echo "Registry entry is not visible yet (attempt ${attempt}/12)."
+            sleep 10
+          done
+
+          echo "::error::The published MCP Registry entry could not be verified. Existing NuGet and GitHub Release artifacts are unaffected."
+          exit 1
