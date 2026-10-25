@@ -11,6 +11,8 @@ internal sealed record McpHostOptions(
     internal const int DefaultTimeoutSeconds = 30;
     internal const long DefaultMaximumInputBytes = 50 * 1024 * 1024;
     internal const int DefaultMaximumFiles = 2_000;
+    internal const long MaximumInputBytesLimit = 1024L * 1024 * 1024;
+    internal const int MaximumFilesLimit = 100_000;
 
     internal static bool TryParse(string[] args, out McpHostOptions? options, out string? error)
     {
@@ -22,6 +24,13 @@ internal sealed record McpHostOptions(
         for (int index = 0; index < args.Length; index++)
         {
             string option = args[index];
+            if (option is not ("--root" or "--timeout-seconds" or "--max-input-bytes" or "--max-files"))
+            {
+                options = null;
+                error = "Unknown option '" + option + "'.";
+                return false;
+            }
+
             if (index + 1 >= args.Length)
             {
                 options = null;
@@ -47,32 +56,41 @@ internal sealed record McpHostOptions(
                     break;
                 case "--max-input-bytes":
                     if (!long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out maximumBytes)
-                        || maximumBytes < 1)
+                        || maximumBytes is < 1 or > MaximumInputBytesLimit)
                     {
                         options = null;
-                        error = "--max-input-bytes must be greater than zero.";
+                        error = "--max-input-bytes must be between 1 and 1073741824.";
                         return false;
                     }
 
                     break;
                 case "--max-files":
                     if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out maximumFiles)
-                        || maximumFiles < 1)
+                        || maximumFiles is < 1 or > MaximumFilesLimit)
                     {
                         options = null;
-                        error = "--max-files must be greater than zero.";
+                        error = "--max-files must be between 1 and 100000.";
                         return false;
                     }
 
                     break;
                 default:
-                    options = null;
-                    error = "Unknown option '" + option + "'.";
-                    return false;
+                    throw new InvalidOperationException("Validated startup option was not handled.");
             }
         }
 
-        string fullRoot = Path.GetFullPath(root);
+        string fullRoot;
+        try
+        {
+            fullRoot = Path.GetFullPath(root);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            options = null;
+            error = "The allowed root path is invalid.";
+            return false;
+        }
+
         if (!Directory.Exists(fullRoot))
         {
             options = null;

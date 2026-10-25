@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 using ComplexityAnalysis.Mcp;
@@ -12,17 +13,13 @@ namespace ComplexityAnalysis.Analyzers.Tests;
 
 public sealed class McpServerContractTests
 {
+    private static readonly string[] NonRegressionClassifications = ["equivalent", "incomparable"];
+
     [Fact]
     public async Task Stdio_client_discovers_the_read_only_tool_surface()
     {
         using McpFixture fixture = McpFixture.Create();
-        string assemblyPath = typeof(ComplexityTools).Assembly.Location;
-        StdioClientTransport transport = new(new StdioClientTransportOptions
-        {
-            Name = "complexity-analysis-contract",
-            Command = "dotnet",
-            Arguments = [assemblyPath, "--root", fixture.Root],
-        });
+        StdioClientTransport transport = CreateTransport(fixture.Root);
 
         await using var client = await McpClient.CreateAsync(transport);
         IList<McpClientTool> tools = await client.ListToolsAsync();
@@ -31,12 +28,28 @@ public sealed class McpServerContractTests
             ["analyze_project", "compare_snapshots", "query_member_evidence"],
             tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
         Assert.All(tools, tool => Assert.True(tool.ProtocolTool.Annotations?.ReadOnlyHint));
+        Assert.All(tools, tool => Assert.NotNull(tool.ProtocolTool.OutputSchema));
+        McpClientTool analyzeTool = Assert.Single(tools, tool => tool.Name == "analyze_project");
+        Assert.Contains("Unknown", analyzeTool.Description, StringComparison.Ordinal);
+        Assert.Equal(
+            ["maxMembers", "path", "responseMode"],
+            analyzeTool.ProtocolTool.InputSchema.GetProperty("properties")
+                .EnumerateObject()
+                .Select(property => property.Name)
+                .Order(StringComparer.Ordinal));
+        Assert.Equal(
+            ["path"],
+            analyzeTool.ProtocolTool.InputSchema.GetProperty("required")
+                .EnumerateArray()
+                .Select(item => item.GetString()));
 
         var result = await client.CallToolAsync(
             "analyze_project",
             new Dictionary<string, object?> { ["path"] = "Fixture.csproj" });
         JsonElement structured = Assert.IsType<JsonElement>(result.StructuredContent);
         Assert.Equal("complexity-mcp-analysis/1.0", structured.GetProperty("schemaVersion").GetString());
+        Assert.Equal("full", structured.GetProperty("responseMode").GetString());
+        Assert.False(structured.GetProperty("isTruncated").GetBoolean());
         Assert.Equal(
             "complexity-snapshot/1.0",
             structured.GetProperty("report").GetProperty("SchemaVersion").GetString());
@@ -46,16 +59,19 @@ public sealed class McpServerContractTests
             .GetProperty("Files")[0]
             .GetProperty("Members")[0]
             .GetProperty("StableId").GetString());
+        string analysisId = Assert.IsType<string>(structured.GetProperty("analysisId").GetString());
         var evidenceResult = await client.CallToolAsync(
             "query_member_evidence",
             new Dictionary<string, object?>
             {
                 ["path"] = "Fixture.csproj",
                 ["stableId"] = stableId,
+                ["analysisId"] = analysisId,
             });
         JsonElement evidence = Assert.IsType<JsonElement>(evidenceResult.StructuredContent);
         Assert.True(evidence.GetProperty("found").GetBoolean());
         Assert.Equal(stableId, evidence.GetProperty("stableId").GetString());
+        Assert.Equal("cachedSnapshot", evidence.GetProperty("source").GetString());
 
         fixture.WriteJson("baseline.json", report);
         fixture.WriteJson("current.json", report);
@@ -88,7 +104,7 @@ public sealed class McpServerContractTests
         ComplexityMcpService service = fixture.CreateService();
 
         McpAnalysisResponse response = await service.AnalyzeProjectAsync("Fixture.csproj", CancellationToken.None);
-        JsonElement report = response.Report;
+        JsonElement report = response.Report!.Value;
         JsonElement member = report.GetProperty("Projects")[0]
             .GetProperty("Files")[0]
             .GetProperty("Members")[0];
@@ -102,6 +118,8 @@ public sealed class McpServerContractTests
         Assert.True(evidence.Found);
         Assert.Equal(stableId, evidence.StableId);
         Assert.True(evidence.Member!.Value.TryGetProperty("Evidence", out _));
+        Assert.Equal("fresh", evidence.Source);
+        Assert.DoesNotContain(fixture.Root, report.GetRawText(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -109,7 +127,7 @@ public sealed class McpServerContractTests
     {
         using McpFixture fixture = McpFixture.Create();
         ComplexityMcpService service = fixture.CreateService();
-        JsonElement snapshot = (await service.AnalyzeProjectAsync("Fixture.csproj", CancellationToken.None)).Report;
+        JsonElement snapshot = (await service.AnalyzeProjectAsync("Fixture.csproj", CancellationToken.None)).Report!.Value;
         fixture.WriteJson("baseline.json", snapshot);
         fixture.WriteJson("current.json", snapshot);
 
@@ -128,7 +146,64 @@ public sealed class McpServerContractTests
         Assert.Equal(first.GetRawText(), second.GetRawText());
         Assert.All(
             first.GetProperty("Findings").EnumerateArray(),
-            finding => Assert.Equal("equivalent", finding.GetProperty("Classification").GetString()));
+            finding => Assert.Contains(
+                finding.GetProperty("Classification").GetString(),
+                NonRegressionClassifications));
+    }
+
+    [Fact]
+    public async Task Summary_is_bounded_and_cached_snapshot_avoids_reanalysis()
+    {
+        using McpFixture fixture = McpFixture.Create();
+        ComplexityMcpService service = fixture.CreateService();
+
+        McpAnalysisResponse response = await service.AnalyzeProjectAsync(
+            "Fixture.csproj",
+            "summary",
+            1,
+            CancellationToken.None);
+
+        Assert.Null(response.Report);
+        Assert.NotNull(response.Summary);
+        Assert.True(response.Reusable);
+        Assert.True(response.IsTruncated);
+        Assert.Equal(2, response.TotalMemberCount);
+        _ = Assert.Single(response.Summary.Members);
+
+        McpMemberSummary indexedMember = response.Summary.Members[0];
+        File.WriteAllText(Path.Combine(fixture.Root, "Fixture.cs"), "public static class Fixture { }");
+        McpMemberEvidenceResponse cached = await service.QueryMemberEvidenceAsync(
+            "Fixture.csproj",
+            indexedMember.StableId,
+            response.AnalysisId,
+            CancellationToken.None);
+        McpMemberEvidenceResponse fresh = await service.QueryMemberEvidenceAsync(
+            "Fixture.csproj",
+            indexedMember.StableId,
+            null,
+            CancellationToken.None);
+
+        Assert.True(cached.Found);
+        Assert.Equal("cachedSnapshot", cached.Source);
+        Assert.False(fresh.Found);
+        Assert.Equal("fresh", fresh.Source);
+    }
+
+    [Fact]
+    public async Task Unknown_and_concurrent_requests_remain_explicit_and_isolated()
+    {
+        using McpFixture fixture = McpFixture.Create();
+        ComplexityMcpService service = fixture.CreateService();
+
+        McpAnalysisResponse[] responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ =>
+            service.AnalyzeProjectAsync("Fixture.csproj", "summary", 10, CancellationToken.None)));
+
+        _ = Assert.Single(responses.Select(response => response.AnalysisId).Distinct(StringComparer.Ordinal));
+        Assert.All(responses, response => Assert.Equal(2, response.TotalMemberCount));
+        McpMemberSummary unknown = Assert.Single(
+            responses[0].Summary!.Members,
+            member => StringComparer.Ordinal.Equals(member.ComplexityStatus, "unknown"));
+        Assert.Null(unknown.Complexity);
     }
 
     [Fact]
@@ -150,6 +225,94 @@ public sealed class McpServerContractTests
         Assert.Equal("Path is outside the allowed root.", traversal.Message);
         Assert.Equal("The analysis exceeds the configured input-size limit.", size.Message);
         Assert.DoesNotContain(fixture.Root, traversal.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Configured_timeout_is_distinct_from_client_cancellation()
+    {
+        using McpFixture fixture = McpFixture.Create();
+        ComplexityMcpService service = fixture.CreateService(timeout: TimeSpan.Zero);
+
+        TimeoutException timeout = await Assert.ThrowsAsync<TimeoutException>(() =>
+            service.AnalyzeProjectAsync("Fixture.csproj", CancellationToken.None));
+
+        Assert.Equal("The analysis exceeded the configured request timeout.", timeout.Message);
+        Assert.DoesNotContain(fixture.Root, timeout.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Requests_reject_file_limit_and_symbolic_link_traversal()
+    {
+        using McpFixture fixture = McpFixture.Create();
+        ComplexityMcpService limitedService = fixture.CreateService(maximumFiles: 1);
+
+        ArgumentException fileLimit = await Assert.ThrowsAsync<ArgumentException>(() =>
+            limitedService.AnalyzeProjectAsync("Fixture.csproj", CancellationToken.None));
+        Assert.Equal("The analysis exceeds the configured file limit.", fileLimit.Message);
+
+        string outside = Path.Combine(Path.GetTempPath(), "complexity-mcp-outside-" + Guid.NewGuid().ToString("N") + ".json");
+        string link = Path.Combine(fixture.Root, "linked.json");
+        await File.WriteAllTextAsync(outside, "{}");
+        try
+        {
+            try
+            {
+                _ = File.CreateSymbolicLink(link, outside);
+            }
+            catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or PlatformNotSupportedException)
+            {
+                return;
+            }
+
+            AllowedPathPolicy policy = new(new McpHostOptions(
+                fixture.Root,
+                TimeSpan.FromSeconds(1),
+                1_000_000,
+                10));
+            ArgumentException symbolicLink = Assert.Throws<ArgumentException>(() => policy.ResolveInput("linked.json", ".json"));
+            Assert.Equal("Symbolic-link traversal is not allowed.", symbolicLink.Message);
+        }
+        finally
+        {
+            File.Delete(link);
+            File.Delete(outside);
+        }
+    }
+
+    [Fact]
+    public async Task Informational_commands_exit_without_starting_the_protocol()
+    {
+        string assemblyPath = typeof(ComplexityTools).Assembly.Location;
+        foreach (string argument in new[] { "--help", "--version" })
+        {
+            using Process process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = $"\"{assemblyPath}\" {argument}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            })!;
+            string output = await process.StandardOutput.ReadToEndAsync();
+            string error = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            Assert.Equal(0, process.ExitCode);
+            Assert.True(string.IsNullOrEmpty(error), error);
+            Assert.DoesNotContain("jsonrpc", output, StringComparison.OrdinalIgnoreCase);
+            Assert.False(string.IsNullOrWhiteSpace(output));
+        }
+    }
+
+    [Theory]
+    [InlineData("--timeout-seconds", "0", "--timeout-seconds must be between 1 and 300.")]
+    [InlineData("--max-input-bytes", "1073741825", "--max-input-bytes must be between 1 and 1073741824.")]
+    [InlineData("--max-files", "100001", "--max-files must be between 1 and 100000.")]
+    public void Invalid_startup_limits_are_rejected_without_paths(string option, string value, string expected)
+    {
+        Assert.False(McpHostOptions.TryParse([option, value], out _, out string? error));
+        Assert.Equal(expected, error);
+        Assert.DoesNotContain(Path.GetTempPath(), error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -197,6 +360,19 @@ public sealed class McpServerContractTests
         }
     }
 
+    private static StdioClientTransport CreateTransport(string root)
+    {
+        string? installedCommand = Environment.GetEnvironmentVariable("COMPLEXITY_MCP_COMMAND");
+        return new(new StdioClientTransportOptions
+        {
+            Name = "complexity-analysis-contract",
+            Command = installedCommand ?? "dotnet",
+            Arguments = installedCommand is null
+                ? [typeof(ComplexityTools).Assembly.Location, "--root", root]
+                : ["--root", root],
+        });
+    }
+
     private sealed class McpFixture : IDisposable
     {
         private readonly long _maximumBytes;
@@ -221,17 +397,20 @@ public sealed class McpServerContractTests
                 "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
             File.WriteAllText(
                 Path.Combine(root, "Fixture.cs"),
-                "public static class Fixture { public static int Sum(int[] values) { int total = 0; foreach (int value in values) { total += value; } return total; } }");
+                "public static class Fixture { public static int Sum(int[] values) { int total = 0; foreach (int value in values) { total += value; } return total; } public static void Mystery() { while (true) { } } }");
             return new(root, maximumBytes);
         }
 
-        internal ComplexityMcpService CreateService(long? maximumBytes = null)
+        internal ComplexityMcpService CreateService(
+            long? maximumBytes = null,
+            int maximumFiles = 100,
+            TimeSpan? timeout = null)
         {
             return new(new McpHostOptions(
                 Root,
-                TimeSpan.FromSeconds(30),
+                timeout ?? TimeSpan.FromSeconds(30),
                 maximumBytes ?? _maximumBytes,
-                100));
+                maximumFiles));
         }
 
         internal void WriteJson(string name, JsonElement value)

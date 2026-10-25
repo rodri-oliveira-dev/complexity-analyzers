@@ -26,10 +26,27 @@ internal sealed class AllowedPathPolicy
             throw new ArgumentException("Input path cannot be empty.");
         }
 
-        string candidate = Path.IsPathRooted(path)
-            ? Path.GetFullPath(path)
-            : Path.GetFullPath(path, _root);
-        ValidateBoundary(candidate);
+        string candidate;
+        try
+        {
+            candidate = Path.IsPathRooted(path)
+                ? Path.GetFullPath(path)
+                : Path.GetFullPath(path, _root);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new ArgumentException("Input path is invalid.");
+        }
+
+        try
+        {
+            ValidateBoundary(candidate);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new ArgumentException("Input path cannot be accessed within the allowed root.");
+        }
+
         if (!File.Exists(candidate))
         {
             throw new ArgumentException("Input file does not exist within the allowed root.");
@@ -51,7 +68,15 @@ internal sealed class AllowedPathPolicy
 
     private void ValidateBoundary(string candidate)
     {
-        string normalized = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidate));
+        string normalized;
+        try
+        {
+            normalized = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidate));
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new ArgumentException("Input path is invalid.");
+        }
         if (!normalized.Equals(_root, _pathComparison)
             && !normalized.StartsWith(_rootPrefix, _pathComparison))
         {
