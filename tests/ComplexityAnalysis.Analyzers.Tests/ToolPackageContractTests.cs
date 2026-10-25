@@ -8,6 +8,7 @@ using Xunit;
 
 namespace ComplexityAnalysis.Analyzers.Tests;
 
+[Collection("Package contract tests")]
 public sealed class ToolPackageContractTests
 {
     private const string PackageId = "ComplexityAnalysis.Tool";

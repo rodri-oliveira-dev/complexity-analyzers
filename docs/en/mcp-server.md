@@ -1,74 +1,198 @@
 # Local MCP Server
 
-`ComplexityAnalysis.Mcp` is a separate, local-only MCP host that exposes
-project complexity analysis over standard input/output. It does not change the
-Roslyn analyzer package or add MCP dependencies to analyzer consumers.
+[Português (Brasil)](../pt-BR/mcp-server.md)
 
-## Build and configure
+`ComplexityAnalysis.Mcp` is the separately versioned, local-only stdio surface
+for the repository's project analysis. It exposes tools to compatible external
+agents; it is not an autonomous agent. It shares report, evidence, StableId,
+and comparison code with `ComplexityAnalysis.Tool` and does not add MCP runtime
+dependencies to analyzer consumers.
 
-Build the repository before starting the server:
+See the [package README](../../src/ComplexityAnalysis.Mcp/README.md) for the
+consumer quickstart, global/local installation, maintenance commands, client
+configuration, examples, OS-specific PATH guidance, and known limitations.
+
+## Distribution and startup
+
+The independent package identity is `ComplexityAnalysis.Mcp`; version `1.0.0`
+installs the `complexity-mcp` .NET 10 command:
 
 ```bash
-dotnet build ./ComplexityAnalysis.Analyzers.slnx --configuration Release
+dotnet tool install --global ComplexityAnalysis.Mcp --version 1.0.0
+complexity-mcp --root /absolute/path/to/project
 ```
 
-Use the resulting assembly as the MCP client's subprocess. MCP clients may
-start it from an unrelated working directory, so configure both the assembly
-and allowed root as absolute paths. Replace the placeholders below with the
-absolute repository path for your machine:
+For a manifest-local installation:
+
+```bash
+dotnet new tool-manifest
+dotnet tool install ComplexityAnalysis.Mcp --version 1.0.0
+dotnet tool run complexity-mcp --root /absolute/path/to/project
+```
+
+Informational commands exit before protocol startup:
+
+```bash
+complexity-mcp --help
+complexity-mcp --version
+```
+
+The server accepts `--root` (current directory), `--timeout-seconds` (`30`,
+range `1..300`), `--max-input-bytes` (50 MiB, range `1..1073741824`), and
+`--max-files` (`2000`, range `1..100000`). Invalid configuration returns exit
+code `2` and a sanitized message on stderr.
+
+## Protocol contract
+
+All three tools advertise MCP read-only annotations, structured output, input
+schemas with parameter descriptions, and output schemas.
+
+| Tool | Inputs | Result |
+| --- | --- | --- |
+| `analyze_project` | Project/solution path; optional `responseMode` and `maxMembers` | Full deterministic snapshot or explicit bounded summary, plus `analysisId` |
+| `query_member_evidence` | Project/solution path, exact `StableId`, optional `analysisId` | Matching member/evidence or `found: false` |
+| `compare_snapshots` | Baseline/current snapshot JSON paths | Deterministic comparison report |
+
+The default `analyze_project` behavior remains compatible: `responseMode` is
+`full` and `report` contains the complete `complexity-snapshot/1.0`. Summary
+mode returns at most 100 member index entries by default (configurable from 1 to
+500) and reports `isTruncated`, total, and returned counts. It does not silently
+omit evidence while claiming a complete report.
+
+Each analysis hashes the exact serialized snapshot into an `analysisId`. The
+process retains at most four snapshots and 16 MiB. Passing the ID to
+`query_member_evidence` avoids repeating analysis and explicitly identifies the
+source as `cachedSnapshot`. This is snapshot reuse, not a current-files cache:
+the server never treats it as proof that the filesystem is unchanged. Omitting
+the ID preserves the original fresh-analysis behavior. Missing/evicted IDs fail
+with guidance to run `analyze_project` again.
+
+`Unknown` remains an explicit conservative result. Summary entries use
+`complexityStatus: "unknown"` and `complexity: null`; member evidence retains a
+typed `UnknownReason` when available. Snapshot comparison classifies Unknown
+evidence as incomparable, never as a proven regression.
+
+## Security boundary
+
+The host is local, stdio-only, and read-only. It exposes no write, shell,
+network, telemetry, remote transport, or arbitrary process tool.
+
+- Every entry file must be below the canonical `--root` boundary and have a
+  supported extension.
+- Project/solution references and discovered C# files are validated before
+  reading.
+- Symbolic-link and reparse-point traversal below the root is rejected or
+  skipped during enumeration.
+- File-count and aggregate-byte scopes are isolated per request.
+- Client cancellation and configured timeouts propagate through loading,
+  Roslyn analysis, comparison, and serialization.
+- Report paths are relative to `--root`; sanitized errors do not echo absolute
+  local paths.
+- stdout is reserved for JSON-RPC after startup. Console logging is cleared and
+  reconfigured to stderr.
+
+The loader parses supported project and solution files directly; it does not
+execute MSBuild, restore packages, run builds, or evaluate arbitrary project
+tasks. Security checks reduce accidental data exposure but do not turn an
+untrusted local repository into trusted code.
+
+## Client configurations
+
+VS Code / GitHub Copilot uses `.vscode/mcp.json` with top-level `servers`:
 
 ```json
 {
-  "command": "dotnet",
-  "args": [
-    "/absolute/path/to/complexity-analyzers/src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
-    "--root",
-    "/absolute/path/to/complexity-analyzers"
-  ]
+  "servers": {
+    "complexity-analysis": {
+      "type": "stdio",
+      "command": "complexity-mcp",
+      "args": ["--root", "${workspaceFolder}"]
+    }
+  }
 }
 ```
 
-On Windows, use the equivalent absolute paths with escaped backslashes or
-forward slashes in JSON.
+Codex CLI can register the command directly:
 
-The host accepts these startup limits:
+```bash
+codex mcp add complexity-analysis -- complexity-mcp --root /absolute/path/to/project
+codex mcp list
+```
 
-- `--root <directory>`: only files below this directory may be read; defaults
-  to the current directory.
-- `--timeout-seconds <1..300>`: per-request timeout; defaults to `30`.
-- `--max-input-bytes <positive integer>`: aggregate file-size limit per
-  request; defaults to 50 MiB.
-- `--max-files <positive integer>`: file-count limit per request; defaults to
-  `2000`.
+Or use `~/.codex/config.toml` / trusted project `.codex/config.toml`:
 
-## Read-only tools
+```toml
+[mcp_servers.complexity-analysis]
+command = "complexity-mcp"
+args = ["--root", "/absolute/path/to/project"]
+```
 
-| Tool | Input | Result |
-| --- | --- | --- |
-| `analyze_project` | A `.csproj`, `.sln`, or `.slnx` path | A typed response whose `report` is a deterministic `complexity-snapshot/1.0` including evidence |
-| `query_member_evidence` | Project path and exact `StableId` | The matching member and evidence, or `Found: false` |
-| `compare_snapshots` | Baseline and current snapshot `.json` paths | A typed response whose `comparison` is a deterministic `complexity-comparison/1.0` report |
+Claude Desktop local developer configuration uses
+`claude_desktop_config.json` with top-level `mcpServers`:
 
-All tools advertise the MCP read-only annotation. The server offers no tool
-that writes files, launches arbitrary commands, accesses the network, or
-mutates source code. Requests reject paths outside the allowed root,
-unsupported extensions, symbolic-link traversal, missing files, and configured
-workload-limit violations. Error messages do not echo absolute paths.
+```json
+{
+  "mcpServers": {
+    "complexity-analysis": {
+      "command": "complexity-mcp",
+      "args": ["--root", "/absolute/path/to/project"]
+    }
+  }
+}
+```
 
-Cancellation from the MCP client and the per-request timeout are propagated to
-project analysis and snapshot reads. Inconclusive complexity remains
-`Unknown`; the MCP layer does not reinterpret or upgrade the CLI result.
+These formats are based on the official
+[VS Code reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration),
+[Codex MCP documentation](https://developers.openai.com/codex/extend/mcp), and
+[MCP SDK real-host guide](https://py.sdk.modelcontextprotocol.io/get-started/real-host/).
 
-## Reproduce results with the CLI
+## Distribution and Registry publication
 
-The MCP operations use the same report, evidence, identity, and comparison
-implementations as the .NET tool. Reproduce them with:
+NuGet.org is the executable distribution source for the `ComplexityAnalysis.Mcp`
+.NET tool. GitHub Packages receives the same validated package as an alternative
+repository feed. The Official MCP Registry contains only discovery metadata
+under `io.github.rodri-oliveira-dev/complexity-analysis` and resolves its
+`nuget` package to NuGet.org; it does not replace installation or stdio startup
+in VS Code/Copilot, Codex, or Claude Desktop.
+
+`.mcp/server.json` is the version-controlled baseline. For every manual release
+from `main`, `release-mcp.yml` replaces both manifest version fields with the
+validated workflow version, proving equality with `mcp-v<version>` and the
+NuGet package. After NuGet publication and GitHub Release completion, the
+Registry job waits for the NuGet README and its exact `mcp-name` ownership
+marker, verifies the pinned `mcp-publisher` artifact with Sigstore, validates
+the manifest, authenticates with GitHub OIDC, publishes, and verifies the API
+result. Pull requests execute validation only.
+
+Before the first release, configure NuGet Trusted Publishing as documented in
+the contribution guide, protect the GitHub `release` environment, and ensure
+the GitHub repository can authenticate its `io.github` namespace to the
+Registry with OIDC. No Registry PAT or persistent secret is required. Search
+the [Official Registry](https://registry.modelcontextprotocol.io/) by the exact
+name to verify publication.
+
+For failures, validate locally with `mcp-publisher validate .mcp/server.json`.
+An unavailable package normally means NuGet README indexing has not completed;
+retry the workflow after indexing. OIDC failures require checking `main`, the
+protected environment approval, repository identity, and `id-token: write`.
+Never overwrite a conflicting immutable NuGet or Registry version: correct the
+manifest source and release a new version. See the official
+[package specification](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/package-types.mdx),
+[Actions guide](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx), and
+[.NET guide](https://learn.microsoft.com/en-us/dotnet/ai/quickstarts/publish-mcp-registry).
+
+## Reproduce and validate
+
+The equivalent CLI operations are:
 
 ```bash
 dotnet run --project ./src/ComplexityAnalysis.Tool -- analyze <project-or-solution> --format json --snapshot
 dotnet run --project ./src/ComplexityAnalysis.Tool -- compare <baseline.json> <current.json> --format json
 ```
 
-Use the `StableId` in the first JSON report to reproduce a member-evidence
-query. The member returned by MCP is the matching member object from that
-snapshot.
+The release workflow packs one MCP artifact, installs it in an isolated tool
+path, and runs the repository's real `ModelContextProtocol.Client` contract
+test against that installed command. The test performs protocol initialization,
+tool discovery, and real calls to all three tools. It also validates package
+metadata, help/version, SPDX 2.3 SBOM generation, and package isolation before
+any manual publication job can run.

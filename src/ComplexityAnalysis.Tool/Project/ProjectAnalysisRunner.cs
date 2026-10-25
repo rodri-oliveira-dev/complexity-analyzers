@@ -25,13 +25,16 @@ internal static class ProjectAnalysisRunner
         ToolOptions options,
         CancellationToken cancellationToken,
         Action<string>? validatePath = null,
-        bool skipReparsePoints = false)
+        bool skipReparsePoints = false,
+        string? displayBaseDirectory = null)
     {
         _ = options ?? throw new ArgumentNullException(nameof(options));
         cancellationToken.ThrowIfCancellationRequested();
         validatePath?.Invoke(options.EntryPath);
 
-        string baseDirectory = Directory.GetCurrentDirectory();
+        string baseDirectory = displayBaseDirectory is null
+            ? Directory.GetCurrentDirectory()
+            : Path.GetFullPath(displayBaseDirectory);
         ProjectReport report = new()
         {
             EntryPoint = PathUtilities.ToDisplayPath(options.EntryPath, baseDirectory),

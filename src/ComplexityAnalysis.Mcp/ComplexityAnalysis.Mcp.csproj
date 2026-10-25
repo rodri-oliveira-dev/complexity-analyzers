@@ -2,7 +2,23 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>complexity-mcp</ToolCommandName>
+    <PackageId>ComplexityAnalysis.Mcp</PackageId>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <Title>Complexity Analysis MCP Server</Title>
+    <Description>Local read-only MCP server for deterministic C# project complexity analysis, member evidence, and snapshot comparison.</Description>
+    <Authors>Rodrigo de Oliveira</Authors>
+    <PackageTags>dotnet-tool;mcp;csharp;roslyn;static-analysis;complexity;big-o;ai-agents</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/rodri-oliveira-dev/complexity-analyzers</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);EnableGenerateDocumentationFile</NoWarn>
   </PropertyGroup>
@@ -11,5 +27,11 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="ModelContextProtocol" />
     <ProjectReference Include="..\ComplexityAnalysis.Tool\ComplexityAnalysis.Tool.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md" Pack="true" PackagePath="/" />
+    <None Update="README.pt-BR.md" Pack="true" PackagePath="/" />
+    <None Include="../../resources/icon.png" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>

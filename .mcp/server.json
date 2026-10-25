@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.rodri-oliveira-dev/complexity-analysis",
+  "title": "Complexity Analysis",
+  "description": "Analyze C# complexity, inspect member evidence, and compare deterministic snapshots.",
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "identifier": "ComplexityAnalysis.Mcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "named",
+          "name": "--root",
+          "description": "Absolute directory boundary for read-only project analysis.",
+          "isRequired": true,
+          "format": "filepath"
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/rodri-oliveira-dev/complexity-analyzers",
+    "source": "github",
+    "subfolder": "src/ComplexityAnalysis.Mcp"
+  }
+}

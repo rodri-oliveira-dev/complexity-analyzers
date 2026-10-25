@@ -6,6 +6,11 @@ using Microsoft.Extensions.Logging;
 
 using ModelContextProtocol.Server;
 
+if (McpCommandLine.TryHandle(args, Console.Out))
+{
+    return;
+}
+
 if (!McpHostOptions.TryParse(args, out McpHostOptions? options, out string? error)
     || options is null)
 {
@@ -15,6 +20,7 @@ if (!McpHostOptions.TryParse(args, out McpHostOptions? options, out string? erro
 }
 
 HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+builder.Logging.ClearProviders();
 builder.Logging.AddConsole(console => console.LogToStandardErrorThreshold = LogLevel.Trace);
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton(new ComplexityMcpService(options));

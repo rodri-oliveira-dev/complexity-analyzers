@@ -96,7 +96,9 @@ Não introduza `Microsoft.CodeAnalysis.Workspaces` ou dependências de runtime, 
 
 ## Releases
 
-Releases de produção são criadas manualmente pelo workflow `Release` do GitHub Actions em `.github/workflows/release.yml`.
+Releases de produção do analyzer são criadas manualmente pelo workflow `Release`
+do GitHub Actions em `.github/workflows/release.yml`; CLI e MCP usam os workflows
+independentes documentados abaixo.
 
 Pull requests que alteram o workflow de release ou arquivos relevantes ao package executam somente o caminho `build-and-pack` com uma versão sintética de CI. Esse dry run exercita validação do package e geração da SBOM sem criar tags, publicar packages, gerar attestations ou criar GitHub Release.
 
@@ -178,6 +180,46 @@ environment `release`. Não crie a tag antecipadamente. Uma repetição segura
 aceita `tool-v1.0.0` existente somente quando ela aponta para o mesmo commit
 validado; os pushes usam skip-duplicate e assets da GitHub Release nunca são
 substituídos.
+
+### Releases do ComplexityAnalysis.Mcp
+
+O servidor MCP tem uma terceira linha independente.
+`.github/workflows/release-mcp.yml` publica somente `ComplexityAnalysis.Mcp`,
+aceita versão semântica manual e deriva tags `mcp-v<versão>`. Pull requests
+executam build, testes, instalação do pacote, contrato com cliente MCP real e
+SBOM sem publicar. Jobs de produção exigem dispatch manual a partir de `main`.
+As GitHub Releases MCP não são marcadas como a release genérica mais recente,
+preservando a identificação da release do analyzer.
+
+Antes da primeira release `1.0.0`, conclua:
+
+1. No NuGet.org Trusted Publishing, crie uma policy GitHub com owner
+   `rodri-oliveira-dev`, repositório `complexity-analyzers`, workflow
+   `release-mcp.yml` e environment `release`. Autorize exatamente o PackageId
+   `ComplexityAnalysis.Mcp` com escopo **Push new packages and package
+   versions**.
+2. Garanta que o environment GitHub `release` permita deployments somente da
+   `main` e use os reviewers desejados. Não adicione API key NuGet duradoura; o
+   workflow troca OIDC por credencial temporária.
+3. Proteja `mcp-v*` no ruleset de tags contra exclusão, force update e
+   recriação, permitindo criação pelo workflow depois da validação.
+4. Confirme GitHub Packages e permissão de escrita por `GITHUB_TOKEN`.
+5. Verifique a disponibilidade de `ComplexityAnalysis.Mcp` e `1.0.0` no
+   NuGet.org imediatamente antes da primeira publicação.
+6. Confirme que o GitHub OIDC deste repositório pode reivindicar o namespace
+   `io.github.rodri-oliveira-dev/complexity-analysis` no Official MCP Registry.
+   O job do Registry usa `id-token: write` no mesmo environment protegido
+   `release`; não configure PAT nem secret persistente do Registry.
+
+Depois de aprovação e merge, selecione **Release ComplexityAnalysis.Mcp**,
+escolha `main`, informe `1.0.0` e revise o deployment protegido. Não crie a tag
+antes. O workflow publica o artefato exato já validado e instalado; ele não gera
+notas comparando namespaces de tags do analyzer, CLI e MCP. Depois do NuGet.org
+e da GitHub Release, publica o `.mcp/server.json` sincronizado por uma versão
+fixa e verificada por Sigstore do `mcp-publisher` e confere a entrada no Registry.
+Falha no Registry fica visível na execução, mas não remove artefatos publicados;
+repita a mesma versão somente quando seus metadados imutáveis forem compatíveis.
+Consulte o [guia oficial de Actions do Registry](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx).
 
 ## Pull requests
 
