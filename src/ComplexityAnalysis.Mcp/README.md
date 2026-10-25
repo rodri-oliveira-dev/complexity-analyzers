@@ -223,9 +223,9 @@ On Windows the file is under `%APPDATA%\Claude`; on macOS it is under
 ## Windows, macOS, and Linux notes
 
 - Ensure the .NET global tools directory is on the environment `PATH` inherited
-  by the client. If discovery fails, use the absolute installed executable:
-  `%USERPROFILE%\.dotnet\tools\complexity-mcp.exe` on Windows or
-  `$HOME/.dotnet/tools/complexity-mcp` on macOS/Linux.
+  by the client. `dotnet tool list --global` confirms the installation; if the
+  client cannot resolve it, configure the absolute `complexity-mcp` executable
+  discovered on that machine without committing the machine-specific path.
 - JSON Windows paths require escaped backslashes; forward slashes also work in
   .NET paths.
 - GUI clients may inherit a different `PATH` from an interactive shell. Restart

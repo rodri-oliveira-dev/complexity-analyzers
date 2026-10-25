@@ -219,9 +219,9 @@ No Windows, o arquivo fica em `%APPDATA%\Claude`; no macOS, em
 ## Notas para Windows, macOS e Linux
 
 - Garanta que o diretório de ferramentas globais .NET esteja no `PATH` herdado
-  pelo cliente. Se necessário, use o executável absoluto:
-  `%USERPROFILE%\.dotnet\tools\complexity-mcp.exe` no Windows ou
-  `$HOME/.dotnet/tools/complexity-mcp` no macOS/Linux.
+  pelo cliente. `dotnet tool list --global` confirma a instalação; se o cliente
+  não resolver o comando, configure o executável `complexity-mcp` absoluto
+  descoberto nessa máquina sem versionar o caminho específico.
 - Em JSON, caminhos Windows exigem barras invertidas escapadas; barras normais
   também funcionam com .NET.
 - Clientes gráficos podem herdar `PATH` diferente do terminal. Reinicie o
