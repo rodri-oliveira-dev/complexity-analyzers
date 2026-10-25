@@ -54,7 +54,7 @@ jobs:
           dotnet test ComplexityAnalysis.Analyzers.slnx
           --configuration Release
           --no-build
-          --filter "FullyQualifiedName!~AnalyzerPackageContractTests&FullyQualifiedName!~PerformanceSyntheticCorpusTests"
+          --filter "FullyQualifiedName!~AnalyzerPackageContractTests&FullyQualifiedName!~ToolPackageContractTests&FullyQualifiedName!~PerformanceSyntheticCorpusTests"
 
   package:
     name: Package

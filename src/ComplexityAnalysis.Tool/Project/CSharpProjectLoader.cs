@@ -38,7 +38,8 @@ internal static class CSharpProjectLoader
         string projectPath,
         ToolOptions options,
         CancellationToken cancellationToken,
-        Action<string>? validatePath = null)
+        Action<string>? validatePath = null,
+        bool skipReparsePoints = false)
     {
         _ = options ?? throw new ArgumentNullException(nameof(options));
         cancellationToken.ThrowIfCancellationRequested();
@@ -54,7 +55,12 @@ internal static class CSharpProjectLoader
             ProjectDirectory = projectDirectory,
         };
 
-        foreach (string sourcePath in ResolveCompileFiles(projectDocument, projectDirectory, options, validatePath))
+        foreach (string sourcePath in ResolveCompileFiles(
+            projectDocument,
+            projectDirectory,
+            options,
+            validatePath,
+            skipReparsePoints))
         {
             cancellationToken.ThrowIfCancellationRequested();
             validatePath?.Invoke(sourcePath);
@@ -81,7 +87,8 @@ internal static class CSharpProjectLoader
         XDocument projectDocument,
         string projectDirectory,
         ToolOptions options,
-        Action<string>? validatePath)
+        Action<string>? validatePath,
+        bool skipReparsePoints)
     {
         List<string> includes =
         [
@@ -104,13 +111,21 @@ internal static class CSharpProjectLoader
 
         validatePath?.Invoke(projectDirectory);
         IEnumerable<string> implicitFiles = HasImplicitCompileItems(projectDocument)
-            ? EnumerateFiles(projectDirectory, validatePath)
+            ? EnumerateFiles(projectDirectory, skipReparsePoints)
             : [];
-        IEnumerable<string> explicitFiles = includes.SelectMany(include => ExpandInclude(projectDirectory, include, validatePath));
+        IEnumerable<string> explicitFiles = includes.SelectMany(include => ExpandInclude(
+            projectDirectory,
+            include,
+            validatePath,
+            skipReparsePoints));
         IEnumerable<string> files = implicitFiles.Concat(explicitFiles);
 
         HashSet<string> removed = new(
-            removes.SelectMany(remove => ExpandInclude(projectDirectory, remove, validatePath)),
+            removes.SelectMany(remove => ExpandInclude(
+                projectDirectory,
+                remove,
+                validatePath,
+                skipReparsePoints)),
             StringComparer.OrdinalIgnoreCase);
         return
         [
@@ -141,12 +156,13 @@ internal static class CSharpProjectLoader
     private static IEnumerable<string> ExpandInclude(
         string projectDirectory,
         string include,
-        Action<string>? validatePath)
+        Action<string>? validatePath,
+        bool skipReparsePoints)
     {
         string normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
         if (normalized.Contains('*', StringComparison.Ordinal))
         {
-            return ExpandGlob(projectDirectory, normalized, validatePath);
+            return ExpandGlob(projectDirectory, normalized, validatePath, skipReparsePoints);
         }
 
         string fullPath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));
@@ -157,7 +173,8 @@ internal static class CSharpProjectLoader
     private static IEnumerable<string> ExpandGlob(
         string projectDirectory,
         string normalizedPattern,
-        Action<string>? validatePath)
+        Action<string>? validatePath,
+        bool skipReparsePoints)
     {
         string normalizedProjectDirectory = Path.GetFullPath(projectDirectory);
         string pattern = PathUtilities.Normalize(normalizedPattern);
@@ -180,22 +197,18 @@ internal static class CSharpProjectLoader
             "^" + GlobToRegex(relativePattern) + "$",
             RegexOptions.CultureInvariant | RegexOptions.IgnoreCase,
             GlobRegexTimeout);
-        return EnumerateFiles(searchRoot, validatePath)
+        return EnumerateFiles(searchRoot, skipReparsePoints)
             .Where(path => regex.IsMatch(PathUtilities.Normalize(Path.GetRelativePath(searchRoot, path))));
     }
 
-    private static IEnumerable<string> EnumerateFiles(string searchRoot, Action<string>? validatePath)
+    private static IEnumerable<string> EnumerateFiles(string searchRoot, bool skipReparsePoints)
     {
-        if (validatePath is null)
-        {
-            return Directory.EnumerateFiles(searchRoot, "*.cs", SearchOption.AllDirectories);
-        }
-
         EnumerationOptions options = new()
         {
             RecurseSubdirectories = true,
-            AttributesToSkip = FileAttributes.ReparsePoint,
-            MatchCasing = MatchCasing.CaseInsensitive,
+            AttributesToSkip = skipReparsePoints ? FileAttributes.ReparsePoint : 0,
+            IgnoreInaccessible = false,
+            MatchCasing = MatchCasing.PlatformDefault,
         };
         return Directory.EnumerateFiles(searchRoot, "*.cs", options);
     }

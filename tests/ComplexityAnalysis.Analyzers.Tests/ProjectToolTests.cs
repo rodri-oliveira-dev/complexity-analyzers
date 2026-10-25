@@ -68,6 +68,60 @@ public sealed class ProjectToolTests
     }
 
     [Fact]
+    public async Task Nested_executable_members_receive_unique_deterministic_stable_ids()
+    {
+        using FixtureProject fixture = FixtureProject.Create();
+        fixture.WriteProject();
+        fixture.WriteSource(
+            "Nested.cs",
+            """
+            using System;
+
+            public sealed class Nested
+            {
+                public void Run()
+                {
+                    int Local(int value) => value;
+                    Func<int, int> first = value => Local(value);
+                    Func<int, int> second = delegate(int value) { return value; };
+                }
+            }
+            """);
+
+        (int firstExit, string firstOutput, _) = await RunCliAsync(
+            "analyze",
+            fixture.ProjectPath,
+            "--format",
+            "json");
+        (int secondExit, string secondOutput, _) = await RunCliAsync(
+            "analyze",
+            fixture.ProjectPath,
+            "--format",
+            "json");
+
+        Assert.Equal(ToolExitCodes.Success, firstExit);
+        Assert.Equal(ToolExitCodes.Success, secondExit);
+        using JsonDocument first = JsonDocument.Parse(firstOutput);
+        using JsonDocument second = JsonDocument.Parse(secondOutput);
+        string[] firstIds = first.RootElement.GetProperty("Projects")[0]
+            .GetProperty("Files")[0]
+            .GetProperty("Members")
+            .EnumerateArray()
+            .Select(member => member.GetProperty("StableId").GetString()!)
+            .ToArray();
+        string[] secondIds = second.RootElement.GetProperty("Projects")[0]
+            .GetProperty("Files")[0]
+            .GetProperty("Members")
+            .EnumerateArray()
+            .Select(member => member.GetProperty("StableId").GetString()!)
+            .ToArray();
+
+        Assert.Equal(4, firstIds.Length);
+        Assert.Equal(firstIds.Length, firstIds.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(firstIds, secondIds);
+    }
+
+    [Fact]
     public async Task Cli_opt_in_evidence_json_matches_versioned_golden_contract()
     {
         string repositoryRoot = RepositoryTestSupport.FindRepositoryRoot();

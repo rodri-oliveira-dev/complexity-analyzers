@@ -84,7 +84,10 @@ internal static class ComplexityToolApplication
 
         ProjectReport baseline = await SnapshotReader.ReadAsync(options.BaselinePath, cancellationToken);
         ProjectReport current = await SnapshotReader.ReadAsync(options.CurrentPath, cancellationToken);
-        ComplexityComparisonReport comparison = ComplexityRegressionComparer.Compare(baseline, current);
+        ComplexityComparisonReport comparison = ComplexityRegressionComparer.Compare(
+            baseline,
+            current,
+            cancellationToken);
         string rendered = options.Format switch
         {
             ReportFormat.Json => ComparisonReportWriter.WriteJson(comparison),

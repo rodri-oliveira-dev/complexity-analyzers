@@ -1757,6 +1757,36 @@ public sealed class MethodComplexityExtractorTests
     }
 
     [Fact]
+    public void Stored_pipeline_reassigned_after_a_loop_use_remains_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                int M(
+                    IEnumerable<int> values,
+                    IEnumerable<int> iterations,
+                    IEnumerable<int> replacement)
+                {
+                    var query = values.Where(value => value > 0);
+                    int total = 0;
+                    foreach (int unused in iterations)
+                    {
+                        total += query.Count();
+                        query = replacement;
+                    }
+
+                    return total;
+                }
+            }
+            """,
+            "Unknown");
+    }
+
+    [Fact]
     public void Stored_pipeline_with_stable_local_delegate_propagates_delegate_cost()
     {
         AssertMethodComplexity(
@@ -1776,6 +1806,29 @@ public sealed class MethodComplexityExtractorTests
             }
             """,
             "O(n)");
+    }
+
+    [Fact]
+    public void Local_delegate_reassigned_after_use_remains_conservatively_unknown()
+    {
+        AssertMethodComplexity(
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                int M(IEnumerable<int> values)
+                {
+                    Func<int, bool> predicate = value => value > 0;
+                    int count = values.Count(predicate);
+                    predicate = value => value < 0;
+                    return count;
+                }
+            }
+            """,
+            "Unknown");
     }
 
     [Fact]
@@ -2061,6 +2114,105 @@ public sealed class MethodComplexityExtractorTests
             }
             """,
             "O(n)");
+    }
+
+    [Fact]
+    public void Immediate_linq_method_group_is_treated_as_a_delegate_over_the_sequence()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                bool M(IEnumerable<int> values) => values.Any(IsPositive);
+
+                private static bool IsPositive(int value) => value > 0;
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Immediate_linq_local_delegate_is_treated_as_a_delegate_over_the_sequence()
+    {
+        AssertMethodComplexity(
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                bool M(IEnumerable<int> values)
+                {
+                    Func<int, bool> predicate = value => value > 0;
+                    return values.Any(predicate);
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Immediate_count_method_group_is_treated_as_a_delegate_over_the_sequence()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                int M(List<int> values) => values.Count(IsPositive);
+
+                private static bool IsPositive(int value) => value > 0;
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Immediate_count_local_delegate_is_treated_as_a_delegate_over_the_sequence()
+    {
+        AssertMethodComplexity(
+            """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                int M(List<int> values)
+                {
+                    Func<int, bool> predicate = value => value > 0;
+                    return values.Count(predicate);
+                }
+            }
+            """,
+            "O(n)");
+    }
+
+    [Fact]
+    public void Recursive_delegate_target_terminates_conservatively()
+    {
+        AssertMethodComplexity(
+            """
+            using System.Collections.Generic;
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                bool M(IEnumerable<int> values)
+                {
+                    return values.Any(IsPositive);
+
+                    bool IsPositive(int value) => values.Any(IsPositive);
+                }
+            }
+            """,
+            "Unknown");
     }
 
     [Fact]

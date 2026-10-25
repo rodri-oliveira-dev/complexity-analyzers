@@ -222,6 +222,12 @@ internal sealed class InterproceduralInvocationAnalyzer
         SemanticModel calleeSemanticModel = interproceduralContext.GetSemanticModel(
             sourceMember.SyntaxTree,
             callerContext.CancellationToken);
+        ComplexityEvidenceCollector? calleeEvidence = callerContext.EvidenceCollector is { } callerEvidence
+            ? new ComplexityEvidenceCollector(
+                sourceMember.Declaration,
+                callerEvidence.MaximumDepth,
+                callerEvidence.MaximumSteps)
+            : null;
         return new MethodComplexityExtractor()
             .AnalyzeSourceMember(
                 sourceMember,
@@ -230,7 +236,7 @@ internal sealed class InterproceduralInvocationAnalyzer
                 calleeState,
                 calleeOptions,
                 callerContext.CancellationToken,
-                callerContext.EvidenceCollector);
+                calleeEvidence);
     }
 
     private static bool IsCacheable(InterproceduralAnalysisResult result)
@@ -299,7 +305,15 @@ internal sealed class InterproceduralInvocationAnalyzer
             unknownReason = ComplexityUnknownReason.SourceAnalysisUnknown;
         }
 
-        RecordSourceCall(invocation, complexity, unknownReason);
+        if (calleeResult.Template?.Evidence is { } evidence)
+        {
+            callerContext.EvidenceCollector?.Replay(evidence, callerContext.CancellationToken);
+        }
+
+        ComplexityEstimate? estimate = complexity is UnknownComplexity
+            ? null
+            : calleeResult.Template?.Estimate?.WithComplexity(complexity);
+        RecordSourceCall(invocation, complexity, estimate, unknownReason);
         return complexity;
     }
 
@@ -323,13 +337,18 @@ internal sealed class InterproceduralInvocationAnalyzer
         InvocationExpressionSyntax invocation,
         ComplexityUnknownReason reason)
     {
-        RecordSourceCall(invocation, ComplexityFactory.Unknown(), reason);
+        RecordSourceCall(
+            invocation,
+            ComplexityFactory.Unknown(),
+            estimate: null,
+            unknownReason: reason);
         return ComplexityFactory.Unknown();
     }
 
     private void RecordSourceCall(
         InvocationExpressionSyntax invocation,
         ComplexityExpression complexity,
+        ComplexityEstimate? estimate,
         ComplexityUnknownReason unknownReason)
     {
         ComplexityEvidenceCollector? collector = callerContext.EvidenceCollector;
@@ -343,11 +362,13 @@ internal sealed class InterproceduralInvocationAnalyzer
             ComplexityEvidenceOrigin.SourceAnalysis,
             "source-call",
             invocation,
-            complexity is UnknownComplexity
+            complexity is UnknownComplexity || estimate is null
                 ? ComplexityEstimate.Unknown()
-                : ComplexityEstimate.WorstCaseUpperBound(complexity),
+                : estimate,
             ComplexityOperation.Sequential,
-            unknownReason,
+            estimate is null && complexity is not UnknownComplexity
+                ? ComplexityUnknownReason.SourceAnalysisUnknown
+                : unknownReason,
             callerContext.CancellationToken);
     }
 

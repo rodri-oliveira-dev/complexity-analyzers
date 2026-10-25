@@ -5,9 +5,13 @@ namespace ComplexityAnalysis.Tool.Comparison;
 
 internal static class ComplexityRegressionComparer
 {
-    internal static ComplexityComparisonReport Compare(ProjectReport baseline, ProjectReport current)
+    internal static ComplexityComparisonReport Compare(
+        ProjectReport baseline,
+        ProjectReport current,
+        CancellationToken cancellationToken = default)
     {
-        SnapshotMatchResult matches = SnapshotMemberMatcher.Match(baseline, current);
+        cancellationToken.ThrowIfCancellationRequested();
+        SnapshotMatchResult matches = SnapshotMemberMatcher.Match(baseline, current, cancellationToken);
         ComplexityComparisonReport report = new()
         {
             BaselineSchemaVersion = baseline.SchemaVersion,
@@ -17,18 +21,35 @@ internal static class ComplexityRegressionComparer
         bool configurationCompatible = AreConfigurationsCompatible(baseline.Configuration, current.Configuration);
         foreach (SnapshotMemberMatch match in matches.Matches)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             report.Findings.Add(CompareMatch(match, configurationCompatible));
         }
 
-        report.Findings.AddRange(matches.Added.Select(member => CreateUnmatched("added", member)));
-        report.Findings.AddRange(matches.Removed.Select(member => CreateUnmatched("removed", member)));
-        report.Findings.AddRange(matches.AmbiguousIds.Select(id => new ComplexityComparisonFinding
+        foreach (MemberReport member in matches.Added)
         {
-            StableId = id,
-            Classification = "ambiguous",
-            Severity = "note",
-            Reason = "The stable identity occurs more than once in a snapshot.",
-        }));
+            cancellationToken.ThrowIfCancellationRequested();
+            report.Findings.Add(CreateUnmatched("added", member));
+        }
+
+        foreach (MemberReport member in matches.Removed)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            report.Findings.Add(CreateUnmatched("removed", member));
+        }
+
+        foreach (string id in matches.AmbiguousIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            report.Findings.Add(new ComplexityComparisonFinding
+            {
+                StableId = id,
+                Classification = "ambiguous",
+                Severity = "note",
+                Reason = "The stable identity occurs more than once in a snapshot.",
+            });
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
         report.Findings.Sort((left, right) => StringComparer.Ordinal.Compare(left.StableId, right.StableId));
         return report;
     }
@@ -73,19 +94,34 @@ internal static class ComplexityRegressionComparer
 
     private static bool TryGetContract(MemberReport member, out string contract)
     {
-        ComplexityEstimateReport? estimate = member.Evidence?.Steps.FirstOrDefault(step => step.Depth == 0)?.Estimate;
-        if (estimate is null)
+        if (member.Evidence is null
+            || member.Evidence.Steps.Count == 0
+            || member.Evidence.Steps.Any(step => !StringComparer.Ordinal.Equals(step.Estimate.Status, "known")))
         {
-            contract = "legacy";
-            return true;
+            contract = string.Empty;
+            return false;
         }
 
-        contract = estimate.Guarantee + "|" + string.Join(
+        string[] guarantees =
+        [
+            .. member.Evidence.Steps
+                .Select(step => step.Estimate.Guarantee)
+                .Distinct(StringComparer.Ordinal)
+        ];
+        if (guarantees.Length != 1)
+        {
+            contract = string.Empty;
+            return false;
+        }
+
+        contract = guarantees[0] + "|" + string.Join(
             ";",
-            estimate.Assumptions
+            member.Evidence.Steps
+                .SelectMany(step => step.Estimate.Assumptions)
                 .OrderBy(assumption => assumption.Kind, StringComparer.Ordinal)
                 .ThenBy(assumption => assumption.Description, StringComparer.Ordinal)
-                .Select(assumption => assumption.Kind + ":" + assumption.Description));
+                .Select(assumption => assumption.Kind + ":" + assumption.Description)
+                .Distinct(StringComparer.Ordinal));
         return true;
     }
 

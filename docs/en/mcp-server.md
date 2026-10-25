@@ -12,19 +12,24 @@ Build the repository before starting the server:
 dotnet build ./ComplexityAnalysis.Analyzers.slnx --configuration Release
 ```
 
-Use the resulting assembly as the MCP client's subprocess. The exact client
-configuration format varies, but the command and arguments are equivalent to:
+Use the resulting assembly as the MCP client's subprocess. MCP clients may
+start it from an unrelated working directory, so configure both the assembly
+and allowed root as absolute paths. Replace the placeholders below with the
+absolute repository path for your machine:
 
 ```json
 {
   "command": "dotnet",
   "args": [
-    "./src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
+    "/absolute/path/to/complexity-analyzers/src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
     "--root",
-    "."
+    "/absolute/path/to/complexity-analyzers"
   ]
 }
 ```
+
+On Windows, use the equivalent absolute paths with escaped backslashes or
+forward slashes in JSON.
 
 The host accepts these startup limits:
 

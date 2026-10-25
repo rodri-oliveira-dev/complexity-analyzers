@@ -1,6 +1,8 @@
 using System.Text.Json;
 
 using ComplexityAnalysis.Mcp;
+using ComplexityAnalysis.Tool.Comparison;
+using ComplexityAnalysis.Tool.Reporting;
 
 using ModelContextProtocol.Client;
 
@@ -38,6 +40,45 @@ public sealed class McpServerContractTests
         Assert.Equal(
             "complexity-snapshot/1.0",
             structured.GetProperty("report").GetProperty("SchemaVersion").GetString());
+
+        JsonElement report = structured.GetProperty("report");
+        string stableId = Assert.IsType<string>(report.GetProperty("Projects")[0]
+            .GetProperty("Files")[0]
+            .GetProperty("Members")[0]
+            .GetProperty("StableId").GetString());
+        var evidenceResult = await client.CallToolAsync(
+            "query_member_evidence",
+            new Dictionary<string, object?>
+            {
+                ["path"] = "Fixture.csproj",
+                ["stableId"] = stableId,
+            });
+        JsonElement evidence = Assert.IsType<JsonElement>(evidenceResult.StructuredContent);
+        Assert.True(evidence.GetProperty("found").GetBoolean());
+        Assert.Equal(stableId, evidence.GetProperty("stableId").GetString());
+
+        fixture.WriteJson("baseline.json", report);
+        fixture.WriteJson("current.json", report);
+        var comparisonResult = await client.CallToolAsync(
+            "compare_snapshots",
+            new Dictionary<string, object?>
+            {
+                ["baselinePath"] = "baseline.json",
+                ["currentPath"] = "current.json",
+            });
+        JsonElement comparison = Assert.IsType<JsonElement>(comparisonResult.StructuredContent);
+        Assert.Equal(
+            "complexity-comparison/1.0",
+            comparison.GetProperty("comparison").GetProperty("SchemaVersion").GetString());
+
+        var invalidResult = await client.CallToolAsync(
+            "query_member_evidence",
+            new Dictionary<string, object?>
+            {
+                ["path"] = "Fixture.csproj",
+                ["stableId"] = string.Empty,
+            });
+        Assert.True(invalidResult.IsError);
     }
 
     [Fact]
@@ -102,13 +143,58 @@ public sealed class McpServerContractTests
             service.AnalyzeProjectAsync("Fixture.csproj", CancellationToken.None));
         using CancellationTokenSource cancellation = new();
         cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+        _ = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             fixture.CreateService(maximumBytes: 1_000_000)
                 .AnalyzeProjectAsync("Fixture.csproj", cancellation.Token));
 
         Assert.Equal("Path is outside the allowed root.", traversal.Message);
         Assert.Equal("The analysis exceeds the configured input-size limit.", size.Message);
         Assert.DoesNotContain(fixture.Root, traversal.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Comparison_and_serialization_observe_cancellation()
+    {
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+        ProjectReport report = new()
+        {
+            SchemaVersion = "complexity-snapshot/1.0",
+            EntryPoint = "sample.slnx",
+        };
+        ComplexityComparisonReport comparison = new()
+        {
+            BaselineSchemaVersion = report.SchemaVersion,
+            CurrentSchemaVersion = report.SchemaVersion,
+        };
+
+        _ = Assert.Throws<OperationCanceledException>(() =>
+            ComplexityRegressionComparer.Compare(report, report, cancellation.Token));
+        _ = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            JsonReportWriter.WriteAsync(report, cancellation.Token));
+        _ = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            ComparisonReportWriter.WriteJsonAsync(comparison, cancellation.Token));
+    }
+
+    [Fact]
+    public void Volume_root_allows_files_below_the_root_boundary()
+    {
+        string file = Path.GetTempFileName();
+        try
+        {
+            string volumeRoot = Path.GetPathRoot(file)!;
+            AllowedPathPolicy policy = new(new McpHostOptions(
+                volumeRoot,
+                TimeSpan.FromSeconds(1),
+                1_000_000,
+                10));
+
+            Assert.Equal(Path.GetFullPath(file), policy.ResolveInput(file, ".tmp"));
+        }
+        finally
+        {
+            File.Delete(file);
+        }
     }
 
     private sealed class McpFixture : IDisposable
@@ -129,7 +215,7 @@ public sealed class McpServerContractTests
         internal static McpFixture Create(long maximumBytes = 1_000_000)
         {
             string root = Path.Combine(Path.GetTempPath(), "complexity-mcp-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(root);
+            _ = Directory.CreateDirectory(root);
             File.WriteAllText(
                 Path.Combine(root, "Fixture.csproj"),
                 "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");

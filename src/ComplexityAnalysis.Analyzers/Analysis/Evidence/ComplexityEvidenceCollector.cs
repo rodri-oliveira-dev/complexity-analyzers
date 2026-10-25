@@ -97,13 +97,12 @@ internal sealed class ComplexityEvidenceCollector
 
         int relativeStart = Math.Max(0, node.SpanStart - scopeStarts.Peek());
         ImmutableArray<string> dimensions = GetDimensions(estimate.Complexity);
-        string identity = string.Join(
-            ":",
-            steps.Count.ToString("D4", CultureInfo.InvariantCulture),
-            kind.ToString(),
-            currentDepth.ToString(CultureInfo.InvariantCulture),
-            relativeStart.ToString(CultureInfo.InvariantCulture),
-            node.Span.Length.ToString(CultureInfo.InvariantCulture),
+        string identity = CreateIdentity(
+            steps.Count,
+            kind,
+            currentDepth,
+            relativeStart,
+            node.Span.Length,
             operation);
 
         steps.Add(new ComplexityEvidenceStep(
@@ -117,6 +116,48 @@ internal sealed class ComplexityEvidenceCollector
             estimate,
             composition,
             unknownReason));
+    }
+
+    internal void Replay(
+        ComplexityEvidenceTrace trace,
+        CancellationToken cancellationToken)
+    {
+        _ = trace ?? throw new ArgumentNullException(nameof(trace));
+
+        if (trace.IsTruncated)
+        {
+            IsTruncated = true;
+        }
+
+        foreach (ComplexityEvidenceStep step in trace.Steps)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            int depth = currentDepth + step.Depth;
+            if (depth > MaximumDepth || steps.Count >= MaximumSteps)
+            {
+                IsTruncated = true;
+                break;
+            }
+
+            steps.Add(new ComplexityEvidenceStep(
+                CreateIdentity(
+                    steps.Count,
+                    step.Kind,
+                    depth,
+                    step.Location.RelativeStart,
+                    step.Location.Length,
+                    step.Operation),
+                step.Kind,
+                step.Origin,
+                step.Operation,
+                step.Location,
+                depth,
+                step.Dimensions,
+                step.Estimate,
+                step.Composition,
+                step.UnknownReason));
+        }
     }
 
     internal ComplexityEvidenceTrace CreateTrace(ComplexityExpression complexity)
@@ -136,6 +177,24 @@ internal sealed class ComplexityEvidenceCollector
         HashSet<string> dimensions = new(StringComparer.Ordinal);
         CollectDimensions(complexity, dimensions);
         return dimensions.OrderBy(dimension => dimension, StringComparer.Ordinal).ToImmutableArray();
+    }
+
+    private static string CreateIdentity(
+        int index,
+        ComplexityEvidenceKind kind,
+        int depth,
+        int relativeStart,
+        int length,
+        string operation)
+    {
+        return string.Join(
+            ":",
+            index.ToString("D4", CultureInfo.InvariantCulture),
+            kind.ToString(),
+            depth.ToString(CultureInfo.InvariantCulture),
+            relativeStart.ToString(CultureInfo.InvariantCulture),
+            length.ToString(CultureInfo.InvariantCulture),
+            operation);
     }
 
     private static void CollectDimensions(

@@ -24,22 +24,24 @@ internal static class BigONotationParser
         if (body.EndsWith('!'))
         {
             return TryVariable(body[..^1], out ComplexityVariable? variable)
-                && Set(ComplexityFactory.Factorial(variable), out expression);
+                && TryCreate(() => ComplexityFactory.Factorial(variable), out expression);
         }
 
         int exponentialSeparator = body.IndexOf('^');
         if (exponentialSeparator > 0
             && double.TryParse(body[..exponentialSeparator], NumberStyles.Float, CultureInfo.InvariantCulture, out double baseValue)
+            && double.IsFinite(baseValue)
             && TryVariable(body[(exponentialSeparator + 1)..], out ComplexityVariable? exponentialVariable))
         {
-            expression = ComplexityFactory.Exponential(exponentialVariable, baseValue);
-            return true;
+            return TryCreate(
+                () => ComplexityFactory.Exponential(exponentialVariable, baseValue),
+                out expression);
         }
 
         if (body.StartsWith("log ", StringComparison.Ordinal))
         {
             return TryVariable(body[4..], out ComplexityVariable? variable)
-                && Set(ComplexityFactory.LogN(variable), out expression);
+                && TryCreate(() => ComplexityFactory.LogN(variable), out expression);
         }
 
         int logSeparator = body.IndexOf(" log ", StringComparison.Ordinal);
@@ -54,12 +56,13 @@ internal static class BigONotationParser
             return false;
         }
 
-        expression = logSeparator < 0
-            ? ComplexityFactory.Polynomial(polynomialVariable, degree)
-            : Math.Abs(degree - 1d) <= double.Epsilon
-                ? ComplexityFactory.NLogN(polynomialVariable)
-                : new PolynomialLogComplexity(polynomialVariable, degree, logExponent: 1);
-        return true;
+        return TryCreate(
+            () => logSeparator < 0
+                ? ComplexityFactory.Polynomial(polynomialVariable, degree)
+                : Math.Abs(degree - 1d) <= double.Epsilon
+                    ? ComplexityFactory.NLogN(polynomialVariable)
+                    : new PolynomialLogComplexity(polynomialVariable, degree, logExponent: 1),
+            out expression);
     }
 
     private static bool TryPolynomial(string value, out ComplexityVariable variable, out double degree)
@@ -87,6 +90,12 @@ internal static class BigONotationParser
                     variable = null!;
                     return false;
                 }
+
+                if (!double.IsFinite(degree))
+                {
+                    variable = null!;
+                    return false;
+                }
             }
         }
 
@@ -107,9 +116,19 @@ internal static class BigONotationParser
         }
     }
 
-    private static bool Set(ComplexityExpression value, out ComplexityExpression expression)
+    private static bool TryCreate(
+        Func<ComplexityExpression> factory,
+        out ComplexityExpression expression)
     {
-        expression = value;
-        return true;
+        try
+        {
+            expression = factory();
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            expression = ComplexityFactory.Unknown();
+            return false;
+        }
     }
 }

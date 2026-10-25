@@ -13,19 +13,24 @@ Compile o repositório antes de iniciar o servidor:
 dotnet build ./ComplexityAnalysis.Analyzers.slnx --configuration Release
 ```
 
-Use o assembly resultante como subprocesso do cliente MCP. O formato exato da
-configuração varia entre clientes, mas o comando e os argumentos equivalem a:
+Use o assembly resultante como subprocesso do cliente MCP. Clientes MCP podem
+iniciá-lo a partir de outro diretório de trabalho; portanto, configure o
+assembly e a raiz permitida com caminhos absolutos. Substitua os placeholders
+abaixo pelo caminho absoluto do repositório na sua máquina:
 
 ```json
 {
   "command": "dotnet",
   "args": [
-    "./src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
+    "/caminho/absoluto/complexity-analyzers/src/ComplexityAnalysis.Mcp/bin/Release/net10.0/ComplexityAnalysis.Mcp.dll",
     "--root",
-    "."
+    "/caminho/absoluto/complexity-analyzers"
   ]
 }
 ```
+
+No Windows, use os caminhos absolutos equivalentes com barras invertidas
+escapadas ou barras normais no JSON.
 
 O host aceita estes limites na inicialização:
 

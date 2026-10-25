@@ -56,7 +56,7 @@ evidence is opt-in and uses schema `1.1`:
 dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --include-evidence
 ```
 
-`--include-evidence` is valid only with `--format json`. Each member then
+`--include-evidence` is valid with `--format json` or `--format sarif`. Each member then
 includes the bounded evidence trace produced by the analysis core: stable step
 identity, operation and origin, relative source span, input dimensions,
 estimate guarantee and assumptions, composition, truncation state, and an

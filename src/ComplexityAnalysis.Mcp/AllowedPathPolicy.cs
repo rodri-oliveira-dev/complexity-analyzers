@@ -11,7 +11,9 @@ internal sealed class AllowedPathPolicy
     internal AllowedPathPolicy(McpHostOptions options)
     {
         _root = Path.TrimEndingDirectorySeparator(options.AllowedRoot);
-        _rootPrefix = _root + Path.DirectorySeparatorChar;
+        _rootPrefix = Path.EndsInDirectorySeparator(_root)
+            ? _root
+            : _root + Path.DirectorySeparatorChar;
         _pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         _maximumInputBytes = options.MaximumInputBytes;
         _maximumFiles = options.MaximumFiles;

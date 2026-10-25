@@ -34,6 +34,32 @@ public sealed class ComplexityRegressionComparerTests
         Assert.Contains("Unknown", finding.Reason, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("O(0^n)")]
+    [InlineData("O(1^n)")]
+    [InlineData("O(n^-1)")]
+    [InlineData("O(n^NaN)")]
+    [InlineData("O(foo bar)")]
+    [InlineData("O()")]
+    public void Unsupported_or_out_of_domain_notation_is_incomparable(string notation)
+    {
+        ComplexityComparisonFinding finding = Assert.Single(ComplexityRegressionComparer.Compare(
+            Report(Member("M:Sample.Work", notation)),
+            Report(Member("M:Sample.Work", "O(n)"))).Findings);
+
+        Assert.Equal("incomparable", finding.Classification);
+    }
+
+    [Fact]
+    public void Zero_polynomial_degree_is_compared_as_constant()
+    {
+        ComplexityComparisonFinding finding = Assert.Single(ComplexityRegressionComparer.Compare(
+            Report(Member("M:Sample.Work", "O(n^0)")),
+            Report(Member("M:Sample.Work", "O(1)"))).Findings);
+
+        Assert.Equal("equivalent", finding.Classification);
+    }
+
     [Fact]
     public void Incompatible_assumptions_and_configuration_never_become_regressions()
     {
@@ -52,6 +78,37 @@ public sealed class ComplexityRegressionComparerTests
     }
 
     [Fact]
+    public void Missing_or_mixed_evidence_contracts_are_incomparable()
+    {
+        MemberReport missingEvidence = Member("M:Sample.Work", "O(n)", includeEvidence: false);
+        MemberReport mixedGuarantees = Member("M:Sample.Work", "O(nÂ²)");
+        mixedGuarantees.Evidence!.Steps.Add(new ComplexityEvidenceStepReport
+        {
+            Identity = "amortized",
+            Kind = "knownOperation",
+            Origin = "knownOperationRegistry",
+            Operation = "list-add",
+            Location = new ComplexityEvidenceLocationReport(),
+            Estimate = new ComplexityEstimateReport
+            {
+                Status = "known",
+                Value = "O(1)",
+                Guarantee = "amortized",
+            },
+        });
+
+        ComplexityComparisonFinding missing = Assert.Single(ComplexityRegressionComparer.Compare(
+            Report(missingEvidence),
+            Report(Member("M:Sample.Work", "O(nÂ²)"))).Findings);
+        ComplexityComparisonFinding mixed = Assert.Single(ComplexityRegressionComparer.Compare(
+            Report(Member("M:Sample.Work", "O(n)")),
+            Report(mixedGuarantees)).Findings);
+
+        Assert.Equal("incomparable", missing.Classification);
+        Assert.Equal("incomparable", mixed.Classification);
+    }
+
+    [Fact]
     public void Findings_are_deterministically_ordered_and_keep_unmatched_states()
     {
         ComplexityComparisonReport comparison = ComplexityRegressionComparer.Compare(
@@ -62,7 +119,24 @@ public sealed class ComplexityRegressionComparerTests
         Assert.Equal(["removed", "added", "regression"], comparison.Findings.Select(finding => finding.Classification));
     }
 
-    private static ProjectReport Report(MemberReport first, MemberReport? second = null, bool includeGenerated = false)
+    [Fact]
+    public void Identical_member_ids_in_different_projects_do_not_match()
+    {
+        SnapshotMatchResult result = SnapshotMemberMatcher.Match(
+            Report(Member("M:Shared.Work", "O(n)"), projectPath: "src/First.csproj"),
+            Report(Member("M:Shared.Work", "O(n)"), projectPath: "src/Second.csproj"));
+
+        Assert.Empty(result.Matches);
+        _ = Assert.Single(result.Removed);
+        _ = Assert.Single(result.Added);
+        Assert.Empty(result.AmbiguousIds);
+    }
+
+    private static ProjectReport Report(
+        MemberReport first,
+        MemberReport? second = null,
+        bool includeGenerated = false,
+        string projectPath = "Sample.csproj")
     {
         ProjectReport report = new()
         {
@@ -78,7 +152,7 @@ public sealed class ComplexityRegressionComparerTests
         AnalyzedProjectReport project = new()
         {
             Name = "Sample",
-            Path = "Sample.csproj"
+            Path = projectPath
         };
         AnalyzedFileReport file = new()
         {
@@ -95,7 +169,11 @@ public sealed class ComplexityRegressionComparerTests
         return report;
     }
 
-    private static MemberReport Member(string id, string? bigO, string assumption = "same")
+    private static MemberReport Member(
+        string id,
+        string? bigO,
+        string assumption = "same",
+        bool includeEvidence = true)
     {
         ComplexityEvidenceReport evidence = new()
         {
@@ -134,7 +212,7 @@ public sealed class ComplexityRegressionComparerTests
             Kind = "Method",
             Location = new SourceLocationReport { FilePath = "Sample.cs", StartLine = 1, StartColumn = 1, EndLine = 1, EndColumn = 2, Length = 1 },
             BigO = bigO is null ? BigOReport.Unknown() : BigOReport.Known(bigO),
-            Evidence = evidence,
+            Evidence = includeEvidence ? evidence : null,
         };
     }
 }

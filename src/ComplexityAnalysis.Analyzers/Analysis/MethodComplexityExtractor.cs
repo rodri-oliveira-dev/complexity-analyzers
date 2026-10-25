@@ -290,12 +290,14 @@ internal sealed class MethodComplexityExtractor
             evidenceScope?.Dispose();
         }
 
+        ComplexityEvidenceTrace? evidence = evidenceCollector?.CreateTrace(complexity);
         return complexity is UnknownComplexity
             ? InterproceduralAnalysisResult.Unknown("The source method complexity is unknown.")
             : InterproceduralAnalysisResult.Known(
                 MethodComplexityTemplate.Create(
                     complexity,
                     context,
+                    evidence,
                     cancellationToken));
     }
 

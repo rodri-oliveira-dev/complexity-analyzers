@@ -330,4 +330,26 @@ internal sealed class MethodAnalysisContext
                 evidenceCollector,
                 CancellationToken);
     }
+
+    internal MethodAnalysisContext WithDelegateTarget(
+        IMethodSymbol methodSymbol,
+        InterproceduralRootAnalysisState rootState)
+    {
+        _ = methodSymbol ?? throw new ArgumentNullException(nameof(methodSymbol));
+        _ = rootState ?? throw new ArgumentNullException(nameof(rootState));
+
+        CancellationToken.ThrowIfCancellationRequested();
+
+        return new MethodAnalysisContext(
+            SemanticModel,
+            methodSymbol,
+            InputSizeVariables,
+            LocalLoopBounds,
+            InterproceduralContext,
+            rootState,
+            Options.WithAnalysisBudget(rootState.Budget),
+            TreatsDirectRecursiveInvocationsAsConstant,
+            EvidenceCollector,
+            CancellationToken);
+    }
 }

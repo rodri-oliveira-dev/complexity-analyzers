@@ -100,6 +100,46 @@ public sealed class ComplexityEvidenceTests
     }
 
     [Fact]
+    public void Cached_source_calls_replay_the_same_evidence_and_preserve_guarantees()
+    {
+        MethodFacts facts = CreateFacts(
+            "M",
+            """
+            using System.Collections.Generic;
+
+            public sealed class Sample
+            {
+                void M(HashSet<int> values, int first, int second)
+                {
+                    Contains(values, first);
+                    Contains(values, second);
+                }
+
+                private bool Contains(HashSet<int> values, int value) => values.Contains(value);
+            }
+            """);
+
+        ComplexityAnalysisWithEvidenceResult result = Analyze(facts);
+        ComplexityEvidenceStep[] sourceCalls =
+        [
+            .. result.Evidence.Steps.Where(step => step.Kind == ComplexityEvidenceKind.SourceCall)
+        ];
+        ComplexityEvidenceStep[] lookups =
+        [
+            .. result.Evidence.Steps.Where(step => step.Operation == "hashset-contains")
+        ];
+
+        Assert.Equal("O(1)", result.Complexity.ToBigONotation());
+        Assert.Equal(2, sourceCalls.Length);
+        Assert.Equal(2, lookups.Length);
+        Assert.All(sourceCalls, step => Assert.Equal(ComplexityGuarantee.Expected, step.Estimate.Guarantee));
+        Assert.All(lookups, step => Assert.Equal(ComplexityGuarantee.Expected, step.Estimate.Guarantee));
+        Assert.Equal(
+            result.Evidence.Steps.Length,
+            result.Evidence.Steps.Select(step => step.Identity).Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
     public void List_append_evidence_retains_amortized_guarantee_and_sequence_assumption()
     {
         MethodFacts facts = CreateFacts(

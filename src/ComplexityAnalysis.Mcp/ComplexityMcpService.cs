@@ -36,8 +36,14 @@ public sealed class ComplexityMcpService
 
         try
         {
-            ProjectReport report = await ProjectAnalysisRunner.AnalyzeAsync(options, timeout.Token, scope.Validate);
-            return new("complexity-mcp-analysis/1.0", Parse(new JsonReportWriter().Write(report)));
+            ProjectReport report = await ProjectAnalysisRunner.AnalyzeAsync(
+                options,
+                timeout.Token,
+                scope.Validate,
+                skipReparsePoints: true);
+            string json = await JsonReportWriter.WriteAsync(report, timeout.Token);
+            timeout.Token.ThrowIfCancellationRequested();
+            return new("complexity-mcp-analysis/1.0", Parse(json));
         }
         catch (Exception exception) when (IsInputFailure(exception))
         {
@@ -99,8 +105,13 @@ public sealed class ComplexityMcpService
         {
             ProjectReport baselineReport = await SnapshotReader.ReadAsync(baseline, timeout.Token);
             ProjectReport currentReport = await SnapshotReader.ReadAsync(current, timeout.Token);
-            ComplexityComparisonReport comparison = ComplexityRegressionComparer.Compare(baselineReport, currentReport);
-            return new("complexity-mcp-comparison/1.0", Parse(ComparisonReportWriter.WriteJson(comparison)));
+            ComplexityComparisonReport comparison = ComplexityRegressionComparer.Compare(
+                baselineReport,
+                currentReport,
+                timeout.Token);
+            string json = await ComparisonReportWriter.WriteJsonAsync(comparison, timeout.Token);
+            timeout.Token.ThrowIfCancellationRequested();
+            return new("complexity-mcp-comparison/1.0", Parse(json));
         }
         catch (Exception exception) when (IsInputFailure(exception))
         {

@@ -142,7 +142,7 @@ internal sealed class ToolOptions
 
         if (args.Length < 2 || !StringComparer.Ordinal.Equals(args[0], "analyze"))
         {
-            error = "Usage: complexity analyze <project.csproj|solution.slnx|solution.sln> [options]";
+            error = "Usage: complexity-analysis analyze <project.csproj|solution.slnx|solution.sln> [options]";
             return false;
         }
 

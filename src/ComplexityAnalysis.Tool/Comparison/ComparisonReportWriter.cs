@@ -12,6 +12,17 @@ internal static class ComparisonReportWriter
         return JsonSerializer.Serialize(report, JsonOptions) + "\n";
     }
 
+    internal static async Task<string> WriteJsonAsync(
+        ComplexityComparisonReport report,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await using MemoryStream stream = new();
+        await JsonSerializer.SerializeAsync(stream, report, JsonOptions, cancellationToken);
+        await stream.WriteAsync("\n"u8.ToArray(), cancellationToken);
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
     internal static string WriteConsole(ComplexityComparisonReport report)
     {
         StringBuilder builder = new();

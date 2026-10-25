@@ -10,6 +10,7 @@ using ComplexityAnalysis.Tool.Reporting;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ComplexityAnalysis.Tool.Project;
 
@@ -23,7 +24,8 @@ internal static class ProjectAnalysisRunner
     internal static async Task<ProjectReport> AnalyzeAsync(
         ToolOptions options,
         CancellationToken cancellationToken,
-        Action<string>? validatePath = null)
+        Action<string>? validatePath = null,
+        bool skipReparsePoints = false)
     {
         _ = options ?? throw new ArgumentNullException(nameof(options));
         cancellationToken.ThrowIfCancellationRequested();
@@ -62,7 +64,8 @@ internal static class ProjectAnalysisRunner
                 projectPath,
                 options,
                 cancellationToken,
-                validatePath);
+                validatePath,
+                skipReparsePoints);
             report.Projects.Add(AnalyzeProject(
                 project,
                 baseDirectory,
@@ -226,8 +229,7 @@ internal static class ProjectAnalysisRunner
 
         return new MemberReport
         {
-            StableId = member.Symbol.GetDocumentationCommentId()
-                ?? member.Symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            StableId = CreateStableId(member, cancellationToken),
             DisplayName = member.DisplayName,
             Kind = member.Kind.ToString(),
             SymbolId = member.Symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
@@ -245,6 +247,41 @@ internal static class ProjectAnalysisRunner
             CognitiveComplexity = cognitive,
             Halstead = halstead,
         };
+    }
+
+    private static string CreateStableId(
+        ExecutableMember member,
+        CancellationToken cancellationToken)
+    {
+        string? documentationId = member.Symbol.GetDocumentationCommentId();
+        if (documentationId is not null
+            && member.Kind is not (ExecutableMemberKind.LocalFunction
+                or ExecutableMemberKind.Lambda
+                or ExecutableMemberKind.AnonymousMethod))
+        {
+            return documentationId;
+        }
+
+        ISymbol containingSymbol = member.Symbol.ContainingSymbol;
+        string containerId = containingSymbol.GetDocumentationCommentId()
+            ?? containingSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        SyntaxNode container = containingSymbol.DeclaringSyntaxReferences
+            .FirstOrDefault(reference => reference.SyntaxTree == member.SyntaxTree)
+            ?.GetSyntax(cancellationToken)
+            ?? member.SyntaxTree.GetRoot(cancellationToken);
+        int ordinal = container.DescendantNodesAndSelf()
+            .Where(IsOrdinalExecutable)
+            .TakeWhile(node => node.SpanStart <= member.Declaration.SpanStart)
+            .Count() - 1;
+
+        return containerId + "#" + member.Kind + ":" + Math.Max(0, ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static bool IsOrdinalExecutable(SyntaxNode node)
+    {
+        return node is LocalFunctionStatementSyntax
+            or LambdaExpressionSyntax
+            or AnonymousMethodExpressionSyntax;
     }
 
     private static ComplexityEvidenceReport CreateEvidenceReport(ComplexityEvidenceTrace trace)

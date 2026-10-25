@@ -55,6 +55,69 @@ public sealed class ComplexityComparisonCliTests
         Assert.Contains("Unsupported complexity snapshot schema", error, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("--unknown", null, "Unknown option")]
+    [InlineData("--format", null, "requires a value")]
+    [InlineData("--format", "xml", "Format must be")]
+    public async Task Compare_rejects_invalid_options_without_unhandled_exceptions(
+        string option,
+        string? value,
+        string expectedError)
+    {
+        using SnapshotFiles files = SnapshotFiles.Create("O(n)", "O(n)");
+        List<string> args = ["compare", files.Baseline, files.Current, option];
+        if (value is not null)
+        {
+            args.Add(value);
+        }
+
+        (int code, _, string error) = await RunAsync([.. args]);
+
+        Assert.Equal(ToolExitCodes.Error, code);
+        Assert.Contains(expectedError, error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Compare_reports_missing_and_malformed_snapshots_as_operational_errors()
+    {
+        using SnapshotFiles files = SnapshotFiles.Create("O(n)", "O(n)");
+        (int missingCode, _, string missingError) = await RunAsync(
+            "compare",
+            Path.Combine(files.Directory, "missing.json"),
+            files.Current);
+        File.WriteAllText(files.Baseline, "{");
+        (int malformedCode, _, string malformedError) = await RunAsync(
+            "compare",
+            files.Baseline,
+            files.Current);
+
+        Assert.Equal(ToolExitCodes.Error, missingCode);
+        Assert.NotEmpty(missingError);
+        Assert.Equal(ToolExitCodes.Error, malformedCode);
+        Assert.NotEmpty(malformedError);
+    }
+
+    [Fact]
+    public async Task Compare_writes_empty_json_and_sarif_reports_without_enabling_the_gate()
+    {
+        using SnapshotFiles files = SnapshotFiles.CreateEmpty();
+        string jsonPath = Path.Combine(files.Directory, "comparison.json");
+        string sarifPath = Path.Combine(files.Directory, "comparison.sarif");
+
+        (int jsonCode, string jsonOutput, string jsonError) = await RunAsync(
+            "compare", files.Baseline, files.Current, "--format", "json", "--output", jsonPath);
+        (int sarifCode, string sarifOutput, string sarifError) = await RunAsync(
+            "compare", files.Baseline, files.Current, "--format", "sarif", "--output", sarifPath);
+
+        Assert.Equal(ToolExitCodes.Success, jsonCode);
+        Assert.Equal(ToolExitCodes.Success, sarifCode);
+        Assert.Equal(string.Empty, jsonOutput + jsonError + sarifOutput + sarifError);
+        using JsonDocument json = JsonDocument.Parse(File.ReadAllText(jsonPath));
+        using JsonDocument sarif = JsonDocument.Parse(File.ReadAllText(sarifPath));
+        Assert.Empty(json.RootElement.GetProperty("Findings").EnumerateArray());
+        Assert.Empty(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray());
+    }
+
     private static async Task<(int ExitCode, string Output, string Error)> RunAsync(params string[] args)
     {
         using StringWriter output = new();
@@ -97,6 +160,23 @@ public sealed class ComplexityComparisonCliTests
             return files;
         }
 
+        internal static SnapshotFiles CreateEmpty()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), "complexity-comparison-tests", Guid.NewGuid().ToString("N"));
+            _ = System.IO.Directory.CreateDirectory(directory);
+            SnapshotFiles files = new(directory);
+            ProjectReport report = new()
+            {
+                SchemaVersion = "complexity-snapshot/1.0",
+                EntryPoint = "sample.slnx",
+                Configuration = new SnapshotConfigurationReport { IncludeEvidence = true, MinimumDuplicateTokens = 40 },
+            };
+            string json = new JsonReportWriter().Write(report);
+            File.WriteAllText(files.Baseline, json);
+            File.WriteAllText(files.Current, json);
+            return files;
+        }
+
         public void Dispose()
         {
             if (System.IO.Directory.Exists(Directory))
@@ -122,7 +202,7 @@ public sealed class ComplexityComparisonCliTests
             {
                 Path = "Sample.cs"
             };
-            file.Members.Add(new MemberReport
+            MemberReport member = new()
             {
                 StableId = "M:Sample.Work",
                 SymbolId = "Sample.Work",
@@ -130,10 +210,36 @@ public sealed class ComplexityComparisonCliTests
                 Kind = "Method",
                 Location = new SourceLocationReport { FilePath = "Sample.cs", StartLine = 1, StartColumn = 1, EndLine = 1, EndColumn = 2, Length = 1 },
                 BigO = complexity is null ? BigOReport.Unknown() : BigOReport.Known(complexity),
-            });
+                Evidence = CreateEvidence(complexity),
+            };
+            file.Members.Add(member);
             project.Files.Add(file);
             report.Projects.Add(project);
             return report;
+        }
+
+        private static ComplexityEvidenceReport CreateEvidence(string? complexity)
+        {
+            ComplexityEvidenceReport evidence = new()
+            {
+                MaximumDepth = 1,
+                MaximumSteps = 1,
+            };
+            evidence.Steps.Add(new ComplexityEvidenceStepReport
+            {
+                Identity = "root",
+                Kind = "analysis",
+                Origin = "syntax",
+                Operation = "method",
+                Location = new ComplexityEvidenceLocationReport(),
+                Estimate = new ComplexityEstimateReport
+                {
+                    Status = complexity is null ? "unknown" : "known",
+                    Value = complexity,
+                    Guarantee = complexity is null ? "unknown" : "worstCaseUpperBound",
+                },
+            });
+            return evidence;
         }
     }
 }

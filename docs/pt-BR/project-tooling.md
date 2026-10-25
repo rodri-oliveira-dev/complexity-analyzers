@@ -58,7 +58,7 @@ de complexidade são opt-in e usam o schema `1.1`:
 dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --include-evidence
 ```
 
-`--include-evidence` é válido somente com `--format json`. Cada membro passa a
+`--include-evidence` é válido com `--format json` ou `--format sarif`. Cada membro passa a
 incluir o trace limitado produzido pelo core de análise: identidade estável do
 passo, operação e origem, intervalo relativo no código-fonte, dimensões de
 entrada, garantia e hipóteses da estimativa, composição, estado de truncamento e

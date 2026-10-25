@@ -194,8 +194,29 @@ public sealed class SarifReportWriterTests
                 Kind = "Method",
                 Location = Location("Sample.cs"),
                 BigO = BigOReport.Known(complexity),
+                Evidence = KnownEvidence(complexity),
             };
             return report;
+        }
+
+        private static ComplexityEvidenceReport KnownEvidence(string complexity)
+        {
+            ComplexityEvidenceReport evidence = new();
+            evidence.Steps.Add(new ComplexityEvidenceStepReport
+            {
+                Identity = "root",
+                Kind = "analysis",
+                Origin = "syntax",
+                Operation = "method",
+                Location = new ComplexityEvidenceLocationReport(),
+                Estimate = new ComplexityEstimateReport
+                {
+                    Status = "known",
+                    Value = complexity,
+                    Guarantee = "worstCaseUpperBound",
+                },
+            });
+            return evidence;
         }
     }
 }

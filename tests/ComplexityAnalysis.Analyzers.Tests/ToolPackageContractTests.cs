@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO.Compression;
+using System.Security;
 using System.Text.Json;
 using System.Xml.Linq;
 
@@ -35,7 +36,6 @@ public sealed class ToolPackageContractTests
                     "src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj",
                     "--configuration",
                     "Release",
-                    "--no-build",
                     "-p:PackageVersion=" + PackageVersion,
                     "--output",
                     packageDirectory)
@@ -43,6 +43,28 @@ public sealed class ToolPackageContractTests
 
             Assert.True(File.Exists(packagePath), string.Create(CultureInfo.InvariantCulture, $"Expected tool package '{packagePath}'."));
             AssertToolPackageContract(packagePath);
+
+            string nugetConfig = Path.Combine(installDirectory, "NuGet.config");
+            File.WriteAllText(
+                nugetConfig,
+                $"""
+                <?xml version="1.0" encoding="utf-8"?>
+                <configuration>
+                  <packageSources>
+                    <clear />
+                    <add key="contract-package" value="{SecurityElement.Escape(packageDirectory)}" />
+                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+                  </packageSources>
+                  <packageSourceMapping>
+                    <packageSource key="contract-package">
+                      <package pattern="ComplexityAnalysis.Tool" />
+                    </packageSource>
+                    <packageSource key="nuget.org">
+                      <package pattern="*" />
+                    </packageSource>
+                  </packageSourceMapping>
+                </configuration>
+                """);
 
             RepositoryTestSupport.RunDotNet(
                     root,
@@ -54,9 +76,8 @@ public sealed class ToolPackageContractTests
                     PackageVersion,
                     "--tool-path",
                     installDirectory,
-                    "--add-source",
-                    packageDirectory,
-                    "--ignore-failed-sources")
+                    "--configfile",
+                    nugetConfig)
                 .AssertSuccess("dotnet tool install");
 
             string executable = Path.Combine(
