@@ -33,8 +33,10 @@ on:
         type: string
 
 concurrency:
-  group: release-tool
+  group: ${{ github.event_name == 'workflow_dispatch' && 'release-tool' || format('release-tool-validation-{0}', github.ref) }}
   cancel-in-progress: false
+
+permissions: {}
 
 jobs:
   build-and-pack:
@@ -164,11 +166,31 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/tool-install artifacts/tool-smoke
+          cat > artifacts/tool-install.nuget.config <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="tool-package" value="$GITHUB_WORKSPACE/artifacts/packages" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="tool-package">
+                <package pattern="ComplexityAnalysis.Tool" />
+              </packageSource>
+              <packageSource key="nuget.org">
+                <package pattern="Microsoft.*" />
+                <package pattern="NETStandard.Library" />
+                <package pattern="runtime.*" />
+                <package pattern="System.*" />
+              </packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
           dotnet tool install ComplexityAnalysis.Tool \
             --version "$PACKAGE_VERSION" \
             --tool-path artifacts/tool-install \
-            --add-source "$(pwd)/artifacts/packages" \
-            --ignore-failed-sources
+            --configfile artifacts/tool-install.nuget.config
 
           tool="artifacts/tool-install/complexity-analysis"
           [[ "$($tool --version)" == "$PACKAGE_VERSION" ]]
@@ -243,6 +265,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     needs: build-and-pack
     runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    environment: release
     permissions:
       contents: write
 

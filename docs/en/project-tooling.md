@@ -48,6 +48,8 @@ dotnet tool install ComplexityAnalysis.Tool \
   --version 0.0.0-local \
   --add-source artifacts/local-packages \
   --tool-path artifacts/local-tools
+export PATH="$PWD/artifacts/local-tools:$PATH"
+complexity-analysis --version
 ```
 
 ## Run The CLI

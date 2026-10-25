@@ -72,5 +72,7 @@ gh attestation verify ComplexityAnalysis.Analyzers.<version>.nupkg \
 As attestations comprovam a procedência dos artifacts e vinculam a SBOM ao digest do package. Elas complementam, e não substituem, testes de package, CodeQL, Dependency Review, NuGet auditing, Trusted Publishing e review humano.
 
 Para a CLI, substitua por `ComplexityAnalysis.Tool.<version>.nupkg` e pelo
-signer workflow `.github/workflows/release-tool.yml` nos comandos de verificação.
-As tags da CLI usam o namespace independente `tool-v<version>`.
+signer workflow
+`rodri-oliveira-dev/complexity-analyzers/.github/workflows/release-tool.yml` nos
+comandos de verificação. As tags da CLI usam o namespace independente
+`tool-v<version>`.
