@@ -269,8 +269,9 @@ Codex, or Claude Desktop with the installed command:
 The host rejects paths outside that root, symbolic-link traversal, unsupported
 inputs, and workloads beyond its configured timeout, byte, and file limits. It
 does not expose shell, write, network, or arbitrary process operations. Full
-responses remain the default; an explicit summary mode reduces agent context
-and returns an `analysisId` for efficient exact evidence lookup.
+responses remain the default; an explicit summary mode reduces agent context.
+Every `analyze_project` response returns an `analysisId` for efficient exact
+evidence lookup.
 
 See [Local MCP Server](docs/en/mcp-server.md) and the
 [MCP package README](src/ComplexityAnalysis.Mcp/README.md). Published versions

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace ComplexityAnalysis.Mcp;
@@ -21,7 +22,8 @@ public sealed class ComplexityTools
         [Description("Maximum member summaries (1-500) when responseMode is 'summary'; default 100. Supplying it in full mode is rejected.")] int? maxMembers = null)
     {
         ArgumentNullException.ThrowIfNull(service);
-        return service.AnalyzeProjectAsync(path, responseMode, maxMembers, cancellationToken);
+        return InvokeToolAsync(() =>
+            service.AnalyzeProjectAsync(path, responseMode, maxMembers, cancellationToken));
     }
 
     [McpServerTool(
@@ -38,7 +40,8 @@ public sealed class ComplexityTools
         [Description("Optional analysisId returned by analyze_project. Reuses only that exact in-memory snapshot and fails explicitly if unavailable.")] string? analysisId = null)
     {
         ArgumentNullException.ThrowIfNull(service);
-        return service.QueryMemberEvidenceAsync(path, stableId, analysisId, cancellationToken);
+        return InvokeToolAsync(() =>
+            service.QueryMemberEvidenceAsync(path, stableId, analysisId, cancellationToken));
     }
 
     [McpServerTool(
@@ -54,6 +57,22 @@ public sealed class ComplexityTools
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(service);
-        return service.CompareSnapshotsAsync(baselinePath, currentPath, cancellationToken);
+        return InvokeToolAsync(() =>
+            service.CompareSnapshotsAsync(baselinePath, currentPath, cancellationToken));
+    }
+
+    private static async Task<T> InvokeToolAsync<T>(Func<Task<T>> operation)
+    {
+        try
+        {
+            return await operation();
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException
+            or InvalidOperationException
+            or TimeoutException)
+        {
+            throw new McpException(exception.Message, exception);
+        }
     }
 }

@@ -6,6 +6,7 @@ using ComplexityAnalysis.Tool.Comparison;
 using ComplexityAnalysis.Tool.Reporting;
 
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 
 using Xunit;
 
@@ -13,8 +14,6 @@ namespace ComplexityAnalysis.Analyzers.Tests;
 
 public sealed class McpServerContractTests
 {
-    private static readonly string[] NonRegressionClassifications = ["equivalent", "incomparable"];
-
     [Fact]
     public async Task Stdio_client_discovers_the_read_only_tool_surface()
     {
@@ -95,6 +94,18 @@ public sealed class McpServerContractTests
                 ["stableId"] = string.Empty,
             });
         Assert.True(invalidResult.IsError);
+
+        var unavailableResult = await client.CallToolAsync(
+            "query_member_evidence",
+            new Dictionary<string, object?>
+            {
+                ["path"] = "Fixture.csproj",
+                ["stableId"] = stableId,
+                ["analysisId"] = "sha256:" + new string('0', 64),
+            });
+        Assert.True(unavailableResult.IsError);
+        TextContentBlock error = Assert.IsType<TextContentBlock>(Assert.Single(unavailableResult.Content));
+        Assert.Contains("The requested analysisId is unavailable.", error.Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -144,11 +155,36 @@ public sealed class McpServerContractTests
         JsonElement second = secondResponse.Comparison;
         Assert.Equal("complexity-comparison/1.0", first.GetProperty("SchemaVersion").GetString());
         Assert.Equal(first.GetRawText(), second.GetRawText());
-        Assert.All(
-            first.GetProperty("Findings").EnumerateArray(),
-            finding => Assert.Contains(
+        Dictionary<string, string> stableIds = snapshot.GetProperty("Projects")[0]
+            .GetProperty("Files")[0]
+            .GetProperty("Members")
+            .EnumerateArray()
+            .ToDictionary(
+                member => member.GetProperty("DisplayName").GetString()!,
+                member => member.GetProperty("StableId").GetString()!,
+                StringComparer.Ordinal);
+        JsonElement[] findings = first.GetProperty("Findings").EnumerateArray().ToArray();
+        Assert.Equal(
+            "incomparable",
+            Assert.Single(findings, finding =>
+                StringComparer.Ordinal.Equals(
+                    finding.GetProperty("StableId").GetString(),
+                    stableIds["Mystery"]))
+                .GetProperty("Classification")
+                .GetString());
+        Assert.Equal(
+            "equivalent",
+            Assert.Single(findings, finding =>
+                StringComparer.Ordinal.Equals(
+                    finding.GetProperty("StableId").GetString(),
+                    stableIds["Sum"]))
+                .GetProperty("Classification")
+                .GetString());
+        Assert.Contains(
+            findings,
+            finding => StringComparer.Ordinal.Equals(
                 finding.GetProperty("Classification").GetString(),
-                NonRegressionClassifications));
+                "incomparable"));
     }
 
     [Fact]
@@ -187,6 +223,75 @@ public sealed class McpServerContractTests
         Assert.Equal("cachedSnapshot", cached.Source);
         Assert.False(fresh.Found);
         Assert.Equal("fresh", fresh.Source);
+    }
+
+    [Fact]
+    public async Task Analysis_ids_and_response_options_reject_invalid_or_unavailable_values()
+    {
+        using McpFixture fixture = McpFixture.Create();
+        ComplexityMcpService service = fixture.CreateService();
+
+        ArgumentException malformed = await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.QueryMemberEvidenceAsync(
+                "Fixture.csproj",
+                "M:Fixture.Sum",
+                "sha256:not-a-digest",
+                CancellationToken.None));
+        Assert.Equal("analysisId must be the identifier returned by analyze_project.", malformed.Message);
+
+        InvalidOperationException unavailable = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.QueryMemberEvidenceAsync(
+                "Fixture.csproj",
+                "M:Fixture.Sum",
+                "sha256:" + new string('0', 64),
+                CancellationToken.None));
+        Assert.Equal(
+            "The requested analysisId is unavailable. Run analyze_project again and retry with its new analysisId.",
+            unavailable.Message);
+
+        ArgumentException fullLimit = await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.AnalyzeProjectAsync("Fixture.csproj", "full", 1, CancellationToken.None));
+        Assert.Equal("maxMembers is supported only when responseMode is 'summary'.", fullLimit.Message);
+
+        ArgumentException invalidMode = await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.AnalyzeProjectAsync("Fixture.csproj", "compact", null, CancellationToken.None));
+        Assert.Equal("responseMode must be 'full' or 'summary'.", invalidMode.Message);
+
+        foreach (int invalidLimit in new[] { 0, 501 })
+        {
+            ArgumentException summaryLimit = await Assert.ThrowsAsync<ArgumentException>(() =>
+                service.AnalyzeProjectAsync("Fixture.csproj", "summary", invalidLimit, CancellationToken.None));
+            Assert.Equal("maxMembers must be between 1 and 500.", summaryLimit.Message);
+        }
+    }
+
+    [Fact]
+    public void Analysis_result_cache_enforces_lru_entry_and_byte_limits()
+    {
+        AnalysisResultCache cache = new();
+        string entryPath = Path.Combine(Path.GetTempPath(), "cache-fixture.csproj");
+        CacheRegistration[] registrations = Enumerable.Range(0, 5)
+            .Select(index => cache.Register(
+                entryPath,
+                JsonSerializer.SerializeToElement(new
+                {
+                    Index = index
+                })))
+            .ToArray();
+
+        Assert.All(registrations, registration => Assert.True(registration.Reusable));
+        Assert.False(cache.TryGet(registrations[0].AnalysisId, entryPath, out _));
+        Assert.True(cache.TryGet(registrations[4].AnalysisId, entryPath, out JsonElement newest));
+        Assert.Equal(4, newest.GetProperty("Index").GetInt32());
+
+        JsonElement oversized = JsonSerializer.SerializeToElement(
+            new
+            {
+                Payload = new string('x', (16 * 1024 * 1024) + 1)
+            });
+        CacheRegistration oversizedRegistration = cache.Register(entryPath, oversized);
+        Assert.False(oversizedRegistration.Reusable);
+        Assert.False(cache.TryGet(oversizedRegistration.AnalysisId, entryPath, out _));
     }
 
     [Fact]
@@ -241,6 +346,20 @@ public sealed class McpServerContractTests
     }
 
     [Fact]
+    public async Task Tool_boundary_preserves_client_cancellation()
+    {
+        using McpFixture fixture = McpFixture.Create();
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+
+        _ = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            ComplexityTools.AnalyzeProjectAsync(
+                fixture.CreateService(),
+                "Fixture.csproj",
+                cancellation.Token));
+    }
+
+    [Fact]
     public async Task Requests_reject_file_limit_and_symbolic_link_traversal()
     {
         using McpFixture fixture = McpFixture.Create();
@@ -285,17 +404,36 @@ public sealed class McpServerContractTests
         string assemblyPath = typeof(ComplexityTools).Assembly.Location;
         foreach (string argument in new[] { "--help", "--version" })
         {
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(30));
             using Process process = Process.Start(new ProcessStartInfo
             {
                 FileName = "dotnet",
                 Arguments = $"\"{assemblyPath}\" {argument}",
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
             })!;
-            string output = await process.StandardOutput.ReadToEndAsync();
-            string error = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
+            process.StandardInput.Close();
+            Task<string> outputTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            Task<string> errorTask = process.StandardError.ReadToEndAsync(timeout.Token);
+            string output;
+            string error;
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+                output = await outputTask;
+                error = await errorTask;
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+
+                throw;
+            }
 
             Assert.Equal(0, process.ExitCode);
             Assert.True(string.IsNullOrEmpty(error), error);
@@ -313,6 +451,30 @@ public sealed class McpServerContractTests
         Assert.False(McpHostOptions.TryParse([option, value], out _, out string? error));
         Assert.Equal(expected, error);
         Assert.DoesNotContain(Path.GetTempPath(), error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Startup_and_input_paths_validate_positive_and_negative_cases()
+    {
+        using McpFixture fixture = McpFixture.Create();
+
+        Assert.True(McpHostOptions.TryParse(
+            ["--root", fixture.Root, "--timeout-seconds", "5", "--max-input-bytes", "1024", "--max-files", "10"],
+            out McpHostOptions? options,
+            out string? successError));
+        Assert.NotNull(options);
+        Assert.Null(successError);
+
+        Assert.False(McpHostOptions.TryParse(["--unknown", "value"], out _, out string? unknownError));
+        Assert.Equal("Unknown option '--unknown'.", unknownError);
+
+        Assert.False(McpHostOptions.TryParse(["--root", "\0"], out _, out string? rootError));
+        Assert.Equal("The allowed root path is invalid.", rootError);
+
+        AllowedPathPolicy policy = new(options);
+        ArgumentException invalidInput = Assert.Throws<ArgumentException>(() =>
+            policy.ResolveInput("\0", ".json"));
+        Assert.Equal("Input path is invalid.", invalidInput.Message);
     }
 
     [Fact]

@@ -272,8 +272,8 @@ O host rejeita caminhos fora dessa raiz, traversal por links simbólicos,
 entradas não suportadas e cargas acima dos limites configurados de timeout,
 bytes e arquivos. Ele não expõe operações de shell, escrita, rede ou execução
 arbitrária de processos. Respostas completas continuam como padrão; um modo de
-resumo explícito reduz contexto e fornece `analysisId` para consulta eficiente
-de evidência exata.
+resumo explícito reduz contexto. Toda resposta de `analyze_project` fornece
+`analysisId` para consulta eficiente de evidência exata.
 
 Veja [Servidor MCP Local](docs/pt-BR/mcp-server.md) e o
 [README do pacote MCP](src/ComplexityAnalysis.Mcp/README.pt-BR.md). Versões
