@@ -36,6 +36,7 @@ public sealed class ToolPackageContractTests
                     "src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj",
                     "--configuration",
                     "Release",
+                    "-p:Version=" + PackageVersion,
                     "-p:PackageVersion=" + PackageVersion,
                     "--output",
                     packageDirectory)
@@ -97,6 +98,22 @@ public sealed class ToolPackageContractTests
             using JsonDocument report = JsonDocument.Parse(execution.StandardOutput);
             Assert.Equal("1.0", report.RootElement.GetProperty("SchemaVersion").GetString());
             Assert.NotEmpty(report.RootElement.GetProperty("Projects").EnumerateArray());
+
+            ProcessResult help = RepositoryTestSupport.RunProcess(
+                executable,
+                root,
+                TimeSpan.FromMinutes(1),
+                "--help");
+            help.AssertSuccess("installed complexity-analysis --help");
+            Assert.Contains("complexity-analysis analyze", help.StandardOutput, StringComparison.Ordinal);
+
+            ProcessResult version = RepositoryTestSupport.RunProcess(
+                executable,
+                root,
+                TimeSpan.FromMinutes(1),
+                "--version");
+            version.AssertSuccess("installed complexity-analysis --version");
+            Assert.Equal(PackageVersion, version.StandardOutput.Trim());
         }
         finally
         {
@@ -111,10 +128,20 @@ public sealed class ToolPackageContractTests
     {
         using ZipArchive package = ZipFile.OpenRead(packagePath);
         Assert.Contains(package.Entries, entry => entry.FullName.EndsWith("/DotnetToolSettings.xml", StringComparison.Ordinal));
-        Assert.Contains(package.Entries, entry => entry.FullName.EndsWith("/ComplexityAnalysis.Tool.dll", StringComparison.Ordinal));
+        Assert.Contains(package.Entries, entry => StringComparer.Ordinal.Equals(entry.FullName, "tools/net10.0/any/ComplexityAnalysis.Tool.dll"));
         Assert.Contains(package.Entries, entry => entry.FullName.EndsWith("/ComplexityAnalysis.Analyzers.dll", StringComparison.Ordinal));
+        Assert.DoesNotContain(package.Entries, entry => entry.FullName.StartsWith("lib/", StringComparison.Ordinal));
         Assert.Contains(package.Entries, entry => entry.FullName == "README.md");
+        Assert.Contains(package.Entries, entry => entry.FullName == "README.pt-BR.md");
         Assert.Contains(package.Entries, entry => entry.FullName == "icon.png");
+
+        ZipArchiveEntry readmeEntry = Assert.Single(package.Entries, entry => entry.FullName == "README.md");
+        using (StreamReader readmeReader = new(readmeEntry.Open()))
+        {
+            string readme = readmeReader.ReadToEnd();
+            Assert.Contains("dotnet tool install --global ComplexityAnalysis.Tool", readme, StringComparison.Ordinal);
+            Assert.Contains("complexity-analysis compare", readme, StringComparison.Ordinal);
+        }
 
         ZipArchiveEntry nuspecEntry = Assert.Single(package.Entries, entry => entry.FullName.EndsWith(".nuspec", StringComparison.Ordinal));
         using Stream stream = nuspecEntry.Open();
@@ -122,6 +149,13 @@ public sealed class ToolPackageContractTests
         XElement metadata = nuspec.Root!.Elements().Single(element => element.Name.LocalName == "metadata");
         Assert.Equal(PackageId, metadata.Elements().Single(element => element.Name.LocalName == "id").Value);
         Assert.Equal(PackageVersion, metadata.Elements().Single(element => element.Name.LocalName == "version").Value);
+        Assert.Equal("README.md", metadata.Elements().Single(element => element.Name.LocalName == "readme").Value);
+        Assert.Equal("MIT", metadata.Elements().Single(element => element.Name.LocalName == "license").Value);
+        Assert.Equal("icon.png", metadata.Elements().Single(element => element.Name.LocalName == "icon").Value);
+        Assert.Contains("complexity", metadata.Elements().Single(element => element.Name.LocalName == "tags").Value, StringComparison.Ordinal);
+        Assert.Equal(
+            "https://github.com/rodri-oliveira-dev/complexity-analyzers",
+            metadata.Elements().Single(element => element.Name.LocalName == "repository").Attribute("url")?.Value);
         Assert.Equal("DotnetTool", metadata.Elements().Single(element => element.Name.LocalName == "packageTypes").Elements().Single().Attribute("name")?.Value);
     }
 }

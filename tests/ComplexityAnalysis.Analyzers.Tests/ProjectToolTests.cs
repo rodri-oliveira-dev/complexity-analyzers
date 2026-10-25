@@ -11,6 +11,33 @@ namespace ComplexityAnalysis.Analyzers.Tests;
 
 public sealed class ProjectToolTests
 {
+    [Theory]
+    [InlineData("--help", "complexity-analysis analyze")]
+    [InlineData("-h", "complexity-analysis compare")]
+    [InlineData("analyze --help", "--max-cyclomatic-complexity")]
+    [InlineData("compare --help", "--fail-on-regression")]
+    public async Task Help_is_available_without_running_analysis(string arguments, string expected)
+    {
+        string[] args = (arguments ?? throw new ArgumentNullException(nameof(arguments)))
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        (int exitCode, string output, string error) = await RunCliAsync(args);
+
+        Assert.Equal(ToolExitCodes.Success, exitCode);
+        Assert.Contains(expected, output, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, error);
+    }
+
+    [Fact]
+    public async Task Version_reports_the_tool_assembly_version()
+    {
+        (int exitCode, string output, string error) = await RunCliAsync("--version");
+
+        Assert.Equal(ToolExitCodes.Success, exitCode);
+        Assert.Matches("^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$", output.Trim());
+        Assert.Equal(string.Empty, error);
+    }
+
     private static readonly JsonSerializerOptions GoldenJsonOptions = new()
     {
         WriteIndented = true,

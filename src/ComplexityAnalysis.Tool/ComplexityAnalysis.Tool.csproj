@@ -6,6 +6,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>complexity-analysis</ToolCommandName>
     <PackageId>ComplexityAnalysis.Tool</PackageId>
+    <VersionPrefix>1.0.0</VersionPrefix>
     <Title>Complexity Analysis .NET Tool</Title>
     <Description>Deterministic project-level C# complexity reports, snapshots, regression comparison, quality gates, and SARIF export.</Description>
     <Authors>Rodrigo de Oliveira</Authors>
@@ -28,7 +29,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
+    <None Update="README.pt-BR.md" Pack="true" PackagePath="/" />
     <None Include="../../resources/icon.png" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>
