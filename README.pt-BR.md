@@ -201,30 +201,45 @@ Veja [Primeiros Passos](docs/pt-BR/getting-started.md).
 
 ## CLI em nível de projeto
 
-O repositório inclui `ComplexityAnalysis.Tool` para relatórios em nível de projeto:
+`ComplexityAnalysis.Tool` é uma ferramenta .NET 10 com versionamento separado
+para relatórios explícitos em projetos e solutions. Depois que a versão `1.0.0`
+for publicada, instale-a pelo NuGet.org:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze ComplexityAnalysis.Analyzers.slnx --format json --detect-duplicates
+dotnet tool install --global ComplexityAnalysis.Tool --version 1.0.0
+complexity-analysis analyze MySolution.slnx
+complexity-analysis analyze MyProject.csproj --format json
+complexity-analysis analyze MyProject.csproj --format sarif
+complexity-analysis analyze MyProject.csproj --max-cyclomatic-complexity 10
 ```
 
-A CLI suporta entradas `.csproj`, `.slnx` e `.sln`, relatórios console e JSON
-determinísticos, quality gates opt-in, exclusão de código gerado/outputs de
-build e detecção normalizada de código duplicado. Ela é separada do pacote
-Roslyn analyzer; nenhum scan de projeto é adicionado aos hot paths de
-`DiagnosticAnalyzer`.
-
-Para criar e instalar a CLI como .NET Tool local sem publicá-la:
+Para um manifest local com versão fixada:
 
 ```bash
-dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
+dotnet new tool-manifest
+dotnet tool install ComplexityAnalysis.Tool --version 1.0.0
+dotnet tool restore
+dotnet tool run complexity-analysis analyze MyProject.csproj
+```
+
+A CLI suporta `.csproj`, `.slnx` e `.sln`, relatórios console/JSON/SARIF,
+snapshots e comparação de regressões, quality gates opt-in, exclusões e detecção
+normalizada de duplicação. O Roslyn analyzer executa durante a compilação; a CLI
+somente quando invocada; o host MCP local é uma superfície separada e somente
+leitura.
+
+Para testar um pacote ainda não publicado, compilado desta árvore de código, use
+uma fonte explícita e uma versão somente local:
+
+```bash
+dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj --configuration Release -p:Version=0.0.0-local -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 dotnet tool install ComplexityAnalysis.Tool --version 0.0.0-local --add-source artifacts/local-packages --tool-path artifacts/local-tools
 artifacts/local-tools/complexity-analysis analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
 ```
 
-O pacote da ferramenta é independente de `ComplexityAnalysis.Analyzers`;
-instalar o analyzer não instala a CLI, e seus consumidores não recebem uma
-dependência runtime da ferramenta.
+Esse fluxo local não comprova uma release no NuGet.org. O pacote é independente
+de `ComplexityAnalysis.Analyzers`; instalar um não instala o outro nem adiciona
+dependência de runtime aos consumidores do analyzer.
 
 Veja [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md).
 

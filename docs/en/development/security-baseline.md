@@ -37,7 +37,11 @@ Workflow hardening must not rename required jobs casually. The active ruleset de
 
 ## Release provenance and SBOM
 
-The official `Release` workflow generates an SPDX 2.3 SBOM from the exact `.nupkg` produced by `build-and-pack`. The package and SBOM are uploaded together as one immutable workflow artifact and the same downloaded `.nupkg` is reused for NuGet.org, GitHub Packages, attestations, and the GitHub Release.
+The `Release` analyzer workflow and the independent `Release
+ComplexityAnalysis.Tool` workflow generate an SPDX 2.3 SBOM from the exact
+`.nupkg` produced by their build jobs. Each package and SBOM pair is uploaded as
+one workflow artifact, and the same downloaded `.nupkg` is reused for
+NuGet.org, GitHub Packages, attestations, and the GitHub Release.
 
 The `github-release` job uses GitHub OIDC with least-privilege attestation permissions to create:
 
@@ -66,3 +70,7 @@ gh attestation verify ComplexityAnalysis.Analyzers.<version>.nupkg \
 ```
 
 Attestations prove artifact provenance and bind the SBOM to the package digest. They complement, rather than replace, package tests, CodeQL, Dependency Review, NuGet auditing, Trusted Publishing, and human review.
+
+For the CLI, substitute `ComplexityAnalysis.Tool.<version>.nupkg` and signer
+workflow `.github/workflows/release-tool.yml` in the verification commands. CLI
+release tags use the independent `tool-v<version>` namespace.

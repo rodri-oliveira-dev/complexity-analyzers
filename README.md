@@ -199,29 +199,45 @@ See [Getting Started](docs/en/getting-started.md).
 
 ## Project-level CLI
 
-The repository includes `ComplexityAnalysis.Tool` for project-level reports:
+`ComplexityAnalysis.Tool` is a separately versioned .NET 10 tool for explicit
+project- and solution-level reports. After `1.0.0` is published, install it from
+NuGet.org:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze ComplexityAnalysis.Analyzers.slnx --format json --detect-duplicates
+dotnet tool install --global ComplexityAnalysis.Tool --version 1.0.0
+complexity-analysis analyze MySolution.slnx
+complexity-analysis analyze MyProject.csproj --format json
+complexity-analysis analyze MyProject.csproj --format sarif
+complexity-analysis analyze MyProject.csproj --max-cyclomatic-complexity 10
 ```
 
-The CLI supports `.csproj`, `.slnx`, and `.sln` inputs, deterministic console and
-JSON reports, opt-in quality gates, generated/build-output exclusions, and
-normalized duplicate-code detection. It is separate from the packaged Roslyn
-analyzer; no project scanning is added to `DiagnosticAnalyzer` hot paths.
-
-To create and install the CLI as a local .NET Tool without publishing it:
+For a pinned local tool manifest:
 
 ```bash
-dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj --configuration Release --no-build -p:PackageVersion=0.0.0-local --output artifacts/local-packages
+dotnet new tool-manifest
+dotnet tool install ComplexityAnalysis.Tool --version 1.0.0
+dotnet tool restore
+dotnet tool run complexity-analysis analyze MyProject.csproj
+```
+
+The CLI supports `.csproj`, `.slnx`, and `.sln`, console/JSON/SARIF reports,
+snapshots and regression comparison, opt-in quality gates, exclusions, and
+normalized duplicate detection. The Roslyn analyzer runs during compilation;
+the CLI runs only when invoked; the local MCP host is a separate read-only
+integration surface.
+
+To test an unpublished package built from this source tree, use an explicit
+local source and local-only version:
+
+```bash
+dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj --configuration Release -p:Version=0.0.0-local -p:PackageVersion=0.0.0-local --output artifacts/local-packages
 dotnet tool install ComplexityAnalysis.Tool --version 0.0.0-local --add-source artifacts/local-packages --tool-path artifacts/local-tools
 artifacts/local-tools/complexity-analysis analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
 ```
 
-The tool package is independent from `ComplexityAnalysis.Analyzers`; installing
-the analyzer does not install the CLI, and analyzer consumers gain no runtime
-dependency on it.
+This local flow is not evidence of a NuGet.org release. The package is
+independent from `ComplexityAnalysis.Analyzers`; installing either package does
+not install the other or add a runtime dependency to analyzer consumers.
 
 See [Project-Level Tooling](docs/en/project-tooling.md).
 

@@ -28,14 +28,25 @@ O analyzer é o produto representado pela raiz do repositório. O código de pro
 
 ## Executar A CLI Em Nível De Projeto
 
-O repositório também compila `ComplexityAnalysis.Tool`, uma superfície de linha
-de comando em nível de projeto para relatórios agregados e gates voltados a CI.
-Ela é separada do pacote analyzer consumido pelas aplicações.
+O repositório também compila `ComplexityAnalysis.Tool`, uma ferramenta .NET 10
+com versionamento separado para relatórios agregados e gates voltados a CI.
+Depois que `1.0.0` for publicada, instale o pacote consumidor globalmente ou em
+um manifest local:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze ComplexityAnalysis.Analyzers.slnx --format json --detect-duplicates
+dotnet tool install --global ComplexityAnalysis.Tool --version 1.0.0
+complexity-analysis analyze MySolution.slnx
+
+dotnet new tool-manifest
+dotnet tool install ComplexityAnalysis.Tool --version 1.0.0
+dotnet tool restore
+dotnet tool run complexity-analysis analyze MyProject.csproj --format json
 ```
+
+Para desenvolver a partir do código-fonte, use `dotnet run --project
+src/ComplexityAnalysis.Tool -- analyze <path>`. Um pacote local deve ser
+instalado com `--add-source` explícito e versão somente local; ele não é uma
+release publicada.
 
 A ferramenta suporta entradas `.csproj`, `.slnx` e `.sln`. Veja
 [Ferramentas em Nível de Projeto](project-tooling.md) para JSON, saída console,

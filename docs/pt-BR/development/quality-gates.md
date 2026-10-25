@@ -140,7 +140,8 @@ A ruleset ativa de `main` exige estes status checks pelo nome exato:
 | Evidência de regressão de projeto | `Complexity regression` | Geração/comparação manual de snapshots, retenção de artefato e resumo do job. |
 
 Regras adicionais de branch exigem pull requests, histórico linear, resolução de
-threads, limites de code scanning e tags de release protegidas em `v*`.
+threads, limites de code scanning e tags de release protegidas em `v*` para o
+analyzer e `tool-v*` para a CLI com versionamento independente.
 
 Não renomeie workflows ou jobs exigidos casualmente. Se um nome de check precisar
 mudar, trate como mudança explícita de governança e documente o impacto na ruleset.

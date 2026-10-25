@@ -28,14 +28,24 @@ The analyzer is the product represented by the repository root. Production code 
 
 ## Run The Project-Level CLI
 
-The repository also builds `ComplexityAnalysis.Tool`, a project-level command
-line surface for aggregate reports and CI-oriented gates. It is separate from
-the analyzer package consumed by applications.
+The repository also builds `ComplexityAnalysis.Tool`, a separately versioned
+.NET 10 tool for aggregate reports and CI-oriented gates. After `1.0.0` is
+published, install the consumer package globally or in a local manifest:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze ComplexityAnalysis.Analyzers.slnx --format json --detect-duplicates
+dotnet tool install --global ComplexityAnalysis.Tool --version 1.0.0
+complexity-analysis analyze MySolution.slnx
+
+dotnet new tool-manifest
+dotnet tool install ComplexityAnalysis.Tool --version 1.0.0
+dotnet tool restore
+dotnet tool run complexity-analysis analyze MyProject.csproj --format json
 ```
+
+For source development, use `dotnet run --project
+src/ComplexityAnalysis.Tool -- analyze <path>`. A locally packed tool must be
+installed with an explicit `--add-source` and local-only version; it is not a
+published release.
 
 The tool supports `.csproj`, `.slnx`, and `.sln` inputs. See
 [Project-Level Tooling](project-tooling.md) for JSON, console output, quality
