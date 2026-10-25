@@ -37,12 +37,15 @@ internal static class CSharpProjectLoader
     internal static async Task<CSharpProjectSource> LoadAsync(
         string projectPath,
         ToolOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<string>? validatePath = null,
+        bool skipReparsePoints = false)
     {
         _ = options ?? throw new ArgumentNullException(nameof(options));
         cancellationToken.ThrowIfCancellationRequested();
 
         string fullProjectPath = Path.GetFullPath(projectPath);
+        validatePath?.Invoke(fullProjectPath);
         string projectDirectory = Path.GetDirectoryName(fullProjectPath) ?? Directory.GetCurrentDirectory();
         XDocument projectDocument = XDocument.Load(fullProjectPath);
         CSharpProjectSource project = new()
@@ -52,9 +55,15 @@ internal static class CSharpProjectLoader
             ProjectDirectory = projectDirectory,
         };
 
-        foreach (string sourcePath in ResolveCompileFiles(projectDocument, projectDirectory, options))
+        foreach (string sourcePath in ResolveCompileFiles(
+            projectDocument,
+            projectDirectory,
+            options,
+            validatePath,
+            skipReparsePoints))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            validatePath?.Invoke(sourcePath);
             string text = await File.ReadAllTextAsync(sourcePath, cancellationToken);
             if (!options.IncludeGenerated && IsGenerated(sourcePath, text))
             {
@@ -77,7 +86,9 @@ internal static class CSharpProjectLoader
     private static IReadOnlyList<string> ResolveCompileFiles(
         XDocument projectDocument,
         string projectDirectory,
-        ToolOptions options)
+        ToolOptions options,
+        Action<string>? validatePath,
+        bool skipReparsePoints)
     {
         List<string> includes =
         [
@@ -98,14 +109,23 @@ internal static class CSharpProjectLoader
                 .SelectMany(SplitItemList)
         ];
 
+        validatePath?.Invoke(projectDirectory);
         IEnumerable<string> implicitFiles = HasImplicitCompileItems(projectDocument)
-            ? Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
+            ? EnumerateFiles(projectDirectory, skipReparsePoints)
             : [];
-        IEnumerable<string> explicitFiles = includes.SelectMany(include => ExpandInclude(projectDirectory, include));
+        IEnumerable<string> explicitFiles = includes.SelectMany(include => ExpandInclude(
+            projectDirectory,
+            include,
+            validatePath,
+            skipReparsePoints));
         IEnumerable<string> files = implicitFiles.Concat(explicitFiles);
 
         HashSet<string> removed = new(
-            removes.SelectMany(remove => ExpandInclude(projectDirectory, remove)),
+            removes.SelectMany(remove => ExpandInclude(
+                projectDirectory,
+                remove,
+                validatePath,
+                skipReparsePoints)),
             StringComparer.OrdinalIgnoreCase);
         return
         [
@@ -133,18 +153,28 @@ internal static class CSharpProjectLoader
         }
     }
 
-    private static IEnumerable<string> ExpandInclude(string projectDirectory, string include)
+    private static IEnumerable<string> ExpandInclude(
+        string projectDirectory,
+        string include,
+        Action<string>? validatePath,
+        bool skipReparsePoints)
     {
         string normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
         if (normalized.Contains('*', StringComparison.Ordinal))
         {
-            return ExpandGlob(projectDirectory, normalized);
+            return ExpandGlob(projectDirectory, normalized, validatePath, skipReparsePoints);
         }
 
-        return [Path.GetFullPath(Path.Combine(projectDirectory, normalized))];
+        string fullPath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));
+        validatePath?.Invoke(fullPath);
+        return [fullPath];
     }
 
-    private static IEnumerable<string> ExpandGlob(string projectDirectory, string normalizedPattern)
+    private static IEnumerable<string> ExpandGlob(
+        string projectDirectory,
+        string normalizedPattern,
+        Action<string>? validatePath,
+        bool skipReparsePoints)
     {
         string normalizedProjectDirectory = Path.GetFullPath(projectDirectory);
         string pattern = PathUtilities.Normalize(normalizedPattern);
@@ -154,6 +184,7 @@ internal static class CSharpProjectLoader
             ? pattern[..(lastSeparatorBeforeWildcard + 1)]
             : string.Empty;
         string searchRoot = Path.GetFullPath(Path.Combine(normalizedProjectDirectory, basePrefix.Replace('/', Path.DirectorySeparatorChar)));
+        validatePath?.Invoke(searchRoot);
         if (!Directory.Exists(searchRoot))
         {
             return [];
@@ -166,8 +197,20 @@ internal static class CSharpProjectLoader
             "^" + GlobToRegex(relativePattern) + "$",
             RegexOptions.CultureInvariant | RegexOptions.IgnoreCase,
             GlobRegexTimeout);
-        return Directory.EnumerateFiles(searchRoot, "*.cs", SearchOption.AllDirectories)
+        return EnumerateFiles(searchRoot, skipReparsePoints)
             .Where(path => regex.IsMatch(PathUtilities.Normalize(Path.GetRelativePath(searchRoot, path))));
+    }
+
+    private static IEnumerable<string> EnumerateFiles(string searchRoot, bool skipReparsePoints)
+    {
+        EnumerationOptions options = new()
+        {
+            RecurseSubdirectories = true,
+            AttributesToSkip = skipReparsePoints ? FileAttributes.ReparsePoint : 0,
+            IgnoreInaccessible = false,
+            MatchCasing = MatchCasing.PlatformDefault,
+        };
+        return Directory.EnumerateFiles(searchRoot, "*.cs", options);
     }
 
     private static string GlobToRegex(string pattern)

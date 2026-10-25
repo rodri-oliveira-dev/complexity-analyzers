@@ -133,6 +133,12 @@ A ruleset ativa de `main` exige estes status checks pelo nome exato:
 | Compatibilidade de host | `Compatibility (9.0.x)` | Smoke de consumer real com package no host SDK .NET 9. |
 | Compatibilidade de host | `Compatibility (10.0.x)` | Smoke de consumer real com package no host SDK .NET 10. |
 
+### Checks opcionais
+
+| Dimensão de qualidade | Check opcional | O que cobre |
+| --- | --- | --- |
+| Evidência de regressão de projeto | `Complexity regression` | Geração/comparação manual de snapshots, retenção de artefato e resumo do job. |
+
 Regras adicionais de branch exigem pull requests, histórico linear, resolução de
 threads, limites de code scanning e tags de release protegidas em `v*`.
 

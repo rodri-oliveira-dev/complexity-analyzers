@@ -1,0 +1,356 @@
+{
+  "SchemaVersion": "complexity-snapshot/1.0",
+  "Deterministic": true,
+  "Origin": {
+    "Kind": "projectAnalysis",
+    "EntryPoint": "samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj"
+  },
+  "Configuration": {
+    "IncludeGenerated": false,
+    "IncludeBuildOutput": false,
+    "IncludeEvidence": true,
+    "DetectDuplicates": false,
+    "MinimumDuplicateTokens": 40,
+    "MinimumDuplicateLines": null
+  },
+  "EntryPoint": "samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj",
+  "Projects": [
+    {
+      "Name": "ComplexityAnalysis.Sample",
+      "Path": "samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj",
+      "Language": "C#",
+      "Files": [
+        {
+          "Path": "samples/ComplexityAnalysis.Sample/Program.cs",
+          "NormalizedTokenCount": 0,
+          "DuplicateTokenCount": 0,
+          "DuplicateRate": {
+            "Status": "unknown",
+            "Value": null
+          },
+          "Members": [
+            {
+              "StableId": "M:ComplexityAnalysis.Sample.Program.Main",
+              "DisplayName": "Main",
+              "Kind": "OrdinaryMethod",
+              "SymbolId": "ComplexityAnalysis.Sample.Program.Main()",
+              "Location": {
+                "FilePath": "samples/ComplexityAnalysis.Sample/Program.cs",
+                "StartLine": 8,
+                "StartColumn": 5,
+                "EndLine": 24,
+                "EndColumn": 6,
+                "Start": 123,
+                "Length": 615
+              },
+              "BigO": {
+                "Status": "unknown",
+                "Value": null,
+                "IsUnknown": true
+              },
+              "Evidence": {
+                "IsTruncated": false,
+                "MaximumDepth": 8,
+                "MaximumSteps": 64,
+                "UnknownReason": "sourceAnalysisUnknown",
+                "Steps": [
+                  {
+                    "Identity": "0000:Analysis:0:0:615:method-analysis",
+                    "Kind": "analysis",
+                    "Origin": "syntax",
+                    "Operation": "method-analysis",
+                    "Location": {
+                      "RelativeStart": 0,
+                      "Length": 615
+                    },
+                    "Depth": 0,
+                    "Dimensions": [],
+                    "Estimate": {
+                      "Status": "unknown",
+                      "Value": null,
+                      "Guarantee": "unknown",
+                      "Assumptions": []
+                    },
+                    "Composition": null,
+                    "UnknownReason": "sourceAnalysisUnknown"
+                  }
+                ]
+              },
+              "CyclomaticComplexity": {
+                "Status": "known",
+                "Value": 1
+              },
+              "MaximumNestingDepth": {
+                "Status": "known",
+                "Value": 0
+              },
+              "Nloc": {
+                "Status": "known",
+                "Value": 10
+              },
+              "StatementCount": {
+                "Status": "known",
+                "Value": 7
+              },
+              "TokenCount": {
+                "Status": "known",
+                "Value": 125
+              },
+              "ParameterCount": {
+                "Status": "known",
+                "Value": 0
+              },
+              "CognitiveComplexity": {
+                "Status": "known",
+                "Value": 0
+              },
+              "Halstead": {
+                "Status": "known",
+                "DistinctOperatorCount": 6,
+                "DistinctOperandCount": 33,
+                "TotalOperatorCount": 21,
+                "TotalOperandCount": 52,
+                "Vocabulary": 39,
+                "Length": 73,
+                "CalculatedLength": 181.9747809431559,
+                "Volume": 385.8343619769441,
+                "Difficulty": 4.7272727272727275,
+                "Effort": 1823.9442566182813,
+                "EstimatedImplementationTime": 101.33023647879341,
+                "EstimatedDeliveredBugs": 0.1286114539923147
+              }
+            },
+            {
+              "StableId": "M:ComplexityAnalysis.Sample.Program.CountBlockedCustomers(System.Collections.Generic.List{System.Int32},System.Collections.Generic.List{System.Int32})",
+              "DisplayName": "CountBlockedCustomers",
+              "Kind": "OrdinaryMethod",
+              "SymbolId": "ComplexityAnalysis.Sample.Program.CountBlockedCustomers(System.Collections.Generic.List\u003Cint\u003E, System.Collections.Generic.List\u003Cint\u003E)",
+              "Location": {
+                "FilePath": "samples/ComplexityAnalysis.Sample/Program.cs",
+                "StartLine": 26,
+                "StartColumn": 5,
+                "EndLine": 39,
+                "EndColumn": 6,
+                "Start": 744,
+                "Length": 330
+              },
+              "BigO": {
+                "Status": "known",
+                "Value": "O(n \u00B7 m)",
+                "IsUnknown": false
+              },
+              "Evidence": {
+                "IsTruncated": false,
+                "MaximumDepth": 8,
+                "MaximumSteps": 64,
+                "UnknownReason": null,
+                "Steps": [
+                  {
+                    "Identity": "0000:Loop:0:132:169:foreach-loop",
+                    "Kind": "loop",
+                    "Origin": "syntax",
+                    "Operation": "foreach-loop",
+                    "Location": {
+                      "RelativeStart": 132,
+                      "Length": 169
+                    },
+                    "Depth": 0,
+                    "Dimensions": [
+                      "n"
+                    ],
+                    "Estimate": {
+                      "Status": "known",
+                      "Value": "O(n)",
+                      "Guarantee": "worstCaseUpperBound",
+                      "Assumptions": []
+                    },
+                    "Composition": "nested",
+                    "UnknownReason": null
+                  },
+                  {
+                    "Identity": "0001:KnownOperation:1:66:39:list-contains",
+                    "Kind": "knownOperation",
+                    "Origin": "knownOperationRegistry",
+                    "Operation": "list-contains",
+                    "Location": {
+                      "RelativeStart": 66,
+                      "Length": 39
+                    },
+                    "Depth": 1,
+                    "Dimensions": [
+                      "m"
+                    ],
+                    "Estimate": {
+                      "Status": "known",
+                      "Value": "O(m)",
+                      "Guarantee": "worstCaseUpperBound",
+                      "Assumptions": [
+                        {
+                          "Kind": "elementOperationCost",
+                          "Description": "Equality checks have constant cost."
+                        }
+                      ]
+                    },
+                    "Composition": null,
+                    "UnknownReason": null
+                  }
+                ]
+              },
+              "CyclomaticComplexity": {
+                "Status": "known",
+                "Value": 3
+              },
+              "MaximumNestingDepth": {
+                "Status": "known",
+                "Value": 2
+              },
+              "Nloc": {
+                "Status": "known",
+                "Value": 5
+              },
+              "StatementCount": {
+                "Status": "known",
+                "Value": 5
+              },
+              "TokenCount": {
+                "Status": "known",
+                "Value": 33
+              },
+              "ParameterCount": {
+                "Status": "known",
+                "Value": 2
+              },
+              "CognitiveComplexity": {
+                "Status": "known",
+                "Value": 3
+              },
+              "Halstead": {
+                "Status": "known",
+                "DistinctOperatorCount": 7,
+                "DistinctOperandCount": 7,
+                "TotalOperatorCount": 7,
+                "TotalOperandCount": 10,
+                "Vocabulary": 14,
+                "Length": 17,
+                "CalculatedLength": 39.302968908806456,
+                "Volume": 64.72503367497926,
+                "Difficulty": 5,
+                "Effort": 323.6251683748963,
+                "EstimatedImplementationTime": 17.979176020827573,
+                "EstimatedDeliveredBugs": 0.021575011224993085
+              }
+            },
+            {
+              "StableId": "M:ComplexityAnalysis.Sample.Program.ClassifyOrder(ComplexityAnalysis.Sample.Program.Order)",
+              "DisplayName": "ClassifyOrder",
+              "Kind": "OrdinaryMethod",
+              "SymbolId": "ComplexityAnalysis.Sample.Program.ClassifyOrder(ComplexityAnalysis.Sample.Program.Order)",
+              "Location": {
+                "FilePath": "samples/ComplexityAnalysis.Sample/Program.cs",
+                "StartLine": 41,
+                "StartColumn": 5,
+                "EndLine": 64,
+                "EndColumn": 6,
+                "Start": 1080,
+                "Length": 482
+              },
+              "BigO": {
+                "Status": "unknown",
+                "Value": null,
+                "IsUnknown": true
+              },
+              "Evidence": {
+                "IsTruncated": false,
+                "MaximumDepth": 8,
+                "MaximumSteps": 64,
+                "UnknownReason": "sourceAnalysisUnknown",
+                "Steps": [
+                  {
+                    "Identity": "0000:Analysis:0:0:482:method-analysis",
+                    "Kind": "analysis",
+                    "Origin": "syntax",
+                    "Operation": "method-analysis",
+                    "Location": {
+                      "RelativeStart": 0,
+                      "Length": 482
+                    },
+                    "Depth": 0,
+                    "Dimensions": [],
+                    "Estimate": {
+                      "Status": "unknown",
+                      "Value": null,
+                      "Guarantee": "unknown",
+                      "Assumptions": []
+                    },
+                    "Composition": null,
+                    "UnknownReason": "sourceAnalysisUnknown"
+                  }
+                ]
+              },
+              "CyclomaticComplexity": {
+                "Status": "known",
+                "Value": 6
+              },
+              "MaximumNestingDepth": {
+                "Status": "known",
+                "Value": 1
+              },
+              "Nloc": {
+                "Status": "known",
+                "Value": 9
+              },
+              "StatementCount": {
+                "Status": "known",
+                "Value": 9
+              },
+              "TokenCount": {
+                "Status": "known",
+                "Value": 69
+              },
+              "ParameterCount": {
+                "Status": "known",
+                "Value": 1
+              },
+              "CognitiveComplexity": {
+                "Status": "known",
+                "Value": 5
+              },
+              "Halstead": {
+                "Status": "known",
+                "DistinctOperatorCount": 8,
+                "DistinctOperandCount": 16,
+                "TotalOperatorCount": 23,
+                "TotalOperandCount": 23,
+                "Vocabulary": 24,
+                "Length": 46,
+                "CalculatedLength": 88,
+                "Volume": 210.90827503317317,
+                "Difficulty": 5.75,
+                "Effort": 1212.7225814407457,
+                "EstimatedImplementationTime": 67.37347674670809,
+                "EstimatedDeliveredBugs": 0.07030275834439105
+              }
+            }
+          ]
+        }
+      ],
+      "DuplicateRate": {
+        "Status": "unknown",
+        "Value": null
+      }
+    }
+  ],
+  "Duplicates": {
+    "Enabled": false,
+    "MinimumTokens": 0,
+    "MinimumLines": null,
+    "TotalNormalizedTokens": 0,
+    "DuplicateTokenCount": 0,
+    "DuplicateRate": {
+      "Status": "unknown",
+      "Value": null
+    },
+    "CloneGroups": []
+  },
+  "QualityGates": []
+}

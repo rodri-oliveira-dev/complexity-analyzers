@@ -11,15 +11,28 @@ internal sealed class KnownOperationMapping : IEquatable<KnownOperationMapping>
         ComplexityExpression complexity,
         KnownOperationExecutionKind executionKind,
         KnownOperationProvenance provenance,
-        KnownOperationMetadata metadata,
-        KnownOperationComplexityCase complexityCase = KnownOperationComplexityCase.WorstCase)
+        KnownOperationMetadata metadata)
+        : this(
+            identity,
+            CreateEstimate(complexity),
+            executionKind,
+            provenance,
+            metadata)
+    {
+    }
+
+    internal KnownOperationMapping(
+        KnownOperationIdentity identity,
+        ComplexityEstimate estimate,
+        KnownOperationExecutionKind executionKind,
+        KnownOperationProvenance provenance,
+        KnownOperationMetadata metadata)
     {
         Identity = identity ?? throw new ArgumentNullException(nameof(identity));
-        Complexity = complexity ?? throw new ArgumentNullException(nameof(complexity));
+        Estimate = estimate ?? throw new ArgumentNullException(nameof(estimate));
         Provenance = provenance ?? throw new ArgumentNullException(nameof(provenance));
         Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         ExecutionKind = executionKind;
-        ComplexityCase = complexityCase;
     }
 
     internal KnownOperationIdentity Identity
@@ -27,7 +40,9 @@ internal sealed class KnownOperationMapping : IEquatable<KnownOperationMapping>
         get;
     }
 
-    internal ComplexityExpression Complexity
+    internal ComplexityExpression Complexity => Estimate.Complexity;
+
+    internal ComplexityEstimate Estimate
     {
         get;
     }
@@ -47,20 +62,14 @@ internal sealed class KnownOperationMapping : IEquatable<KnownOperationMapping>
         get;
     }
 
-    internal KnownOperationComplexityCase ComplexityCase
-    {
-        get;
-    }
-
     public bool Equals(KnownOperationMapping? other)
     {
         return other is not null
             && Identity.Equals(other.Identity)
-            && Complexity.Equals(other.Complexity)
+            && Estimate.Equals(other.Estimate)
             && ExecutionKind == other.ExecutionKind
             && Provenance.Equals(other.Provenance)
-            && Metadata.Equals(other.Metadata)
-            && ComplexityCase == other.ComplexityCase;
+            && Metadata.Equals(other.Metadata);
     }
 
     public override bool Equals(object? obj)
@@ -73,12 +82,20 @@ internal sealed class KnownOperationMapping : IEquatable<KnownOperationMapping>
         unchecked
         {
             int hash = Identity.GetHashCode();
-            hash = (hash * 397) ^ Complexity.GetHashCode();
+            hash = (hash * 397) ^ Estimate.GetHashCode();
             hash = (hash * 397) ^ ExecutionKind.GetHashCode();
             hash = (hash * 397) ^ Provenance.GetHashCode();
             hash = (hash * 397) ^ Metadata.GetHashCode();
-            hash = (hash * 397) ^ ComplexityCase.GetHashCode();
             return hash;
         }
+    }
+
+    private static ComplexityEstimate CreateEstimate(ComplexityExpression complexity)
+    {
+        _ = complexity ?? throw new ArgumentNullException(nameof(complexity));
+
+        return complexity is UnknownComplexity
+            ? ComplexityEstimate.Unknown()
+            : ComplexityEstimate.WorstCaseUpperBound(complexity);
     }
 }

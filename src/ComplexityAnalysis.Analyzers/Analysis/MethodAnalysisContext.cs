@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Threading;
 
+using ComplexityAnalysis.Analyzers.Analysis.Evidence;
 using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Configuration;
 using ComplexityAnalysis.Analyzers.Model;
@@ -22,6 +23,7 @@ internal sealed class MethodAnalysisContext
         InterproceduralRootAnalysisState? interproceduralRootState,
         ComplexityAnalyzerOptions options,
         bool treatsDirectRecursiveInvocationsAsConstant,
+        ComplexityEvidenceCollector? evidenceCollector,
         CancellationToken cancellationToken)
     {
         SemanticModel = semanticModel;
@@ -32,6 +34,7 @@ internal sealed class MethodAnalysisContext
         InterproceduralRootState = interproceduralRootState;
         Options = options ?? throw new ArgumentNullException(nameof(options));
         TreatsDirectRecursiveInvocationsAsConstant = treatsDirectRecursiveInvocationsAsConstant;
+        EvidenceCollector = evidenceCollector;
         CancellationToken = cancellationToken;
     }
 
@@ -71,6 +74,11 @@ internal sealed class MethodAnalysisContext
     }
 
     internal bool TreatsDirectRecursiveInvocationsAsConstant
+    {
+        get;
+    }
+
+    internal ComplexityEvidenceCollector? EvidenceCollector
     {
         get;
     }
@@ -221,6 +229,7 @@ internal sealed class MethodAnalysisContext
             interproceduralRootState,
             options,
             treatsDirectRecursiveInvocationsAsConstant: false,
+            evidenceCollector: null,
             cancellationToken);
     }
 
@@ -257,6 +266,7 @@ internal sealed class MethodAnalysisContext
             InterproceduralRootState,
             Options,
             TreatsDirectRecursiveInvocationsAsConstant,
+            EvidenceCollector,
             CancellationToken);
     }
 
@@ -276,6 +286,7 @@ internal sealed class MethodAnalysisContext
                 InterproceduralRootState,
                 Options,
                 TreatsDirectRecursiveInvocationsAsConstant,
+                EvidenceCollector,
                 CancellationToken)
             : this;
     }
@@ -295,6 +306,50 @@ internal sealed class MethodAnalysisContext
                 InterproceduralRootState,
                 Options,
                 treatsDirectRecursiveInvocationsAsConstant: true,
+                EvidenceCollector,
                 CancellationToken);
+    }
+
+    internal MethodAnalysisContext WithEvidenceCollector(ComplexityEvidenceCollector evidenceCollector)
+    {
+        _ = evidenceCollector ?? throw new ArgumentNullException(nameof(evidenceCollector));
+
+        CancellationToken.ThrowIfCancellationRequested();
+
+        return ReferenceEquals(EvidenceCollector, evidenceCollector)
+            ? this
+            : new MethodAnalysisContext(
+                SemanticModel,
+                MethodSymbol,
+                InputSizeVariables,
+                LocalLoopBounds,
+                InterproceduralContext,
+                InterproceduralRootState,
+                Options,
+                TreatsDirectRecursiveInvocationsAsConstant,
+                evidenceCollector,
+                CancellationToken);
+    }
+
+    internal MethodAnalysisContext WithDelegateTarget(
+        IMethodSymbol methodSymbol,
+        InterproceduralRootAnalysisState rootState)
+    {
+        _ = methodSymbol ?? throw new ArgumentNullException(nameof(methodSymbol));
+        _ = rootState ?? throw new ArgumentNullException(nameof(rootState));
+
+        CancellationToken.ThrowIfCancellationRequested();
+
+        return new MethodAnalysisContext(
+            SemanticModel,
+            methodSymbol,
+            InputSizeVariables,
+            LocalLoopBounds,
+            InterproceduralContext,
+            rootState,
+            Options.WithAnalysisBudget(rootState.Budget),
+            TreatsDirectRecursiveInvocationsAsConstant,
+            EvidenceCollector,
+            CancellationToken);
     }
 }

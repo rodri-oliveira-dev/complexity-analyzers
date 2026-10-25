@@ -2,12 +2,15 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 
+using ComplexityAnalysis.Analyzers.Analysis.Evidence;
+using ComplexityAnalysis.Analyzers.Analysis.Interprocedural;
 using ComplexityAnalysis.Analyzers.Analysis.KnownOperations;
 using ComplexityAnalysis.Analyzers.Model;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace ComplexityAnalysis.Analyzers.Analysis;
 
@@ -32,6 +35,7 @@ internal sealed class KnownOperationComplexityAnalyzer
             || methodSymbol is null
             || mapping is null)
         {
+            RecordUnknownOperation(invocation, ComplexityUnknownReason.UnresolvedSymbol);
             return ComplexityFactory.Unknown();
         }
 
@@ -49,14 +53,14 @@ internal sealed class KnownOperationComplexityAnalyzer
 
         context.CancellationToken.ThrowIfCancellationRequested();
 
-        if (mapping.ExecutionKind == KnownOperationExecutionKind.Deferred)
-        {
-            return ComplexityFactory.Constant();
-        }
-
-        return IsLinqMapping(mapping)
+        ComplexityExpression complexity = mapping.ExecutionKind == KnownOperationExecutionKind.Deferred
+            ? ComplexityFactory.Constant()
+            : IsLinqMapping(mapping)
             ? AnalyzeImmediateLinqInvocation(invocation, methodSymbol, mapping)
             : AnalyzeImmediateKnownInvocation(invocation, methodSymbol, mapping);
+
+        RecordKnownOperation(invocation, mapping, complexity);
+        return complexity;
     }
 
     internal ComplexityExpression AnalyzeMemberAccess(MemberAccessExpressionSyntax memberAccess)
@@ -192,7 +196,7 @@ internal sealed class KnownOperationComplexityAnalyzer
         IMethodSymbol methodSymbol,
         KnownOperationMapping mapping)
     {
-        ComplexityExpression argumentComplexity = AnalyzeNonLambdaArguments(invocation);
+        ComplexityExpression argumentComplexity = AnalyzeNonLambdaArguments(invocation, methodSymbol);
         if (argumentComplexity is UnknownComplexity)
         {
             return argumentComplexity;
@@ -222,35 +226,38 @@ internal sealed class KnownOperationComplexityAnalyzer
             return ComplexityFactory.Unknown();
         }
 
-        ComplexityExpression argumentComplexity = AnalyzeNonLambdaArguments(invocation);
+        ComplexityExpression argumentComplexity = AnalyzeNonLambdaArguments(invocation, methodSymbol);
         if (argumentComplexity is UnknownComplexity)
         {
             return argumentComplexity;
         }
 
-        ComplexityExpression lambdaComplexity = AnalyzeInvocationLambdaArguments(invocation, mapping);
-        if (lambdaComplexity is UnknownComplexity)
+        ComplexityExpression delegateComplexity = AnalyzeInvocationDelegateArguments(
+            invocation,
+            methodSymbol,
+            mapping);
+        if (delegateComplexity is UnknownComplexity)
         {
-            return lambdaComplexity;
+            return delegateComplexity;
         }
 
         ComplexityExpression operationComplexity = GetImmediateLinqOperationComplexity(
             source,
             mapping,
-            HasLambdaArgument(invocation));
+            HasDelegateArgument(invocation, methodSymbol));
 
         if (operationComplexity is UnknownComplexity)
         {
             return operationComplexity;
         }
 
-        if (lambdaComplexity is not ConstantComplexity
+        if (delegateComplexity is not ConstantComplexity
             && TryAnalyzeSequenceEnumeration(source, out SequenceEnumerationPlan plan)
             && !plan.IsUnknown)
         {
             operationComplexity = ComplexityComposer.Sequential(
                 operationComplexity,
-                ComplexityComposer.Nested(plan.ElementIterationComplexity, lambdaComplexity));
+                ComplexityComposer.Nested(plan.ElementIterationComplexity, delegateComplexity));
         }
 
         return ComplexityComposer.Sequential(argumentComplexity, operationComplexity);
@@ -320,6 +327,25 @@ internal sealed class KnownOperationComplexityAnalyzer
         expression = UnwrapParentheses(expression);
         plan = SequenceEnumerationPlan.Unknown();
 
+        if (TryGetLocalInitializer(
+                expression,
+                out ExpressionSyntax? localInitializer,
+                out _)
+            && localInitializer is not null)
+        {
+            if (TryResolveStableLocalInitializer(expression, out ExpressionSyntax? stableInitializer)
+                && stableInitializer is not null)
+            {
+                return TryAnalyzeDeferredPipeline(stableInitializer, out plan);
+            }
+
+            if (IsDeferredPipelineExpression(localInitializer))
+            {
+                plan = SequenceEnumerationPlan.Unknown();
+                return true;
+            }
+        }
+
         if (expression is not InvocationExpressionSyntax invocation
             || !KnownOperationInvocation.TryResolve(invocation, context, Resolver, out IMethodSymbol? methodSymbol, out KnownOperationMapping? mapping)
             || methodSymbol is null
@@ -338,8 +364,11 @@ internal sealed class KnownOperationComplexityAnalyzer
             return true;
         }
 
-        ComplexityExpression lambdaComplexity = AnalyzeInvocationLambdaArguments(invocation, mapping);
-        if (lambdaComplexity is UnknownComplexity)
+        ComplexityExpression delegateComplexity = AnalyzeInvocationDelegateArguments(
+            invocation,
+            methodSymbol,
+            mapping);
+        if (delegateComplexity is UnknownComplexity)
         {
             plan = SequenceEnumerationPlan.Unknown();
             return true;
@@ -379,11 +408,11 @@ internal sealed class KnownOperationComplexityAnalyzer
                 SubstituteVariable(mapping.Complexity, sourcePlan.PrimaryVariable));
         }
 
-        if (lambdaComplexity is not ConstantComplexity)
+        if (delegateComplexity is not ConstantComplexity)
         {
             total = ComplexityComposer.Sequential(
                 total,
-                ComplexityComposer.Nested(sourcePlan.ElementIterationComplexity, lambdaComplexity));
+                ComplexityComposer.Nested(sourcePlan.ElementIterationComplexity, delegateComplexity));
         }
 
         plan = new SequenceEnumerationPlan(
@@ -411,8 +440,9 @@ internal sealed class KnownOperationComplexityAnalyzer
             && TryResolveDirectInputDimension(bodyExpression, out variable);
     }
 
-    private ComplexityExpression AnalyzeInvocationLambdaArguments(
+    private ComplexityExpression AnalyzeInvocationDelegateArguments(
         InvocationExpressionSyntax invocation,
+        IMethodSymbol methodSymbol,
         KnownOperationMapping mapping)
     {
         ComplexityExpression complexity = ComplexityFactory.Constant();
@@ -424,7 +454,7 @@ internal sealed class KnownOperationComplexityAnalyzer
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            if (argument.Expression is not LambdaExpressionSyntax lambda)
+            if (!IsDelegateArgument(argument, methodSymbol))
             {
                 continue;
             }
@@ -435,7 +465,9 @@ internal sealed class KnownOperationComplexityAnalyzer
                 continue;
             }
 
-            complexity = ComplexityComposer.Sequential(complexity, AnalyzeLambda(lambda));
+            complexity = ComplexityComposer.Sequential(
+                complexity,
+                AnalyzeDelegateExpression(argument.Expression));
             if (complexity is UnknownComplexity)
             {
                 return complexity;
@@ -443,6 +475,113 @@ internal sealed class KnownOperationComplexityAnalyzer
         }
 
         return complexity;
+    }
+
+    private ComplexityExpression AnalyzeDelegateExpression(ExpressionSyntax expression)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        expression = UnwrapParentheses(expression);
+        if (expression is LambdaExpressionSyntax lambda)
+        {
+            return AnalyzeLambda(lambda);
+        }
+
+        if (expression is AnonymousMethodExpressionSyntax anonymousMethod)
+        {
+            return AnalyzeDelegateBlock(anonymousMethod.Block);
+        }
+
+        if (TryResolveStableLocalInitializer(expression, out ExpressionSyntax? initializer)
+            && initializer is not null)
+        {
+            return AnalyzeDelegateExpression(initializer);
+        }
+
+        SourceMethodResolver resolver = new();
+        if (!resolver.TryResolveDelegateTarget(
+                expression,
+                context.SemanticModel,
+                context.CancellationToken,
+                out ExecutableMember? target)
+            || target is null
+            || target.SyntaxTree != context.SemanticModel.SyntaxTree
+            || HasUnstableDelegateTargetState(expression, target))
+        {
+            return ComplexityFactory.Unknown();
+        }
+
+        return AnalyzeDelegateTarget(target);
+    }
+
+    private ComplexityExpression AnalyzeDelegateTarget(ExecutableMember target)
+    {
+        InterproceduralAnalysisContext? interproceduralContext = context.InterproceduralContext;
+        InterproceduralRootAnalysisState? rootState = context.InterproceduralRootState;
+        if (interproceduralContext is null
+            || rootState is null
+            || rootState.ContainsActiveMethod(target.Symbol)
+            || !rootState.TryEnterMethod(
+                target.Symbol,
+                out InterproceduralRootAnalysisState calleeState,
+                out _))
+        {
+            return ComplexityFactory.Unknown();
+        }
+
+        MethodAnalysisContext targetContext = context.WithDelegateTarget(target.Symbol, calleeState);
+        ComplexityEvidenceCollector.Scope? evidenceScope = context.EvidenceCollector?.EnterScope(target.Declaration);
+        try
+        {
+            return target.Body.Expression is not null
+                ? new BasicOperationAnalyzer(targetContext).AnalyzeExpression(target.Body.Expression)
+                : target.Body.Block is not null
+                    ? AnalyzeDelegateBlock(target.Body.Block, targetContext)
+                    : ComplexityFactory.Unknown();
+        }
+        finally
+        {
+            evidenceScope?.Dispose();
+        }
+    }
+
+    private bool HasUnstableDelegateTargetState(
+        ExpressionSyntax targetExpression,
+        ExecutableMember target)
+    {
+        SyntaxNode? executableRoot = targetExpression.Ancestors().FirstOrDefault(IsExecutableRoot);
+        SyntaxNode? targetBody = target.Body.Expression ?? (SyntaxNode?)target.Body.Block;
+        if (executableRoot is null || targetBody is null)
+        {
+            return true;
+        }
+
+        foreach (IdentifierNameSyntax reference
+            in targetBody.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            ISymbol? symbol = context.SemanticModel.GetSymbolInfo(
+                reference,
+                context.CancellationToken).Symbol;
+            if (symbol is not (ILocalSymbol or IParameterSymbol)
+                || SymbolEqualityComparer.Default.Equals(symbol.ContainingSymbol, target.Symbol)
+                || IsDeclaredWithin(symbol, target.Declaration))
+            {
+                continue;
+            }
+
+            if (HasWriteBetween(
+                executableRoot,
+                symbol,
+                GetStabilityStart(symbol, executableRoot),
+                executableRoot.Span.End))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private ComplexityExpression AnalyzeLambda(LambdaExpressionSyntax lambda)
@@ -457,23 +596,37 @@ internal sealed class KnownOperationComplexityAnalyzer
 
     private ComplexityExpression AnalyzeLambdaBlock(BlockSyntax block)
     {
+        return AnalyzeDelegateBlock(block);
+    }
+
+    private ComplexityExpression AnalyzeDelegateBlock(BlockSyntax block)
+    {
+        return AnalyzeDelegateBlock(block, context);
+    }
+
+    private static ComplexityExpression AnalyzeDelegateBlock(
+        BlockSyntax block,
+        MethodAnalysisContext analysisContext)
+    {
         if (block.Statements.Count != 1
             || block.Statements[0] is not ReturnStatementSyntax { Expression: { } expression })
         {
             return ComplexityFactory.Unknown();
         }
 
-        return new BasicOperationAnalyzer(context).AnalyzeExpression(expression);
+        return new BasicOperationAnalyzer(analysisContext).AnalyzeExpression(expression);
     }
 
-    private ComplexityExpression AnalyzeNonLambdaArguments(InvocationExpressionSyntax invocation)
+    private ComplexityExpression AnalyzeNonLambdaArguments(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol methodSymbol)
     {
         ComplexityExpression complexity = ComplexityFactory.Constant();
         foreach (ArgumentSyntax argument in invocation.ArgumentList.Arguments)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            if (argument.Expression is LambdaExpressionSyntax)
+            if (IsDelegateArgument(argument, methodSymbol))
             {
                 continue;
             }
@@ -488,6 +641,235 @@ internal sealed class KnownOperationComplexityAnalyzer
         }
 
         return complexity;
+    }
+
+    private bool IsDelegateArgument(ArgumentSyntax argument, IMethodSymbol? methodSymbol)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        if (context.SemanticModel.GetOperation(argument, context.CancellationToken)
+            is IArgumentOperation { Parameter.Type.TypeKind: TypeKind.Delegate })
+        {
+            return true;
+        }
+
+        return methodSymbol is not null
+            && argument.Expression is LambdaExpressionSyntax or AnonymousMethodExpressionSyntax;
+    }
+
+    private bool TryResolveStableLocalInitializer(
+        ExpressionSyntax expression,
+        out ExpressionSyntax? initializer)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        initializer = null;
+        if (!TryGetLocalInitializer(
+                expression,
+                out ExpressionSyntax? value,
+                out VariableDeclaratorSyntax? declarator)
+            || value is null
+            || declarator is null
+            || context.SemanticModel.GetSymbolInfo(
+                UnwrapParentheses(expression),
+                context.CancellationToken).Symbol is not ILocalSymbol localSymbol)
+        {
+            return false;
+        }
+
+        SyntaxNode? executableRoot = declarator.Ancestors().FirstOrDefault(IsExecutableRoot);
+        if (executableRoot is null)
+        {
+            return false;
+        }
+
+        if (HasWriteBetween(
+                executableRoot,
+                localSymbol,
+                declarator.Span.End,
+                executableRoot.Span.End)
+            || HasUnstableCapturedState(
+                value,
+                executableRoot,
+                executableRoot.Span.End))
+        {
+            return false;
+        }
+
+        initializer = value;
+        return true;
+    }
+
+    private bool TryGetLocalInitializer(
+        ExpressionSyntax expression,
+        out ExpressionSyntax? initializer,
+        out VariableDeclaratorSyntax? declarator)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        expression = UnwrapParentheses(expression);
+        initializer = null;
+        declarator = null;
+        if (expression is not IdentifierNameSyntax
+            || context.SemanticModel.GetSymbolInfo(expression, context.CancellationToken).Symbol
+                is not ILocalSymbol { DeclaringSyntaxReferences.Length: 1 } localSymbol
+            || localSymbol.DeclaringSyntaxReferences[0].GetSyntax(context.CancellationToken)
+                is not VariableDeclaratorSyntax { Initializer.Value: { } value } declaration
+            || declaration.SyntaxTree != expression.SyntaxTree
+            || declaration.SpanStart >= expression.SpanStart)
+        {
+            return false;
+        }
+
+        initializer = value;
+        declarator = declaration;
+        return true;
+    }
+
+    private bool IsDeferredPipelineExpression(ExpressionSyntax expression)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+
+        expression = UnwrapParentheses(expression);
+        if (expression is InvocationExpressionSyntax invocation
+            && KnownOperationInvocation.TryResolve(
+                invocation,
+                context,
+                Resolver,
+                out _,
+                out KnownOperationMapping? mapping)
+            && mapping?.ExecutionKind == KnownOperationExecutionKind.Deferred)
+        {
+            return true;
+        }
+
+        return TryGetLocalInitializer(expression, out ExpressionSyntax? initializer, out _)
+            && initializer is not null
+            && IsDeferredPipelineExpression(initializer);
+    }
+
+    private bool HasUnstableCapturedState(
+        ExpressionSyntax initializer,
+        SyntaxNode executableRoot,
+        int observationPosition)
+    {
+        foreach (AnonymousFunctionExpressionSyntax anonymousFunction
+            in initializer.DescendantNodesAndSelf().OfType<AnonymousFunctionExpressionSyntax>())
+        {
+            foreach (IdentifierNameSyntax reference
+                in anonymousFunction.DescendantNodes().OfType<IdentifierNameSyntax>())
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+
+                ISymbol? symbol = context.SemanticModel.GetSymbolInfo(
+                    reference,
+                    context.CancellationToken).Symbol;
+                if (symbol is not (ILocalSymbol or IParameterSymbol)
+                    || IsDeclaredWithin(symbol, anonymousFunction))
+                {
+                    continue;
+                }
+
+                int stabilityStart = GetStabilityStart(symbol, executableRoot);
+                if (HasWriteBetween(
+                    executableRoot,
+                    symbol,
+                    stabilityStart,
+                    observationPosition))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool HasWriteBetween(
+        SyntaxNode executableRoot,
+        ISymbol symbol,
+        int startPosition,
+        int endPosition)
+    {
+        foreach (IdentifierNameSyntax reference
+            in executableRoot.DescendantNodes().OfType<IdentifierNameSyntax>())
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (reference.SpanStart <= startPosition
+                || reference.SpanStart >= endPosition
+                || !IsWriteReference(reference)
+                || !SymbolEqualityComparer.Default.Equals(
+                    context.SemanticModel.GetSymbolInfo(reference, context.CancellationToken).Symbol,
+                    symbol))
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsDeclaredWithin(ISymbol symbol, SyntaxNode node)
+    {
+        return symbol.DeclaringSyntaxReferences.Any(reference =>
+            reference.SyntaxTree == node.SyntaxTree
+            && node.Span.Contains(reference.Span));
+    }
+
+    private static int GetStabilityStart(ISymbol symbol, SyntaxNode executableRoot)
+    {
+        SyntaxReference? declaration = symbol.DeclaringSyntaxReferences.FirstOrDefault(reference =>
+            reference.SyntaxTree == executableRoot.SyntaxTree
+            && executableRoot.Span.Contains(reference.Span));
+        return declaration?.Span.End ?? executableRoot.SpanStart;
+    }
+
+    private static bool IsExecutableRoot(SyntaxNode node)
+    {
+        return node is BaseMethodDeclarationSyntax
+            or LocalFunctionStatementSyntax
+            or LambdaExpressionSyntax
+            or AnonymousMethodExpressionSyntax
+            or AccessorDeclarationSyntax;
+    }
+
+    private static bool IsWriteReference(IdentifierNameSyntax reference)
+    {
+        foreach (SyntaxNode ancestor in reference.Ancestors())
+        {
+            if (ancestor is AssignmentExpressionSyntax assignment)
+            {
+                return assignment.Left.Span.Contains(reference.Span);
+            }
+
+            if (ancestor is PrefixUnaryExpressionSyntax prefix)
+            {
+                return prefix.IsKind(SyntaxKind.PreIncrementExpression)
+                    || prefix.IsKind(SyntaxKind.PreDecrementExpression);
+            }
+
+            if (ancestor is PostfixUnaryExpressionSyntax postfix)
+            {
+                return postfix.IsKind(SyntaxKind.PostIncrementExpression)
+                    || postfix.IsKind(SyntaxKind.PostDecrementExpression);
+            }
+
+            if (ancestor is ArgumentSyntax argument)
+            {
+                return argument.RefOrOutKeyword.IsKind(SyntaxKind.RefKeyword)
+                    || argument.RefOrOutKeyword.IsKind(SyntaxKind.OutKeyword);
+            }
+
+            if (ancestor is StatementSyntax or LambdaExpressionSyntax or AnonymousMethodExpressionSyntax)
+            {
+                break;
+            }
+        }
+
+        return false;
     }
 
     private ComplexityExpression AnalyzeArguments(SeparatedSyntaxList<ArgumentSyntax> arguments)
@@ -509,9 +891,11 @@ internal sealed class KnownOperationComplexityAnalyzer
         return complexity;
     }
 
-    private bool HasLambdaArgument(InvocationExpressionSyntax invocation)
+    private bool HasDelegateArgument(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol methodSymbol)
     {
-        return invocation.ArgumentList.Arguments.Any(argument => argument.Expression is LambdaExpressionSyntax);
+        return invocation.ArgumentList.Arguments.Any(argument => IsDelegateArgument(argument, methodSymbol));
     }
 
     private bool TryResolveDirectInputDimension(ExpressionSyntax expression, out ComplexityVariable? variable)
@@ -611,6 +995,45 @@ internal sealed class KnownOperationComplexityAnalyzer
         return namespaceSymbol.IsGlobalNamespace
             ? string.Empty
             : namespaceSymbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+    }
+
+    private void RecordKnownOperation(
+        InvocationExpressionSyntax invocation,
+        KnownOperationMapping mapping,
+        ComplexityExpression complexity)
+    {
+        ComplexityEvidenceCollector? collector = context.EvidenceCollector;
+        if (collector is null)
+        {
+            return;
+        }
+
+        collector.Record(
+            ComplexityEvidenceKind.KnownOperation,
+            ComplexityEvidenceOrigin.KnownOperationRegistry,
+            mapping.Metadata.OperationFamily,
+            invocation,
+            mapping.Estimate.WithComplexity(complexity),
+            composition: null,
+            complexity is UnknownComplexity
+                ? ComplexityUnknownReason.UnresolvedInputDimension
+                : ComplexityUnknownReason.None,
+            context.CancellationToken);
+    }
+
+    private void RecordUnknownOperation(
+        InvocationExpressionSyntax invocation,
+        ComplexityUnknownReason reason)
+    {
+        context.EvidenceCollector?.Record(
+            ComplexityEvidenceKind.KnownOperation,
+            ComplexityEvidenceOrigin.KnownOperationRegistry,
+            "unresolved-operation",
+            invocation,
+            ComplexityEstimate.Unknown(),
+            composition: null,
+            reason,
+            context.CancellationToken);
     }
 
     private static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)

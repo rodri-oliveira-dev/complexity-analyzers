@@ -130,6 +130,12 @@ The active `main` ruleset requires these status checks by exact name:
 | Host compatibility | `Compatibility (9.0.x)` | Real package consumer smoke under .NET 9 SDK host. |
 | Host compatibility | `Compatibility (10.0.x)` | Real package consumer smoke under .NET 10 SDK host. |
 
+### Optional checks
+
+| Quality dimension | Optional check | What it covers |
+| --- | --- | --- |
+| Project regression evidence | `Complexity regression` | Manual snapshot generation/comparison, artifact retention, and job summary. |
+
 Additional branch rules require pull requests, linear history, thread resolution,
 code-scanning limits, and protected release tags matching `v*`.
 

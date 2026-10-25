@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Threading;
 
+using ComplexityAnalysis.Analyzers.Analysis.Evidence;
 using ComplexityAnalysis.Analyzers.Configuration;
 using ComplexityAnalysis.Analyzers.Model;
 
@@ -52,8 +53,13 @@ internal sealed class InterproceduralInvocationAnalyzer
                     resolution,
                     interproceduralContext,
                     rootState),
-            CallTargetResolutionKind.SourceMethod or CallTargetResolutionKind.Unsupported => ComplexityFactory.Unknown(),
-            _ => ComplexityFactory.Unknown(),
+            CallTargetResolutionKind.SourceMethod => RecordUnknownInvocation(
+                invocation,
+                ComplexityUnknownReason.InterproceduralAnalysisDisabled),
+            CallTargetResolutionKind.Unsupported => RecordUnknownInvocation(
+                invocation,
+                ComplexityUnknownReason.UnsupportedOperation),
+            _ => RecordUnknownInvocation(invocation, ComplexityUnknownReason.UnresolvedSymbol),
         };
     }
 
@@ -82,7 +88,7 @@ internal sealed class InterproceduralInvocationAnalyzer
             || resolution.SourceMethodDefinition is null
             || resolution.SourceMember is null)
         {
-            return ComplexityFactory.Unknown();
+            return RecordUnknownSourceCall(invocation, ComplexityUnknownReason.UnresolvedSymbol);
         }
 
         IMethodSymbol sourceMethodDefinition = resolution.SourceMethodDefinition;
@@ -92,9 +98,7 @@ internal sealed class InterproceduralInvocationAnalyzer
             callerContext.CancellationToken);
         if (rootState.ContainsActiveMethod(sourceMethodDefinition))
         {
-            return InterproceduralAnalysisResult
-                .CycleBoundary("The method is already active in the current root call path.")
-                .Complexity;
+            return RecordUnknownSourceCall(invocation, ComplexityUnknownReason.CycleBoundary);
         }
 
         // A completed template may avoid consuming the per-root method expansion budget,
@@ -103,9 +107,7 @@ internal sealed class InterproceduralInvocationAnalyzer
         // which root method Roslyn happens to analyze first.
         if (rootState.CurrentDepth >= rootState.Budget.MaximumCallDepth)
         {
-            return InterproceduralAnalysisResult
-                .BudgetExceeded("Maximum call depth was reached.")
-                .Complexity;
+            return RecordUnknownSourceCall(invocation, ComplexityUnknownReason.BudgetExceeded);
         }
 
         if (interproceduralContext.TemplateCache.TryGetCompleted(
@@ -114,7 +116,7 @@ internal sealed class InterproceduralInvocationAnalyzer
             callerContext.CancellationToken,
             out InterproceduralAnalysisResult cachedResult))
         {
-            return SubstituteCallSiteArguments(
+            return SubstituteAndRecordSourceCall(
                 invocation,
                 resolution.TargetMethodSymbol,
                 sourceMethodDefinition,
@@ -126,7 +128,9 @@ internal sealed class InterproceduralInvocationAnalyzer
             out InterproceduralRootAnalysisState calleeState,
             out InterproceduralAnalysisResult boundaryResult))
         {
-            return boundaryResult.Complexity;
+            return RecordUnknownSourceCall(
+                invocation,
+                ToUnknownReason(boundaryResult.Kind));
         }
 
         InterproceduralAnalysisResult calleeResult;
@@ -144,7 +148,7 @@ internal sealed class InterproceduralInvocationAnalyzer
             _ = calleeState.ExitMethod(sourceMethodDefinition);
         }
 
-        return SubstituteCallSiteArguments(
+        return SubstituteAndRecordSourceCall(
             invocation,
             resolution.TargetMethodSymbol,
             sourceMethodDefinition,
@@ -218,6 +222,12 @@ internal sealed class InterproceduralInvocationAnalyzer
         SemanticModel calleeSemanticModel = interproceduralContext.GetSemanticModel(
             sourceMember.SyntaxTree,
             callerContext.CancellationToken);
+        ComplexityEvidenceCollector? calleeEvidence = callerContext.EvidenceCollector is { } callerEvidence
+            ? new ComplexityEvidenceCollector(
+                sourceMember.Declaration,
+                callerEvidence.MaximumDepth,
+                callerEvidence.MaximumSteps)
+            : null;
         return new MethodComplexityExtractor()
             .AnalyzeSourceMember(
                 sourceMember,
@@ -225,7 +235,8 @@ internal sealed class InterproceduralInvocationAnalyzer
                 interproceduralContext,
                 calleeState,
                 calleeOptions,
-                callerContext.CancellationToken);
+                callerContext.CancellationToken,
+                calleeEvidence);
     }
 
     private static bool IsCacheable(InterproceduralAnalysisResult result)
@@ -272,6 +283,106 @@ internal sealed class InterproceduralInvocationAnalyzer
         return ComplexityComposer.Sequential(
             callSiteEvaluationComplexity,
             substitutedCalleeComplexity);
+    }
+
+    private ComplexityExpression SubstituteAndRecordSourceCall(
+        InvocationExpressionSyntax invocation,
+        IMethodSymbol targetMethodSymbol,
+        IMethodSymbol sourceMethodDefinition,
+        InterproceduralAnalysisResult calleeResult)
+    {
+        ComplexityExpression complexity = SubstituteCallSiteArguments(
+            invocation,
+            targetMethodSymbol,
+            sourceMethodDefinition,
+            calleeResult);
+        ComplexityUnknownReason unknownReason = complexity is UnknownComplexity
+            ? ToUnknownReason(calleeResult.Kind)
+            : ComplexityUnknownReason.None;
+        if (unknownReason == ComplexityUnknownReason.None
+            && complexity is UnknownComplexity)
+        {
+            unknownReason = ComplexityUnknownReason.SourceAnalysisUnknown;
+        }
+
+        if (calleeResult.Template?.Evidence is { } evidence)
+        {
+            callerContext.EvidenceCollector?.Replay(evidence, callerContext.CancellationToken);
+        }
+
+        ComplexityEstimate? estimate = complexity is UnknownComplexity
+            ? null
+            : calleeResult.Template?.Estimate?.WithComplexity(complexity);
+        RecordSourceCall(invocation, complexity, estimate, unknownReason);
+        return complexity;
+    }
+
+    private ComplexityExpression RecordUnknownInvocation(
+        InvocationExpressionSyntax invocation,
+        ComplexityUnknownReason reason)
+    {
+        callerContext.EvidenceCollector?.Record(
+            ComplexityEvidenceKind.Analysis,
+            ComplexityEvidenceOrigin.Syntax,
+            "unsupported-invocation",
+            invocation,
+            ComplexityEstimate.Unknown(),
+            composition: null,
+            reason,
+            callerContext.CancellationToken);
+        return ComplexityFactory.Unknown();
+    }
+
+    private ComplexityExpression RecordUnknownSourceCall(
+        InvocationExpressionSyntax invocation,
+        ComplexityUnknownReason reason)
+    {
+        RecordSourceCall(
+            invocation,
+            ComplexityFactory.Unknown(),
+            estimate: null,
+            unknownReason: reason);
+        return ComplexityFactory.Unknown();
+    }
+
+    private void RecordSourceCall(
+        InvocationExpressionSyntax invocation,
+        ComplexityExpression complexity,
+        ComplexityEstimate? estimate,
+        ComplexityUnknownReason unknownReason)
+    {
+        ComplexityEvidenceCollector? collector = callerContext.EvidenceCollector;
+        if (collector is null)
+        {
+            return;
+        }
+
+        collector.Record(
+            ComplexityEvidenceKind.SourceCall,
+            ComplexityEvidenceOrigin.SourceAnalysis,
+            "source-call",
+            invocation,
+            complexity is UnknownComplexity || estimate is null
+                ? ComplexityEstimate.Unknown()
+                : estimate,
+            ComplexityOperation.Sequential,
+            estimate is null && complexity is not UnknownComplexity
+                ? ComplexityUnknownReason.SourceAnalysisUnknown
+                : unknownReason,
+            callerContext.CancellationToken);
+    }
+
+    private static ComplexityUnknownReason ToUnknownReason(
+        InterproceduralAnalysisResultKind resultKind)
+    {
+        return resultKind switch
+        {
+            InterproceduralAnalysisResultKind.Known => ComplexityUnknownReason.None,
+            InterproceduralAnalysisResultKind.Unknown => ComplexityUnknownReason.SourceAnalysisUnknown,
+            InterproceduralAnalysisResultKind.BudgetExceeded => ComplexityUnknownReason.BudgetExceeded,
+            InterproceduralAnalysisResultKind.CycleBoundary => ComplexityUnknownReason.CycleBoundary,
+            _ => throw new ArgumentOutOfRangeException(nameof(resultKind)),
+        };
     }
 
     private bool IsDirectRecursiveInvocation(InvocationExpressionSyntax invocation)

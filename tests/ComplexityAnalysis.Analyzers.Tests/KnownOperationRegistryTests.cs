@@ -294,7 +294,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         false,
         false,
         false)]
@@ -309,7 +309,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         false,
         false,
         false)]
@@ -322,7 +322,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         false,
         false,
         false)]
@@ -335,7 +335,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         false,
         false,
         false)]
@@ -343,7 +343,7 @@ public sealed class KnownOperationRegistryTests
         string operationFamily,
         string source,
         string expectedComplexity,
-        string expectedCase,
+        string expectedGuarantee,
         bool expectedEnumeratesReceiver,
         bool expectedOrders,
         bool expectedLookupOperation)
@@ -354,13 +354,28 @@ public sealed class KnownOperationRegistryTests
             mapping,
             operationFamily,
             expectedComplexity,
-            ParseComplexityCase(expectedCase),
+            ParseGuarantee(expectedGuarantee),
             expectedEnumeratesReceiver,
             expectedOrders,
             expectedLookupOperation);
     }
 
     [Theory]
+    [InlineData(
+        "list-add",
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            void M(List<int> values) => values.Add(1);
+        }
+        """,
+        "O(1)",
+        "Amortized",
+        false,
+        false,
+        false)]
     [InlineData(
         "list-contains",
         """
@@ -372,7 +387,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -387,7 +402,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -402,7 +417,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -417,7 +432,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -432,7 +447,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n log n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         true,
         false)]
@@ -447,7 +462,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n log n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         true,
         false)]
@@ -462,7 +477,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n log n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         true,
         false)]
@@ -477,7 +492,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n log n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         true,
         false)]
@@ -492,7 +507,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "Average",
+        "Expected",
         false,
         false,
         true)]
@@ -507,7 +522,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(n)",
-        "WorstCase",
+        "WorstCaseUpperBound",
         true,
         false,
         true)]
@@ -522,7 +537,7 @@ public sealed class KnownOperationRegistryTests
         }
         """,
         "O(1)",
-        "Average",
+        "Expected",
         false,
         false,
         true)]
@@ -530,7 +545,7 @@ public sealed class KnownOperationRegistryTests
         string operationFamily,
         string source,
         string expectedComplexity,
-        string expectedCase,
+        string expectedGuarantee,
         bool expectedEnumeratesReceiver,
         bool expectedOrders,
         bool expectedLookupOperation)
@@ -541,7 +556,7 @@ public sealed class KnownOperationRegistryTests
             mapping,
             operationFamily,
             expectedComplexity,
-            ParseComplexityCase(expectedCase),
+            ParseGuarantee(expectedGuarantee),
             expectedEnumeratesReceiver,
             expectedOrders,
             expectedLookupOperation);
@@ -601,7 +616,16 @@ public sealed class KnownOperationRegistryTests
         Assert.Equal("hashset-contains", hashSetContains.Metadata.OperationFamily);
         Assert.Equal("O(n)", listContains.Complexity.ToBigONotation());
         Assert.Equal("O(1)", hashSetContains.Complexity.ToBigONotation());
-        Assert.Equal(KnownOperationComplexityCase.Average, hashSetContains.ComplexityCase);
+        Assert.Contains(
+            listContains.Estimate.Assumptions,
+            assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);
+        Assert.Equal(ComplexityGuarantee.Expected, hashSetContains.Estimate.Guarantee);
+        Assert.Contains(
+            hashSetContains.Estimate.Assumptions,
+            assumption => assumption.Kind == ComplexityAssumptionKind.HashDistribution);
+        Assert.Contains(
+            hashSetContains.Estimate.Assumptions,
+            assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);
     }
 
     [Fact]
@@ -625,6 +649,171 @@ public sealed class KnownOperationRegistryTests
         KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
 
         Assert.False(resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out _));
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        namespace MyCompany
+        {
+            public sealed class Dictionary<TKey, TValue>
+            {
+                public bool ContainsKey(TKey key) => true;
+            }
+
+            public sealed class Sample
+            {
+                bool M(Dictionary<int, string> values) => values.ContainsKey(1);
+            }
+        }
+        """)]
+    [InlineData(
+        """
+        namespace MyCompany
+        {
+            public sealed class HashSet<T>
+            {
+                public bool Contains(T value) => true;
+            }
+
+            public sealed class Sample
+            {
+                bool M(HashSet<int> values) => values.Contains(1);
+            }
+        }
+        """)]
+    public void Bcl_registry_does_not_match_other_custom_homonymous_collections(string source)
+    {
+        InvocationFacts facts = CreateInvocationFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        Assert.False(resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out _));
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(ICollection<int> values) => values.Contains(1);
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(ISet<int> values) => values.Contains(1);
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(IDictionary<int, string> values) => values.ContainsKey(1);
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            bool M(IReadOnlyDictionary<int, string> values) => values.ContainsKey(1);
+        }
+        """)]
+    public void Bcl_registry_keeps_interface_method_dispatch_unknown(string source)
+    {
+        InvocationFacts facts = CreateInvocationFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        Assert.False(resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out _));
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(ICollection<int> values) => values.Count;
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(IReadOnlyCollection<int> values) => values.Count;
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(IList<int> values) => values[0];
+        }
+        """)]
+    [InlineData(
+        """
+        using System.Collections.Generic;
+
+        public sealed class Sample
+        {
+            int M(IReadOnlyList<int> values) => values[0];
+        }
+        """)]
+    public void Bcl_registry_keeps_interface_property_dispatch_unknown(string source)
+    {
+        PropertyFacts facts = CreatePropertyFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        Assert.False(resolver.TryResolve(facts.PropertySymbol, CancellationToken.None, out _));
+    }
+
+    [Fact]
+    public void Bcl_registry_matches_inherited_list_symbol_but_not_hidden_member()
+    {
+        KnownOperationMapping inherited = ResolveBclInvocation(
+            """
+            using System.Collections.Generic;
+
+            public sealed class DerivedList<T> : List<T>
+            {
+            }
+
+            public sealed class Sample
+            {
+                bool M(DerivedList<int> values) => values.Contains(1);
+            }
+            """);
+        InvocationFacts hiddenFacts = CreateInvocationFacts(
+            """
+            using System.Collections.Generic;
+
+            public sealed class DerivedList<T> : List<T>
+            {
+                public new bool Contains(T value) => true;
+            }
+
+            public sealed class Sample
+            {
+                bool M(DerivedList<int> values) => values.Contains(1);
+            }
+            """);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Bcl);
+
+        Assert.Equal("list-contains", inherited.Metadata.OperationFamily);
+        Assert.False(resolver.TryResolve(hiddenFacts.MethodSymbol, CancellationToken.None, out _));
     }
 
     [Fact]
@@ -904,7 +1093,7 @@ public sealed class KnownOperationRegistryTests
         KnownOperationMapping mapping,
         string operationFamily,
         string expectedComplexity,
-        KnownOperationComplexityCase expectedCase,
+        ComplexityGuarantee expectedGuarantee,
         bool expectedEnumeratesReceiver,
         bool expectedOrders,
         bool expectedLookupOperation)
@@ -912,18 +1101,37 @@ public sealed class KnownOperationRegistryTests
         Assert.Equal(operationFamily, mapping.Metadata.OperationFamily);
         Assert.Equal(expectedComplexity, mapping.Complexity.ToBigONotation());
         Assert.Equal(KnownOperationExecutionKind.Immediate, mapping.ExecutionKind);
-        Assert.Equal(expectedCase, mapping.ComplexityCase);
+        Assert.Equal(expectedGuarantee, mapping.Estimate.Guarantee);
+        if (expectedGuarantee == ComplexityGuarantee.Expected)
+        {
+            Assert.Contains(
+                mapping.Estimate.Assumptions,
+                assumption => assumption.Kind == ComplexityAssumptionKind.HashDistribution);
+            Assert.Contains(
+                mapping.Estimate.Assumptions,
+                assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);
+        }
+        else if (expectedGuarantee == ComplexityGuarantee.Amortized)
+        {
+            Assert.Contains(
+                mapping.Estimate.Assumptions,
+                assumption => assumption.Kind == ComplexityAssumptionKind.OperationSequence);
+            Assert.Contains(
+                mapping.Estimate.Assumptions,
+                assumption => assumption.Kind == ComplexityAssumptionKind.ElementOperationCost);
+        }
+
         Assert.Equal(expectedEnumeratesReceiver, mapping.Metadata.EnumeratesReceiver);
         Assert.False(mapping.Metadata.Materializes);
         Assert.Equal(expectedOrders, mapping.Metadata.Orders);
         Assert.Equal(expectedLookupOperation, mapping.Metadata.IsLookupOperation);
     }
 
-    private static KnownOperationComplexityCase ParseComplexityCase(string value)
+    private static ComplexityGuarantee ParseGuarantee(string value)
     {
-        return Enum.TryParse(value, ignoreCase: false, out KnownOperationComplexityCase complexityCase)
-            ? complexityCase
-            : throw new ArgumentException("Unknown complexity case.", nameof(value));
+        return Enum.TryParse(value, ignoreCase: false, out ComplexityGuarantee guarantee)
+            ? guarantee
+            : throw new ArgumentException("Unknown complexity guarantee.", nameof(value));
     }
 
     private static KnownOperationExecutionKind ParseExecutionKind(string value)
