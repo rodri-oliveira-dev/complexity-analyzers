@@ -148,6 +148,38 @@ Release provenance and the SBOM can be verified locally with GitHub CLI. See [Re
 
 Do not manually move, reuse, or recreate an existing release tag for a different commit. Release tags are intended to be immutable.
 
+### ComplexityAnalysis.Tool releases
+
+The CLI has an independent release line. `.github/workflows/release-tool.yml`
+publishes only `ComplexityAnalysis.Tool`, receives the production version as a
+manual input, and derives `tool-v<version>` tags. It does not change or publish
+the analyzer package. Pull requests run only its build, package-install, smoke,
+and SBOM path; publication jobs run only for a manual dispatch from `main`.
+
+Before the first `1.0.0` release, complete these external settings:
+
+1. In NuGet.org Trusted Publishing, create a GitHub policy owned by
+   `rodri-oliveira-dev` for repository `complexity-analyzers`, workflow file
+   `release-tool.yml`, and environment `release`. Scope it to push new packages
+   and package versions matching exactly `ComplexityAnalysis.Tool`.
+2. In GitHub, ensure the `release` environment permits deployments only from
+   `main` and configure the intended required reviewers. Do not add a NuGet API
+   key; the publish job exchanges GitHub OIDC for a temporary credential.
+3. Extend the repository tag ruleset to protect `tool-v*`. Prevent deletion,
+   force updates, and tag recreation while allowing the release workflow's
+   `contents: write` job to create a new tag after validation.
+4. Confirm GitHub Packages is enabled and repository Actions may write packages
+   with the workflow `GITHUB_TOKEN`.
+5. Recheck that `ComplexityAnalysis.Tool` and the intended version are still
+   available on NuGet.org. Availability before the first publish does not
+   reserve the ID.
+
+After approval and merge, select **Release ComplexityAnalysis.Tool** in GitHub
+Actions, choose `main`, enter `1.0.0`, and review the `release` environment
+deployment. Do not pre-create the tag. A safe retry accepts an existing
+`tool-v1.0.0` only when it points at the same validated commit; package pushes
+use skip-duplicate semantics and GitHub Release assets are never replaced.
+
 ## Pull requests
 
 Pull requests should:

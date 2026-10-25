@@ -145,6 +145,40 @@ A provenance da release e a SBOM podem ser verificadas localmente com GitHub CLI
 
 Não mova, reutilize ou recrie manualmente uma release tag existente para outro commit. Release tags devem ser imutáveis.
 
+### Releases Do ComplexityAnalysis.Tool
+
+A CLI possui uma linha de release independente.
+`.github/workflows/release-tool.yml` publica somente `ComplexityAnalysis.Tool`,
+recebe a versão de produção como input manual e deriva tags `tool-v<version>`.
+Ele não altera nem publica o pacote do analyzer. Pull requests executam apenas
+build, instalação do pacote, smoke tests e SBOM; jobs de publicação executam
+somente por dispatch manual a partir da `main`.
+
+Antes da primeira release `1.0.0`, conclua estas configurações externas:
+
+1. No Trusted Publishing do NuGet.org, crie uma policy GitHub pertencente a
+   `rodri-oliveira-dev` para o repositório `complexity-analyzers`, workflow
+   `release-tool.yml` e environment `release`. Restrinja o escopo a publicar
+   pacotes novos e versões do padrão exato `ComplexityAnalysis.Tool`.
+2. No GitHub, garanta que o environment `release` aceite deployments somente da
+   `main` e configure os required reviewers desejados. Não adicione API key do
+   NuGet; o job troca OIDC do GitHub por uma credencial temporária.
+3. Estenda o ruleset de tags para proteger `tool-v*`. Impeça exclusão, force
+   update e recriação, permitindo que o job com `contents: write` crie uma tag
+   nova somente depois da validação.
+4. Confirme que GitHub Packages está habilitado e que Actions pode escrever
+   packages com o `GITHUB_TOKEN` do workflow.
+5. Verifique novamente se `ComplexityAnalysis.Tool` e a versão pretendida ainda
+   estão disponíveis no NuGet.org. A disponibilidade antes da primeira
+   publicação não reserva o ID.
+
+Depois da aprovação e do merge, selecione **Release ComplexityAnalysis.Tool**
+no GitHub Actions, escolha `main`, informe `1.0.0` e revise o deployment no
+environment `release`. Não crie a tag antecipadamente. Uma repetição segura
+aceita `tool-v1.0.0` existente somente quando ela aponta para o mesmo commit
+validado; os pushes usam skip-duplicate e assets da GitHub Release nunca são
+substituídos.
+
 ## Pull requests
 
 Pull requests devem:

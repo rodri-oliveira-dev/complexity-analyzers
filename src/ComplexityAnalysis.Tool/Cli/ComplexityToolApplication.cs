@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using System.Xml;
 
@@ -9,6 +10,64 @@ namespace ComplexityAnalysis.Tool.Cli;
 
 internal static class ComplexityToolApplication
 {
+    private const string GeneralHelp = """
+        Complexity Analysis .NET Tool
+
+        Usage:
+          complexity-analysis analyze <project.csproj|solution.slnx|solution.sln> [options]
+          complexity-analysis compare <baseline.json> <current.json> [options]
+          complexity-analysis --help
+          complexity-analysis --version
+
+        Commands:
+          analyze    Analyze a C# project or solution.
+          compare    Compare two JSON snapshots.
+
+        Run 'complexity-analysis <command> --help' for command-specific options.
+        """;
+
+    private const string AnalyzeHelp = """
+        Usage: complexity-analysis analyze <project.csproj|solution.slnx|solution.sln> [options]
+
+        Report options:
+          --format <console|json|sarif>      Output format. Default: console.
+          --output <path>                    Write the report to a file.
+          --include-evidence                 Include bounded evidence in JSON or SARIF.
+          --snapshot                         Emit a comparison snapshot in JSON.
+          --include-generated                Include generated C# files.
+          --include-build-output             Include files under build-output directories.
+
+        Quality gates:
+          --max-complexity <value>           Maximum Big-O classification.
+          --max-cyclomatic-complexity <n>    Positive integer.
+          --max-nesting-depth <n>            Non-negative integer.
+          --max-method-nloc <n>              Positive integer.
+          --max-statement-count <n>          Positive integer.
+          --max-token-count <n>              Positive integer.
+          --max-parameters <n>               Non-negative integer.
+          --max-cognitive-complexity <n>     Non-negative integer.
+
+        Duplicate detection:
+          --detect-duplicates                Enable normalized duplicate detection.
+          --min-duplicate-tokens <n>         Positive integer. Default: 40.
+          --min-duplicate-lines <n>          Positive integer.
+          --max-duplicate-rate <n>           Non-negative percentage.
+          --max-duplicate-tokens <n>         Positive integer.
+
+        Big-O values:
+          constant, log_n, linear, n, n_log_n, quadratic, n2, cubic, n3,
+          exponential, factorial
+        """;
+
+    private const string CompareHelp = """
+        Usage: complexity-analysis compare <baseline.json> <current.json> [options]
+
+        Options:
+          --format <console|json|sarif>      Output format. Default: console.
+          --output <path>                    Write the comparison to a file.
+          --fail-on-regression               Return exit code 2 for proven regressions.
+        """;
+
     internal static async Task<int> RunAsync(
         string[] args,
         TextWriter output,
@@ -21,6 +80,18 @@ internal static class ComplexityToolApplication
 
         try
         {
+            if (IsHelpRequest(args))
+            {
+                await output.WriteLineAsync(GetHelp(args));
+                return ToolExitCodes.Success;
+            }
+
+            if (args.Length == 1 && StringComparer.Ordinal.Equals(args[0], "--version"))
+            {
+                await output.WriteLineAsync(GetVersion());
+                return ToolExitCodes.Success;
+            }
+
             if (args.Length > 0 && StringComparer.Ordinal.Equals(args[0], "compare"))
             {
                 return await RunComparisonAsync(args, output, error, cancellationToken);
@@ -67,6 +138,40 @@ internal static class ComplexityToolApplication
             await error.WriteLineAsync(ex.Message);
             return ToolExitCodes.Error;
         }
+    }
+
+    private static bool IsHelpRequest(string[] args)
+    {
+        return (args.Length == 1 && IsHelpOption(args[0]))
+            || (args.Length == 2
+            && (StringComparer.Ordinal.Equals(args[0], "analyze")
+                || StringComparer.Ordinal.Equals(args[0], "compare"))
+            && IsHelpOption(args[1]));
+    }
+
+    private static bool IsHelpOption(string value)
+    {
+        return StringComparer.Ordinal.Equals(value, "--help")
+            || StringComparer.Ordinal.Equals(value, "-h");
+    }
+
+    private static string GetHelp(string[] args)
+    {
+        return args.Length == 2 && StringComparer.Ordinal.Equals(args[0], "analyze")
+            ? AnalyzeHelp
+            : args.Length == 2 && StringComparer.Ordinal.Equals(args[0], "compare")
+            ? CompareHelp
+            : GeneralHelp;
+    }
+
+    private static string GetVersion()
+    {
+        string informationalVersion = typeof(ComplexityToolApplication).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion
+            ?? "unknown";
+        int buildMetadata = informationalVersion.IndexOf('+', StringComparison.Ordinal);
+        return buildMetadata < 0 ? informationalVersion : informationalVersion[..buildMetadata];
     }
 
     private static async Task<int> RunComparisonAsync(

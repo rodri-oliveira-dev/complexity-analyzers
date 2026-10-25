@@ -2,17 +2,65 @@
 
 [English](../en/project-tooling.md) | Português (Brasil)
 
-`ComplexityAnalysis.Tool` analisa projetos C# fora dos hot paths do compiler
-analyzer. A ferramenta serve para revisão local, relatórios agregados e quality
-gates de CI. Instalar o pacote Roslyn analyzer não instala nem exige essa
-ferramenta.
+`ComplexityAnalysis.Tool` fornece o comando instalável `complexity-analysis`
+para relatórios determinísticos de projetos e solutions C#, snapshots,
+comparação de regressões, detecção de duplicação e quality gates de CI.
+
+Escolha o pacote Roslyn `ComplexityAnalysis.Analyzers` para diagnósticos durante
+a compilação, esta CLI para execuções explícitas em projetos ou solutions e o
+host MCP local separado para integração somente leitura com clientes MCP.
+Nenhum deles instala ou exige os demais.
+
+## Pré-Requisitos E Instalação
+
+A ferramenta targeteia `net10.0` e exige o runtime .NET 10. Depois que a versão
+`1.0.0` for publicada no NuGet.org, instale-a globalmente:
+
+```bash
+dotnet tool install --global ComplexityAnalysis.Tool --version 1.0.0
+complexity-analysis --version
+```
+
+Para uma instalação fixada no repositório:
+
+```bash
+dotnet new tool-manifest
+dotnet tool install ComplexityAnalysis.Tool --version 1.0.0
+dotnet tool restore
+dotnet tool run complexity-analysis --version
+```
+
+Mantenha uma instalação global com `dotnet tool update --global
+ComplexityAnalysis.Tool --version <version>` e `dotnet tool uninstall --global
+ComplexityAnalysis.Tool`. Para um manifest local, omita `--global`; execute com
+`dotnet tool run complexity-analysis` ou `dotnet complexity-analysis`.
+
+Esses comandos consomem um pacote publicado. Para um pacote ainda não publicado
+e compilado deste repositório, use uma fonte explícita e uma versão somente local:
+
+```bash
+dotnet pack src/ComplexityAnalysis.Tool/ComplexityAnalysis.Tool.csproj \
+  --configuration Release \
+  -p:Version=0.0.0-local \
+  -p:PackageVersion=0.0.0-local \
+  --output artifacts/local-packages
+dotnet tool install ComplexityAnalysis.Tool \
+  --version 0.0.0-local \
+  --add-source artifacts/local-packages \
+  --tool-path artifacts/local-tools
+export PATH="$PWD/artifacts/local-tools:$PATH"
+complexity-analysis --version
+```
 
 ## Executar A CLI
 
-A partir da raiz do repositório:
+Analise um projeto ou uma solution com o comando instalado:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze <path>
+complexity-analysis analyze MySolution.slnx
+complexity-analysis analyze MyProject.csproj --format json
+complexity-analysis analyze MyProject.csproj --format sarif
+complexity-analysis analyze MyProject.csproj --max-cyclomatic-complexity 10
 ```
 
 Entradas suportadas:
@@ -26,18 +74,52 @@ referenciado é analisado independentemente. O carregamento é intencionalmente
 local ao repositório e não adiciona `Microsoft.CodeAnalysis.Workspaces` ao
 pacote do analyzer.
 
+Use `complexity-analysis --help`, `complexity-analysis analyze --help` ou
+`complexity-analysis compare --help` para a ajuda embutida na versão instalada.
+
+## Referência Da CLI
+
+`analyze <path>` aceita exatamente um path `.csproj`, `.slnx` ou `.sln`.
+
+| Opção | Valor/default | Regras |
+| --- | --- | --- |
+| `--format` | `console` (padrão), `json`, `sarif` | Case-insensitive. |
+| `--output` | Path; stdout por padrão | O diretório pai deve existir. |
+| `--include-evidence` | Desabilitado | Exige JSON ou SARIF. |
+| `--snapshot` | Desabilitado | Exige JSON e implica evidência. |
+| `--include-generated` | Desabilitado | Inclui código-fonte gerado. |
+| `--include-build-output` | Desabilitado | Inclui diretórios de output normalmente excluídos. |
+| `--max-complexity` | Sem gate | `constant`, `log_n`, `linear`/`n`, `n_log_n`, `quadratic`/`n2`, `cubic`/`n3`, `exponential` ou `factorial`. |
+| `--max-cyclomatic-complexity` | Sem gate | Inteiro positivo. |
+| `--max-nesting-depth` | Sem gate | Inteiro não negativo. |
+| `--max-method-nloc` | Sem gate | Inteiro positivo. |
+| `--max-statement-count` | Sem gate | Inteiro positivo. |
+| `--max-token-count` | Sem gate | Inteiro positivo. |
+| `--max-parameters` | Sem gate | Inteiro não negativo. |
+| `--max-cognitive-complexity` | Sem gate | Inteiro não negativo. |
+| `--detect-duplicates` | Desabilitado | Habilita detecção normalizada de duplicação. |
+| `--min-duplicate-tokens` | `40` | Inteiro positivo; também habilita detecção. |
+| `--min-duplicate-lines` | Não definido | Inteiro positivo; também habilita detecção. |
+| `--max-duplicate-rate` | Sem gate | Número não negativo em cultura invariável; também habilita detecção. |
+| `--max-duplicate-tokens` | Sem gate | Inteiro positivo; também habilita detecção. |
+
+`compare <baseline.json> <current.json>` exige dois arquivos
+`complexity-snapshot/1.0`. Ele aceita `--format console|json|sarif` (console por
+padrão), `--output <path>` e o gate opt-in `--fail-on-regression`. Opções
+desconhecidas ou valores ausentes retornam o exit code `1`.
+
 ## Saída
 
 A saída console é o padrão:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
+complexity-analysis analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj
 ```
 
 JSON está disponível para automação:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --output artifacts/project-report.json
+complexity-analysis analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --output artifacts/project-report.json
 ```
 
 Para criar um baseline de comparação, adicione `--snapshot`. Esse modo emite o
@@ -48,14 +130,14 @@ não alteram a identidade. Renames aparecem como remoção e adição; identidad
 duplicadas são ambíguas e nunca são associadas por heurística.
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj --format json --snapshot --output artifacts/baseline.json
+complexity-analysis analyze src/MyProject/MyProject.csproj --format json --snapshot --output artifacts/baseline.json
 ```
 
 O contrato JSON padrão permanece no schema `1.0`. Evidências determinísticas
 de complexidade são opt-in e usam o schema `1.1`:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --include-evidence
+complexity-analysis analyze samples/ComplexityAnalysis.Sample/ComplexityAnalysis.Sample.csproj --format json --include-evidence
 ```
 
 `--include-evidence` é válido com `--format json` ou `--format sarif`. Cada membro passa a
@@ -106,7 +188,7 @@ em nível de projeto realmente precisar desses arquivos.
 Quality gates são opt-in. Nenhum threshold padrão falha um build.
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj \
+complexity-analysis analyze src/MyProject/MyProject.csproj \
   --max-cyclomatic-complexity 10 \
   --max-nesting-depth 3 \
   --max-method-nloc 40 \
@@ -132,7 +214,7 @@ Exit codes:
 Compare dois snapshots gerados anteriormente sem invocar Git ou serviço externo:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- compare artifacts/base.json artifacts/head.json --format json
+complexity-analysis compare artifacts/base.json artifacts/head.json --format json
 ```
 
 Use `--format console` (padrão) ou `--format json`, além de `--output <path>`
@@ -164,8 +246,8 @@ Tanto `analyze` quanto `compare` aceitam `--format sarif`. A saída segue SARIF
 SHA-256 estáveis, regras declaradas, regiões de código-fonte e ordem determinística.
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj --format sarif --include-evidence --output artifacts/complexity.sarif
-dotnet run --project src/ComplexityAnalysis.Tool -- compare artifacts/base.json artifacts/head.json --format sarif --output artifacts/comparison.sarif
+complexity-analysis analyze src/MyProject/MyProject.csproj --format sarif --include-evidence --output artifacts/complexity.sarif
+complexity-analysis compare artifacts/base.json artifacts/head.json --format sarif --output artifacts/comparison.sarif
 ```
 
 Estimativas conhecidas de membros são notes. Um membro com complexidade `Unknown`
@@ -179,7 +261,7 @@ continua sendo uma opção separada e opt-in.
 A detecção de duplicação também é opt-in:
 
 ```bash
-dotnet run --project src/ComplexityAnalysis.Tool -- analyze src/MyProject/MyProject.csproj \
+complexity-analysis analyze src/MyProject/MyProject.csproj \
   --detect-duplicates \
   --min-duplicate-tokens 40 \
   --max-duplicate-rate 5

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### ComplexityAnalysis.Tool 1.0.0
+
+- Prepared the first independently versioned public .NET Tool release with the
+  `ComplexityAnalysis.Tool` package ID and `complexity-analysis` command.
+- Added consumer installation and maintenance guidance, built-in `--help` and
+  `--version`, a package-specific bilingual README, and expanded package and
+  installed-command contracts.
+- Added a manual, main-only `tool-v<version>` release workflow with isolated
+  package smoke tests, SPDX SBOM, NuGet Trusted Publishing, GitHub Packages,
+  provenance/SBOM attestations, and GitHub Release assets.
+
 ### Added
 
 - A formal complexity-estimate model with guarantees, assumptions, bounded
@@ -27,6 +38,7 @@ All notable changes to this project will be documented in this file.
 
 ### Release impact
 
-- These are backward-compatible capabilities suitable for a future minor
-  release. This work does not publish packages, create tags, or perform a
-  release.
+- `ComplexityAnalysis.Tool` starts its own SemVer line at `1.0.0`; the analyzer
+  retains its existing version line and is not republished as `1.0.0`.
+- This work prepares publication after merge and approval. It does not publish
+  packages, create tags, or perform a release.
