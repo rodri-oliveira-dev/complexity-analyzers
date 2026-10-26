@@ -1,0 +1,71 @@
+name: Documentation accessibility
+
+on:
+  pull_request:
+    paths:
+      - "website/**"
+      - ".github/workflows/documentation-accessibility.yml"
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - ".github/workflows/documentation-accessibility.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-accessibility-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  accessibility:
+    name: Automated WCAG checks
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - name: Install and build
+        working-directory: website
+        run: npm ci --ignore-scripts && npm run build
+      - name: Start production preview
+        working-directory: website
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/complexity-docs-preview.log 2>&1 &
+          echo $! > /tmp/complexity-docs-preview.pid
+          for _ in {1..30}; do
+            curl --fail --silent http://127.0.0.1:4321/complexity-analyzers/ > /dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/complexity-docs-preview.log
+          exit 1
+      - name: Run Pa11y CI
+        working-directory: website
+        env:
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+        run: npx --yes --ignore-scripts pa11y-ci@5.0.0 --config .pa11yci --threshold 0
+      - name: Record scope
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "# Accessibility"
+            echo
+            echo "Automated axe and HTML_CodeSniffer checks target representative English and Brazilian Portuguese routes."
+            echo "They do not replace manual keyboard, screen-reader, zoom, or cognitive-accessibility review."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Stop preview
+        if: always()
+        shell: bash
+        run: test ! -f /tmp/complexity-docs-preview.pid || kill "$(cat /tmp/complexity-docs-preview.pid)" 2>/dev/null || true

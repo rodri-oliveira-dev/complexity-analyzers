@@ -1,0 +1,54 @@
+name: Documentation SEO
+
+on:
+  pull_request:
+    paths:
+      - "website/**"
+      - "docs/**"
+      - ".github/workflows/documentation-seo.yml"
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "docs/**"
+      - ".github/workflows/documentation-seo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-seo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Built-site SEO and HTML
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - name: Install and build
+        working-directory: website
+        run: npm ci --ignore-scripts && npm run build
+      - name: Validate SEO, HTML, and spelling
+        working-directory: website
+        run: npm run test:seo && npm run test:html && npm run test:spelling
+      - name: Write summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "# Documentation SEO validation"
+            echo
+            echo "Checks production canonical URLs, hreflang, social metadata, JSON-LD, sitemap membership, HTML, and spelling."
+          } >> "$GITHUB_STEP_SUMMARY"
