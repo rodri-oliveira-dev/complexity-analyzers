@@ -52,6 +52,38 @@ for (const route of routes) {
   }
 }
 
+// These routes use both the splash layout (without a sidebar) and the standard docs layout.
+// Native Starlight selectors must remain available in the independent mobile header menu.
+for (const route of ['', 'getting-started']) {
+  for (const locale of ['en', 'pt-br']) {
+    const slug = [locale === 'pt-br' ? 'pt-br' : '', route].filter(Boolean).join('/');
+    const file = resolve(dist, slug, 'index.html');
+    const html = await readFile(file, 'utf8');
+    const preferences = html.match(/<details\b[^>]*class="[^"]*\bmobile-preferences\b[^"]*"[^>]*>([\s\S]*?)<\/details>/)?.[1];
+    const location = slug || 'homepage';
+
+    if (!preferences) {
+      failures.push(location + ': missing mobile preferences menu.');
+      continue;
+    }
+    if (!preferences.includes('<summary') || !preferences.includes('aria-label=')) {
+      failures.push(location + ': mobile preferences trigger has no accessible label.');
+    }
+    if (!preferences.includes('<starlight-theme-select>') || !preferences.includes('<starlight-lang-select>')) {
+      failures.push(location + ': expected native Starlight preference controls.');
+    }
+    if (['auto', 'dark', 'light'].some((value) => !preferences.includes('value="' + value + '"'))) {
+      failures.push(location + ': missing one or more native theme options.');
+    }
+
+    const counterpart = (locale === 'en' ? 'pt-br/' : '') + (route ? route + '/' : '');
+    const expectedLanguage = '/complexity-analyzers/' + counterpart;
+    if (!preferences.includes('value="' + expectedLanguage + '"')) {
+      failures.push(location + ': missing translated route option ' + expectedLanguage);
+    }
+  }
+}
+
 const searchBundle = files.some((file) => relative(dist, file).split(sep).join('/') === 'pagefind/pagefind.js');
 if (!searchBundle) failures.push('Starlight Pagefind search bundle was not generated.');
 
