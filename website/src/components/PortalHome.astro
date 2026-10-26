@@ -1,0 +1,124 @@
+---
+interface Props { locale?: 'en' | 'pt-BR'; }
+const { locale = 'en' } = Astro.props;
+const pt = locale === 'pt-BR';
+const base = '/complexity-analyzers';
+const prefix = pt ? `${base}/pt-br` : base;
+const codeExample = `<span class="kw">foreach</span> (<span class="kw">var</span> item <span class="kw">in</span> items)
+{
+    <span class="kw">if</span> (otherItems.<span class="fn">Contains</span>(item))
+    {
+        matches.<span class="fn">Add</span>(item);
+    }
+}`;
+const t = pt ? {
+  eyebrow: 'Análise conservadora para C#',
+  title: 'Transforme complexidade em evidência acionável.',
+  lede: 'Um ecossistema para estimar Big-O, medir estrutura e explicar resultados em builds, automação e ferramentas de IA — sem executar seu código.',
+  docs: 'Começar pela documentação', github: 'Ver no GitHub', nuget: 'Pacote no NuGet',
+  whyTitle: 'Complexidade é uma decisão de engenharia, não um palpite.',
+  whyText: 'Métricas diferentes respondem a perguntas diferentes. O portal separa custo assintótico, estrutura de controle, tamanho e evidência inconclusiva para ajudar você a escolher a ação correta.',
+  why: [
+    ['Custo que escala', 'Identifique loops, chamadas e operações de coleção cujo custo cresce com a entrada.'],
+    ['Estrutura que pesa', 'Acompanhe complexidade ciclomática, cognitiva e profundidade sem confundi-las com Big-O.'],
+    ['Limites explícitos', 'Veja Unknown quando uma conclusão segura não pode ser provada pelo subconjunto suportado.']
+  ],
+  productsTitle: 'Três superfícies, um modelo de análise.', productsText: 'Escolha a integração pelo momento em que você precisa da evidência.',
+  products: [
+    ['Analyzer', 'Feedback no build e na IDE', 'Diagnósticos BIG* e thresholds via .editorconfig.', 'analyzer/'],
+    ['CLI', 'Relatórios e quality gates', 'Console, JSON, SARIF, snapshots e comparação determinística.', 'cli/'],
+    ['MCP', 'Contexto para agentes locais', 'Ferramentas somente leitura sobre stdio, com limites e evidências.', 'mcp/']
+  ],
+  metricsTitle: 'Leia o código por mais de uma lente.', metricsText: 'O suporte é deliberadamente documentado e cada resultado preserva suas hipóteses.',
+  chooseTitle: 'Escolha pelo fluxo de trabalho.', chooseText: 'Os pacotes são independentes. Você pode adotar um deles ou combinar as três superfícies.',
+  choices: [
+    ['IDE', 'Use o Analyzer', 'quando o feedback precisa acompanhar compilação e edição.'],
+    ['CI', 'Use a CLI', 'quando você precisa de relatórios, snapshots e gates explícitos.'],
+    ['AGENT', 'Use o MCP', 'quando um agente precisa consultar análise e evidências locais.']
+  ],
+  ciTitle: 'Da revisão local ao gate de CI.', ciText: 'A CLI retorna códigos de saída estáveis; gates são opt-in e resultados Unknown não viram regressões provadas.',
+  finalTitle: 'Comece com o produto que encontra seu código onde ele já está.', finalText: 'Instale, gere o primeiro resultado e aprofunde-se nos modelos, contratos e limites técnicos.',
+  quick: 'Instalação rápida', reference: 'Explorar a referência'
+} : {
+  eyebrow: 'Conservative analysis for C#',
+  title: 'Make complexity evidence actionable.',
+  lede: 'An ecosystem to estimate Big-O, measure structure, and explain results in builds, automation, and AI tools — without executing your code.',
+  docs: 'Start with the documentation', github: 'View on GitHub', nuget: 'Package on NuGet',
+  whyTitle: 'Complexity is an engineering decision, not a guess.',
+  whyText: 'Different metrics answer different questions. This portal separates asymptotic cost, control structure, size, and inconclusive evidence so you can choose the right action.',
+  why: [
+    ['Cost that scales', 'Find loops, calls, and collection operations whose cost grows with input.'],
+    ['Structure that weighs', 'Track cyclomatic, cognitive, and nesting measures without confusing them with Big-O.'],
+    ['Explicit limits', 'See Unknown when the supported subset cannot prove a safe conclusion.']
+  ],
+  productsTitle: 'Three surfaces, one analysis model.', productsText: 'Choose the integration by when and where you need evidence.',
+  products: [
+    ['Analyzer', 'Build and IDE feedback', 'BIG* diagnostics and thresholds through .editorconfig.', 'analyzer/'],
+    ['CLI', 'Reports and quality gates', 'Console, JSON, SARIF, snapshots, and deterministic comparison.', 'cli/'],
+    ['MCP', 'Context for local agents', 'Read-only tools over stdio, with limits and evidence.', 'mcp/']
+  ],
+  metricsTitle: 'Read code through more than one lens.', metricsText: 'Support is deliberately documented, and every result preserves its assumptions.',
+  chooseTitle: 'Choose by workflow.', chooseText: 'The packages are independent. Adopt one surface or combine all three.',
+  choices: [
+    ['IDE', 'Use the Analyzer', 'when feedback must travel with compilation and editing.'],
+    ['CI', 'Use the CLI', 'when you need reports, snapshots, and explicit gates.'],
+    ['AGENT', 'Use MCP', 'when an agent needs local analysis and evidence.']
+  ],
+  ciTitle: 'From local review to a CI gate.', ciText: 'The CLI returns stable exit codes; gates are opt-in, and Unknown results do not become proven regressions.',
+  finalTitle: 'Start with the product that meets your code where it already lives.', finalText: 'Install it, produce the first result, then explore the models, contracts, and technical limits.',
+  quick: 'Quick installation', reference: 'Explore the reference'
+};
+---
+<div class="portal-home">
+  <section class="cx-hero" aria-labelledby="portal-title">
+    <div class="cx-hero-copy">
+      <span class="cx-eyebrow">{t.eyebrow}</span>
+      <h1 id="portal-title">{t.title}</h1>
+      <p class="cx-lede">{t.lede}</p>
+      <div class="cx-actions">
+        <a class="button primary" href={`${prefix}/getting-started/`}>{t.docs}</a>
+        <a class="button secondary" href="https://github.com/rodri-oliveira-dev/complexity-analyzers">{t.github}</a>
+        <a class="button secondary" href="https://www.nuget.org/packages/ComplexityAnalysis.Analyzers">{t.nuget}</a>
+      </div>
+    </div>
+    <div class="cx-code-window" aria-label={pt ? 'Exemplo de diagnóstico C#' : 'C# diagnostic example'}>
+      <div class="cx-window-bar"><i></i><i></i><i></i><span>Search.cs</span></div>
+      <pre><code set:html={codeExample}></code></pre>
+      <div class="cx-diagnostic"><strong>BIG1001</strong><span>{pt ? 'Busca linear dentro de iteração; custo composto estimado O(n × m).' : 'Linear lookup inside iteration; estimated composed cost O(n × m).'}</span></div>
+    </div>
+  </section>
+
+  <section class="cx-section" aria-labelledby="why-title">
+    <div class="cx-heading"><h2 id="why-title">{t.whyTitle}</h2><p>{t.whyText}</p></div>
+    <div class="cx-grid">{t.why.map(([title, text], index) => <article class="portal-card"><span class="kicker">0{index + 1}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
+  </section>
+
+  <section class="cx-section tinted" aria-labelledby="products-title">
+    <div class="cx-heading"><h2 id="products-title">{t.productsTitle}</h2><p>{t.productsText}</p></div>
+    <div class="cx-grid">{t.products.map(([name, title, text, route]) => <a class="portal-card product-card" href={`${prefix}/${route}`}><span class="kicker">{name}</span><h3>{title}</h3><p>{text}</p></a>)}</div>
+  </section>
+
+  <section class="cx-section" aria-labelledby="metrics-title">
+    <div class="cx-heading"><h2 id="metrics-title">{t.metricsTitle}</h2><p>{t.metricsText}</p></div>
+    <div class="metric-grid">
+      <div class="metric"><code>O(n log n)</code><strong>Big-O</strong><span>{pt ? 'Crescimento assintótico suportado' : 'Supported asymptotic growth'}</span></div>
+      <div class="metric"><code>CC = 11</code><strong>{pt ? 'Ciclomática' : 'Cyclomatic'}</strong><span>{pt ? 'Caminhos estruturais' : 'Structural paths'}</span></div>
+      <div class="metric"><code>COG = 17</code><strong>{pt ? 'Cognitiva' : 'Cognitive'}</strong><span>{pt ? 'Carga de compreensão' : 'Comprehension load'}</span></div>
+      <div class="metric"><code>Unknown</code><strong>{pt ? 'Inconclusivo' : 'Inconclusive'}</strong><span>{pt ? 'Sem hipótese inventada' : 'No invented assumption'}</span></div>
+      <div class="metric"><code>Depth = 4</code><strong>{pt ? 'Aninhamento' : 'Nesting'}</strong><span>{pt ? 'Profundidade de controle' : 'Control-flow depth'}</span></div>
+      <div class="metric"><code>NLOC = 42</code><strong>{pt ? 'Tamanho' : 'Size'}</strong><span>{pt ? 'Linhas, statements e tokens' : 'Lines, statements, and tokens'}</span></div>
+      <div class="metric"><code>Halstead</code><strong>{pt ? 'Vocabulário' : 'Vocabulary'}</strong><span>{pt ? 'Métricas internas disponíveis' : 'Available internal metrics'}</span></div>
+      <div class="metric"><code>LINQ</code><strong>{pt ? 'Operações' : 'Operations'}</strong><span>{pt ? 'Materialização e ordenação' : 'Materialization and ordering'}</span></div>
+    </div>
+  </section>
+
+  <section class="cx-section tinted"><div class="cx-decision"><div><h2>{t.chooseTitle}</h2><p>{t.chooseText}</p></div><div class="choice-list">{t.choices.map(([tag, title, text]) => <article class="choice"><b>{tag}</b><div><h3>{title}</h3><p>{text}</p></div></article>)}</div></div></section>
+
+  <section class="cx-section dark"><div class="cx-ci"><div><h2>{t.ciTitle}</h2><p>{t.ciText}</p><a class="button primary" href={`${prefix}/cli/github-actions/`}>GitHub Actions</a></div><pre><code>dotnet tool restore
+dotnet complexity-analysis analyze App.slnx \
+  --format sarif \
+  --max-cyclomatic-complexity 10 \
+  --output artifacts/complexity.sarif</code></pre></div></section>
+
+  <section class="cx-section cx-final"><h2>{t.finalTitle}</h2><p>{t.finalText}</p><div class="cx-actions" style="justify-content:center"><a class="button primary" href={`${prefix}/getting-started/quick-install/`}>{t.quick}</a><a class="button secondary" href={`${prefix}/reference/`}>{t.reference}</a></div></section>
+</div>

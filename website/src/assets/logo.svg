@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 64" role="img" aria-labelledby="title">
+  <title id="title">Complexity Analyzers</title>
+  <g fill="none" stroke="#5946d2" stroke-linecap="round" stroke-linejoin="round" stroke-width="4">
+    <path d="M10 18h14l10 14-10 14H10l10-14z"/><path d="M34 32h18"/><circle cx="56" cy="32" r="6" fill="#20b8c7" stroke="#20b8c7"/>
+  </g>
+  <text x="76" y="39" fill="#12182b" font-family="Inter,Segoe UI,sans-serif" font-size="25" font-weight="760">Complexity Analyzers</text>
+</svg>
