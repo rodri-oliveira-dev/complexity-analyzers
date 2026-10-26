@@ -24,7 +24,7 @@ body { letter-spacing: -.006em; overflow-x: clip; }
 .cx-hero-copy,.cx-code-window { position: relative; z-index: 1; min-width: 0; }
 .portal-home .cx-eyebrow { display: inline-flex; gap: .6rem; align-items: center; margin-bottom: 1.2rem; color: var(--cx-link-hover); background-color: var(--cx-page); font-size: .76rem; font-weight: 820; letter-spacing: .13em; text-transform: uppercase; }
 .cx-eyebrow::before { width: 1.7rem; height: 2px; content: ''; background: var(--cx-cyan-500); }
-.portal-home .cx-hero h1 { width: fit-content; max-width: 12ch; margin: 0; padding: .08em .12em .12em; border-radius: var(--cx-radius-sm); color: #f7f8ff; background-color: #11162a; font-size: clamp(2.9rem, 5.5vw, 5.3rem); line-height: .98; letter-spacing: -.065em; }
+.portal-home .cx-hero h1 { max-width: 12ch; margin: 0; color: var(--cx-heading); background-color: var(--cx-page); font-size: clamp(2.9rem, 5.5vw, 5.3rem); line-height: 1.12; letter-spacing: -.035em; }
 .portal-home .cx-lede { max-width: 43rem; margin-block: 1.65rem 2rem; color: var(--cx-muted); background-color: var(--cx-page); font-size: clamp(1.06rem, 1.7vw, 1.32rem); line-height: 1.63; }
 .cx-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
 .button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.9rem; padding: .72rem 1.18rem; border: 1px solid transparent; border-radius: var(--cx-radius-sm); font-weight: 760; text-decoration: none !important; transition: transform .15s ease, background .15s ease, border-color .15s ease; }
