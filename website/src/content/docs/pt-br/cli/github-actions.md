@@ -34,6 +34,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: dotnet tool restore
+      - run: mkdir -p ./artifacts
       - run: >-
           dotnet complexity-analysis analyze ./App.slnx
           --format sarif

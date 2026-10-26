@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -26,6 +26,15 @@ const link = (html, rel, language) => {
 
 const failures = [];
 const indexable = new Set();
+
+function expectedUrl(path, language) {
+  const route = path === 'index.html' ? '' : path.replace(/index\.html$/, '');
+  const localizedRoute = language === 'pt-BR'
+    ? (route.startsWith('pt-br/') ? route : `pt-br/${route}`)
+    : route.replace(/^pt-br\//, '');
+  return `${site}${base}${localizedRoute}`;
+}
+
 for (const file of htmlFiles) {
   const path = relative(root, file).split(sep).join('/');
   const html = await readFile(file, 'utf8');
@@ -40,14 +49,27 @@ for (const file of htmlFiles) {
     if (!robots?.includes('noindex')) failures.push(`${path}: 404 must be noindex`);
     continue;
   }
-  if (!canonical?.startsWith(`${site}${base}`)) failures.push(`${path}: invalid canonical ${canonical ?? '(missing)'}`);
+  const currentLanguage = path.startsWith('pt-br/') ? 'pt-BR' : 'en';
+  const expectedCanonical = expectedUrl(path, currentLanguage);
+  if (canonical !== expectedCanonical) failures.push(`${path}: invalid canonical ${canonical ?? '(missing)'}; expected ${expectedCanonical}`);
   else indexable.add(canonical);
-  for (const language of ['en', 'pt-BR']) if (!link(html, 'alternate', language)) failures.push(`${path}: missing hreflang ${language}`);
+  for (const language of ['en', 'pt-BR']) {
+    const alternate = link(html, 'alternate', language);
+    const expectedAlternate = expectedUrl(path, language);
+    if (alternate !== expectedAlternate) failures.push(`${path}: invalid hreflang ${language} ${alternate ?? '(missing)'}; expected ${expectedAlternate}`);
+    if (language === currentLanguage && alternate !== canonical) failures.push(`${path}: current-language alternate must equal canonical`);
+  }
   if (attr(html, 'property', 'og:image') !== `${site}${base}social-preview.png`) failures.push(`${path}: invalid Open Graph image`);
   if (attr(html, 'name', 'twitter:card') !== 'summary_large_image') failures.push(`${path}: invalid Twitter card`);
   const jsonLd = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i)?.[1];
   if (!jsonLd) failures.push(`${path}: missing JSON-LD`);
   else { try { JSON.parse(jsonLd); } catch { failures.push(`${path}: invalid JSON-LD`); } }
+}
+
+try {
+  await access(resolve(root, 'social-preview.png'));
+} catch {
+  failures.push('missing social-preview.png');
 }
 
 const sitemapIndex = await readFile(resolve(root, 'sitemap-index.xml'), 'utf8');

@@ -11,7 +11,7 @@ sidebar:
 
 - `analyze_project` analyzes a `.csproj`, `.sln`, or `.slnx` below the configured root and returns a full or bounded summary response.
 - `query_member_evidence` retrieves exact evidence for a stable member identity, optionally reusing an immutable cached analysis by `analysisId`.
-- `compare_snapshots` compares deterministic JSON snapshots and reports only proven regressions.
+- `compare_snapshots` compares deterministic JSON snapshots and classifies regressions, improvements, equivalent results, and incomparable evidence.
 
 ## Operational boundary
 

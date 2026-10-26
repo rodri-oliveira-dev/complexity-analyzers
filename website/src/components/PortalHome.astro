@@ -116,6 +116,7 @@ const t = pt ? {
   <section class="cx-section tinted"><div class="cx-decision"><div><h2>{t.chooseTitle}</h2><p>{t.chooseText}</p></div><div class="choice-list">{t.choices.map(([tag, title, text]) => <article class="choice"><b>{tag}</b><div><h3>{title}</h3><p>{text}</p></div></article>)}</div></div></section>
 
   <section class="cx-section dark"><div class="cx-ci"><div><h2>{t.ciTitle}</h2><p>{t.ciText}</p><a class="button primary" href={`${prefix}/cli/github-actions/`}>GitHub Actions</a></div><pre><code>dotnet tool restore
+mkdir -p artifacts
 dotnet complexity-analysis analyze App.slnx \
   --format sarif \
   --max-cyclomatic-complexity 10 \

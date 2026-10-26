@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 
@@ -35,5 +35,7 @@ describe('documentation synchronization', () => {
     const before = await digest('mcp/reference.md');
     await exec(process.execPath, ['scripts/sync-docs.mjs'], { cwd: new URL('.', root) });
     expect(await digest('mcp/reference.md')).toBe(before);
+    const generatedDirectory = await readdir(new URL('mcp/', docs));
+    expect(generatedDirectory.some((name) => name.endsWith('.tmp'))).toBe(false);
   });
 });

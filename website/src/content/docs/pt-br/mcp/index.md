@@ -11,7 +11,7 @@ sidebar:
 
 - `analyze_project` analisa um `.csproj`, `.sln` ou `.slnx` abaixo da raiz configurada e retorna resposta completa ou resumo limitado.
 - `query_member_evidence` obtém evidência exata de uma identidade estável, podendo reutilizar uma análise imutável em cache por `analysisId`.
-- `compare_snapshots` compara snapshots JSON determinísticos e reporta apenas regressões comprovadas.
+- `compare_snapshots` compara snapshots JSON determinísticos e classifica regressões, melhorias, resultados equivalentes e evidências incomparáveis.
 
 ## Limite operacional
 

@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - "website/**"
+      - "docs/**"
       - ".github/workflows/documentation-accessibility.yml"
   push:
     branches: [main]
     paths:
       - "website/**"
+      - "docs/**"
       - ".github/workflows/documentation-accessibility.yml"
   workflow_dispatch:
 
@@ -54,7 +56,7 @@ jobs:
         working-directory: website
         env:
           PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
-        run: npx --yes --ignore-scripts pa11y-ci@5.0.0 --config .pa11yci --threshold 0
+        run: npx --no-install pa11y-ci --config .pa11yci --threshold 0
       - name: Record scope
         if: always()
         shell: bash

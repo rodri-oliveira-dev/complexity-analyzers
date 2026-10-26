@@ -15,6 +15,6 @@ complexity-analysis compare baseline.json current.json --format json --fail-on-r
 
 Members are matched by stable identity. A known increase such as `O(n)` to `O(n²)` can be classified as a proven regression and return exit code `2` when `--fail-on-regression` is enabled.
 
-An `Unknown` estimate, missing member, or incompatible evidence is not silently ordered against a known complexity. The comparison records the result as incomparable so the reviewer can investigate without a false gate.
+An `Unknown` estimate or incompatible evidence is not silently ordered against a known complexity. The comparison records that estimate as incomparable so the reviewer can investigate without a false gate. Members found only in the current or baseline snapshot are reported separately as added or removed; they are not classified as incomparable estimates.
 
 Commit or retain baselines only according to your repository's artifact and review policy. Snapshot comparison is deterministic and does not depend on Git history or an external service.
