@@ -32,6 +32,7 @@ export default defineConfig({
         'pt-br': { label: 'Português (Brasil)', lang: 'pt-BR' }
       },
       customCss: ['./src/styles/tokens.css', './src/styles/custom.css'],
+      components: { Header: './src/components/Header.astro' },
       routeMiddleware: './src/routeData.ts',
       sidebar: [
         { label: 'Getting started', translations: { 'pt-BR': 'Primeiros passos' }, items: [
