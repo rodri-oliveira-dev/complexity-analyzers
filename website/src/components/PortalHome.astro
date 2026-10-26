@@ -81,11 +81,12 @@ const t = pt ? {
         <a class="button secondary" href="https://www.nuget.org/packages/ComplexityAnalysis.Analyzers">{t.nuget}</a>
       </div>
     </div>
-    <div class="cx-code-window" aria-label={pt ? 'Exemplo de diagnóstico C#' : 'C# diagnostic example'}>
+    <figure class="cx-code-window">
+      <figcaption class="sr-only">{pt ? 'Exemplo de diagnóstico C#' : 'C# diagnostic example'}</figcaption>
       <div class="cx-window-bar"><i></i><i></i><i></i><span>Search.cs</span></div>
       <pre><code set:html={codeExample}></code></pre>
       <div class="cx-diagnostic"><strong>BIG1001</strong><span>{pt ? 'Busca linear dentro de iteração; custo composto estimado O(n × m).' : 'Linear lookup inside iteration; estimated composed cost O(n × m).'}</span></div>
-    </div>
+    </figure>
   </section>
 
   <section class="cx-section" aria-labelledby="why-title">
