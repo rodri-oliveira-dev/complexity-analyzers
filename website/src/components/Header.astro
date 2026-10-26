@@ -1,14 +1,10 @@
 ---
-import config from 'virtual:starlight/user-config';
+import LanguageSelect from '@astrojs/starlight/components/LanguageSelect.astro';
+import Search from '@astrojs/starlight/components/Search.astro';
+import SiteTitle from '@astrojs/starlight/components/SiteTitle.astro';
+import SocialIcons from '@astrojs/starlight/components/SocialIcons.astro';
+import ThemeSelect from '@astrojs/starlight/components/ThemeSelect.astro';
 
-import LanguageSelect from 'virtual:starlight/components/LanguageSelect';
-import Search from 'virtual:starlight/components/Search';
-import SiteTitle from 'virtual:starlight/components/SiteTitle';
-import SocialIcons from 'virtual:starlight/components/SocialIcons';
-import ThemeSelect from 'virtual:starlight/components/ThemeSelect';
-
-const shouldRenderSearch =
-  config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
 const isPortuguese = Astro.locals.starlightRoute.lang === 'pt-BR';
 const preferencesLabel = isPortuguese ? 'Preferências de exibição' : 'Display preferences';
 const themeLabel = isPortuguese ? 'Tema' : 'Theme';
@@ -20,7 +16,7 @@ const languageLabel = isPortuguese ? 'Idioma' : 'Language';
     <SiteTitle />
   </div>
   <div class="sl-flex print:hidden">
-    {shouldRenderSearch && <Search />}
+    <Search />
   </div>
 
   <!-- Splash pages have no sidebar, so mobile preferences must be accessible in the header. -->
