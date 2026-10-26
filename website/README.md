@@ -59,6 +59,10 @@ For synchronized technical documents, update both source-language files and keep
 
 The portal uses product-specific design tokens in `src/styles/tokens.css`, reusable presentation styling in `src/styles/custom.css`, SVG logo assets, and `public/social-preview.png` for social cards. Keep sufficient contrast in both themes and avoid decorative changes that obscure technical content.
 
+## Mobile preferences
+
+Starlight's `splash` layout omits the sidebar that normally exposes theme and language selection on mobile. The custom `src/components/Header.astro` keeps the native Starlight selectors available through a compact header menu across splash and documentation routes. It uses the same theme persistence and localized-route handling as Starlight. The `test:routes` gate checks that the menu and translated destinations appear in both locales and layouts; manually verify mobile widths and keyboard interaction when changing the header.
+
 ## GitHub Pages publication
 
 `.github/workflows/documentation-portal.yml` validates pull requests but builds and deploys the Pages artifact only from `main`. Separate workflows cover SEO/HTML/spelling, automated accessibility, and Lighthouse budgets.
