@@ -1,0 +1,184 @@
+---
+import config from 'virtual:starlight/user-config';
+
+import LanguageSelect from 'virtual:starlight/components/LanguageSelect';
+import Search from 'virtual:starlight/components/Search';
+import SiteTitle from 'virtual:starlight/components/SiteTitle';
+import SocialIcons from 'virtual:starlight/components/SocialIcons';
+import ThemeSelect from 'virtual:starlight/components/ThemeSelect';
+
+const shouldRenderSearch =
+  config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
+const isPortuguese = Astro.locals.starlightRoute.lang === 'pt-BR';
+const preferencesLabel = isPortuguese ? 'Preferências de exibição' : 'Display preferences';
+const themeLabel = isPortuguese ? 'Tema' : 'Theme';
+const languageLabel = isPortuguese ? 'Idioma' : 'Language';
+---
+
+<div class="header">
+  <div class="title-wrapper sl-flex">
+    <SiteTitle />
+  </div>
+  <div class="sl-flex print:hidden">
+    {shouldRenderSearch && <Search />}
+  </div>
+
+  <!-- Splash pages have no sidebar, so mobile preferences must be accessible in the header. -->
+  <details class="mobile-preferences print:hidden">
+    <summary aria-label={preferencesLabel} title={preferencesLabel}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 7h9m4 0h3M4 17h3m4 0h9" />
+        <circle cx="15" cy="7" r="2" />
+        <circle cx="9" cy="17" r="2" />
+      </svg>
+    </summary>
+    <div class="mobile-preferences-panel">
+      <div class="preference-row">
+        <span>{themeLabel}</span>
+        <ThemeSelect />
+      </div>
+      <div class="preference-row">
+        <span>{languageLabel}</span>
+        <LanguageSelect />
+      </div>
+    </div>
+  </details>
+
+  <div class="sl-hidden md:sl-flex print:hidden right-group">
+    <div class="sl-flex social-icons">
+      <SocialIcons />
+    </div>
+    <ThemeSelect />
+    <LanguageSelect />
+  </div>
+</div>
+
+<style>
+  @layer starlight.core {
+    .header {
+      display: flex;
+      gap: var(--sl-nav-gap);
+      justify-content: space-between;
+      align-items: center;
+      height: 100%;
+    }
+
+    .title-wrapper {
+      /* Keep the title from covering the search, preferences and mobile menu buttons. */
+      overflow: clip;
+      padding: 0.25rem;
+      margin: -0.25rem;
+      min-width: 0;
+    }
+
+    .right-group,
+    .social-icons {
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .social-icons::after {
+      content: '';
+      height: 2rem;
+      border-inline-end: 1px solid var(--sl-color-gray-5);
+    }
+
+    @media (min-width: 50rem) {
+      :global(:root[data-has-sidebar]) {
+        --__sidebar-pad: calc(2 * var(--sl-nav-pad-x));
+      }
+
+      :global(:root:not([data-has-toc])) {
+        --__toc-width: 0rem;
+      }
+
+      .header {
+        --__sidebar-width: max(0rem, var(--sl-content-inline-start, 0rem) - var(--sl-nav-pad-x));
+        --__main-column-fr: calc(
+          (
+            100% + var(--__sidebar-pad, 0rem) - var(--__toc-width, var(--sl-sidebar-width)) -
+            (2 * var(--__toc-width, var(--sl-nav-pad-x))) - var(--sl-content-inline-start, 0rem) -
+            var(--sl-content-width)
+          ) / 2
+        );
+        display: grid;
+        grid-template-columns:
+          minmax(
+            calc(var(--__sidebar-width) + max(0rem, var(--__main-column-fr) - var(--sl-nav-gap))),
+            auto
+          )
+          1fr
+          auto;
+        align-content: center;
+      }
+    }
+  }
+
+  @layer starlight.components {
+    .mobile-preferences {
+      position: relative;
+      flex: none;
+    }
+
+    .mobile-preferences summary {
+      display: grid;
+      place-items: center;
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 0.5rem;
+      color: var(--sl-color-gray-2);
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .mobile-preferences summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .mobile-preferences summary:hover,
+    .mobile-preferences[open] summary {
+      color: var(--sl-color-white);
+      background: var(--sl-color-gray-6);
+    }
+
+    .mobile-preferences summary:focus-visible {
+      outline: 3px solid var(--cx-focus);
+      outline-offset: 2px;
+    }
+
+    .mobile-preferences-panel {
+      position: absolute;
+      z-index: 1;
+      inset-inline-end: 0;
+      top: calc(100% + 0.5rem);
+      width: min(18rem, calc(100vw - 2rem));
+      padding: 0.75rem;
+      border: 1px solid var(--sl-color-gray-5);
+      border-radius: 0.75rem;
+      background: var(--sl-color-bg-nav);
+      box-shadow: 0 16px 42px rgb(0 0 0 / 18%);
+    }
+
+    .preference-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      min-height: 2.75rem;
+      color: var(--sl-color-gray-2);
+      font-size: var(--sl-text-sm);
+    }
+
+    .preference-row + .preference-row {
+      border-top: 1px solid var(--sl-color-gray-6);
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+    }
+
+    @media (min-width: 50rem) {
+      .mobile-preferences {
+        display: none;
+      }
+    }
+  }
+</style>
