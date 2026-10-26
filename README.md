@@ -11,6 +11,18 @@ English | [Português (Brasil)](README.pt-BR.md)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_complexity-analyzers&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_complexity-analyzers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/mit)
 
+## Documentation portal
+
+The project's official bilingual documentation portal is planned for [rodri-oliveira-dev.github.io/complexity-analyzers](https://rodri-oliveira-dev.github.io/complexity-analyzers/). Until the GitHub Pages deployment is confirmed, use the versioned documentation in this repository as the authoritative source.
+
+The ecosystem has three independent integration surfaces:
+
+- `ComplexityAnalysis.Analyzers`: Roslyn diagnostics during builds and IDE analysis.
+- `ComplexityAnalysis.Tool`: a .NET CLI for reports, snapshots, comparison, duplicate detection, and opt-in quality gates.
+- `ComplexityAnalysis.Mcp`: a local, read-only MCP server for compatible AI tools.
+
+The portal source and local development instructions live in [`website/`](website/README.md).
+
 `ComplexityAnalysis.Analyzers` is a compile-time Roslyn analyzer for C# that estimates algorithmic complexity and reports diagnostics for costly patterns without adding runtime dependencies or instrumentation to consumer applications.
 
 The analyzer is deliberately conservative: when complexity cannot be proven safely from the available syntax and semantic information, it returns `Unknown` instead of guessing.

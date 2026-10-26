@@ -173,6 +173,7 @@ jobs:
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.projectBaseDir="${GITHUB_WORKSPACE}"
           /d:sonar.cs.opencover.reportsPaths="artifacts/coverage/sonar/opencover/coverage.opencover.xml"
+          /d:sonar.coverage.exclusions="website/**"
           /d:sonar.qualitygate.wait=true
           /d:sonar.qualitygate.timeout=300
 

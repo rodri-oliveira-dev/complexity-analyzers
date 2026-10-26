@@ -1,0 +1,62 @@
+:root {
+  --cx-navy-950: #0a0d1d;
+  --cx-navy-900: #11162a;
+  --cx-violet-700: #4c38bf;
+  --cx-violet-600: #5d49d6;
+  --cx-cyan-500: #159ca9;
+  --cx-cyan-400: #35c4cf;
+  --cx-amber-500: #b86a00;
+  --cx-amber-400: #e9a23b;
+  --cx-page: #fbfbfe;
+  --cx-surface: #ffffff;
+  --cx-surface-muted: #f0f1f8;
+  --cx-text: #22283a;
+  --cx-muted: #596176;
+  --cx-heading: #11162a;
+  --cx-link: #4c38bf;
+  --cx-link-hover: #37269c;
+  --cx-border: #d9dbe8;
+  --cx-focus: #9b5700;
+  --cx-radius-sm: .6rem;
+  --cx-radius-md: 1rem;
+  --cx-radius-lg: 1.6rem;
+  --cx-shadow: 0 24px 70px rgb(17 22 42 / 13%);
+  --sl-color-accent-low: #e6e1ff;
+  --sl-color-accent: var(--cx-link);
+  --sl-color-accent-high: var(--cx-link-hover);
+  --sl-color-white: var(--cx-heading);
+  --sl-color-gray-1: #30374d;
+  --sl-color-gray-2: var(--cx-muted);
+  --sl-color-gray-3: #697187;
+  --sl-color-gray-4: #9ca2b5;
+  --sl-color-gray-5: var(--cx-border);
+  --sl-color-gray-6: var(--cx-surface-muted);
+  --sl-color-black: var(--cx-page);
+  --sl-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sl-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+:root[data-theme='dark'] {
+  --cx-page: #0a0d1d;
+  --cx-surface: #141a31;
+  --cx-surface-muted: #1a213a;
+  --cx-text: #edf0fb;
+  --cx-muted: #b8bfd3;
+  --cx-heading: #f7f8ff;
+  --cx-link: #a99cff;
+  --cx-link-hover: #d4cdff;
+  --cx-border: #343d5b;
+  --cx-focus: #f0b457;
+  --cx-shadow: 0 24px 70px rgb(0 0 0 / 38%);
+  --sl-color-accent-low: #2a235e;
+  --sl-color-accent: var(--cx-link);
+  --sl-color-accent-high: var(--cx-link-hover);
+  --sl-color-white: var(--cx-heading);
+  --sl-color-gray-1: #dce0ef;
+  --sl-color-gray-2: var(--cx-muted);
+  --sl-color-gray-3: #9099b3;
+  --sl-color-gray-4: #58627d;
+  --sl-color-gray-5: var(--cx-border);
+  --sl-color-gray-6: var(--cx-surface-muted);
+  --sl-color-black: var(--cx-page);
+}
