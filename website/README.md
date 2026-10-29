@@ -38,6 +38,8 @@ npm run test:spelling
 
 Accessibility and Lighthouse run in separate GitHub Actions workflows against representative English and Portuguese production routes. Automated checks target WCAG 2.2 AA-aligned outcomes where supported, but do not establish complete conformance or replace manual keyboard, screen-reader, zoom, and cognitive-accessibility review.
 
+The Lighthouse workflow uses the official Lighthouse CLI for three independent measurements of each of four representative routes. Repository scripts calculate the median and enforce the existing gates: performance below 85% is a warning, while accessibility, best practices, or SEO below 95% block the check. JSON reports and the generated Markdown summary are retained in the workflow artifact. Run `npm run lighthouse:collect` against a local production preview, followed by `npm run lighthouse:assert`, to reproduce this behavior.
+
 ## Content structure
 
 Portal-owned editorial content lives in `src/content/docs/`, with Portuguese counterparts under `src/content/docs/pt-br/`. Keep equivalent routes and technical meaning in both languages.

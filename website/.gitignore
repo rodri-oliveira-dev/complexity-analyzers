@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .astro/
+.lighthouseci/
 src/content/docs/analyzer/installation.md
 src/content/docs/analyzer/diagnostics.md
 src/content/docs/analyzer/configuration.md
