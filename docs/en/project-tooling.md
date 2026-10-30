@@ -303,3 +303,7 @@ callbacks.
 The analyzer package remains a `netstandard2.0` Roslyn analyzer asset under
 `analyzers/dotnet/cs/`. The CLI may use repository tooling dependencies, but
 those dependencies are not exposed to analyzer package consumers.
+
+## GitHub Actions integration
+
+For ready-to-use CI configuration built on this CLI, see the [GitHub Action guide](github-action.md). The separately maintained Action invokes the published CLI; it does not change metric semantics, quality-gate defaults, or snapshot comparison behavior. Action and CLI releases are independent. Do not assume the planned Action `v1.0.0` exists until it is publicly released.
