@@ -3,9 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=24.0.0"
-  },
+  "engines": { "node": ">=24.0.0" },
   "scripts": {
     "sync:docs": "node scripts/sync-docs.mjs",
     "predev": "npm run sync:docs",
@@ -42,7 +40,5 @@
     "typescript": "6.0.3",
     "vitest": "5.0.5"
   },
-  "overrides": {
-    "postcss-selector-parser": "7.1.6"
-  }
+  "overrides": { "postcss-selector-parser": "7.1.6" }
 }
