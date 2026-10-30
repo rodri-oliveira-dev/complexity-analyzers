@@ -12,6 +12,7 @@ Choose a language:
 - [Configuration](en/configuration.md)
 - [Architecture](en/architecture.md)
 - [Project-Level Tooling](en/project-tooling.md)
+- [GitHub Action (CI & Pull Requests)](en/github-action.md)
 - [C# Halstead Metrics](en/halstead-metrics.md)
 - [Release Quality Governance](en/development/quality-gates.md)
 
@@ -22,6 +23,7 @@ Choose a language:
 - [Configuração](pt-BR/configuration.md)
 - [Arquitetura](pt-BR/architecture.md)
 - [Ferramentas em Nível de Projeto](pt-BR/project-tooling.md)
+- [GitHub Action (CI e Pull Requests)](pt-BR/github-action.md)
 - [Métricas Halstead para C#](pt-BR/halstead-metrics.md)
 - [Governança de Qualidade de Release](pt-BR/development/quality-gates.md)
 
