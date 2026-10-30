@@ -16,30 +16,57 @@ export function median(values) {
 
 export function analyzeReports(reports, config = defaultConfig) {
   if (!reports.length) throw new Error('No Lighthouse JSON reports were found.');
-  const samplesByUrl = new Map(config.urls.map((url) => [url, Object.fromEntries(Object.keys(config.assertions).map((category) => [category, []]))]));
+
+  const samplesByUrl = createSampleBuckets(config);
   for (const report of reports) {
-    const url = report.requestedUrl;
-    if (!samplesByUrl.has(url)) throw new Error(`Unexpected or missing requested URL in Lighthouse report: ${url ?? '<missing>'}.`);
-    if (!report.categories) throw new Error(`Lighthouse report for ${url} has no categories.`);
-    for (const category of Object.keys(config.assertions)) {
-      const score = report.categories[category]?.score;
-      if (!Number.isFinite(score)) throw new Error(`Lighthouse report for ${url} is missing category ${category}.`);
-      samplesByUrl.get(url)[category].push(score);
-    }
+    collectReportSamples(report, config, samplesByUrl);
   }
+
   const scores = new Map();
   for (const [url, samples] of samplesByUrl) {
-    for (const [category, values] of Object.entries(samples)) {
-      if (values.length !== config.numberOfRuns) throw new Error(`Expected ${config.numberOfRuns} valid ${category} measurements for ${url}, found ${values.length}.`);
-    }
-    scores.set(url, Object.fromEntries(Object.entries(samples).map(([category, values]) => [category, median(values)])));
+    scores.set(url, calculateMedians(url, samples, config.numberOfRuns));
   }
+
   const gates = Object.entries(config.assertions).map(([category, assertion]) => {
     const actual = Math.min(...[...scores.values()].map((entry) => entry[category]));
-    const passed = actual >= assertion.minScore;
-    return { category, actual, ...assertion, result: passed ? 'PASS' : assertion.level === 'error' ? 'FAIL' : 'WARN' };
+    return { category, actual, ...assertion, result: gateResult(actual, assertion) };
   });
   return { scores, gates, failed: gates.some((gate) => gate.result === 'FAIL') };
+}
+
+function createSampleBuckets(config) {
+  const categories = Object.keys(config.assertions);
+  return new Map(config.urls.map((url) => [
+    url,
+    Object.fromEntries(categories.map((category) => [category, []])),
+  ]));
+}
+
+function collectReportSamples(report, config, samplesByUrl) {
+  const url = report.requestedUrl;
+  if (!samplesByUrl.has(url)) throw new Error(`Unexpected or missing requested URL in Lighthouse report: ${url ?? '<missing>'}.`);
+  if (!report.categories) throw new Error(`Lighthouse report for ${url} has no categories.`);
+
+  for (const category of Object.keys(config.assertions)) {
+    const score = report.categories[category]?.score;
+    if (!Number.isFinite(score)) throw new Error(`Lighthouse report for ${url} is missing category ${category}.`);
+    samplesByUrl.get(url)[category].push(score);
+  }
+}
+
+function calculateMedians(url, samples, numberOfRuns) {
+  for (const [category, values] of Object.entries(samples)) {
+    if (values.length !== numberOfRuns) throw new Error(`Expected ${numberOfRuns} valid ${category} measurements for ${url}, found ${values.length}.`);
+  }
+
+  return Object.fromEntries(
+    Object.entries(samples).map(([category, values]) => [category, median(values)]),
+  );
+}
+
+function gateResult(actual, assertion) {
+  if (actual >= assertion.minScore) return 'PASS';
+  return assertion.level === 'error' ? 'FAIL' : 'WARN';
 }
 
 const percent = (value) => `${Math.round(value * 100)}%`;

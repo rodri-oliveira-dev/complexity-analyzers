@@ -109,24 +109,18 @@ public sealed class ComplexityMcpService
             source = "cachedSnapshot";
         }
 
-        foreach (JsonElement project in report.GetProperty("Projects").EnumerateArray())
+        foreach (JsonElement member in EnumerateMembers(report))
         {
-            foreach (JsonElement file in project.GetProperty("Files").EnumerateArray())
+            if (member.TryGetProperty("StableId", out JsonElement id)
+                && StringComparer.Ordinal.Equals(id.GetString(), stableId))
             {
-                foreach (JsonElement member in file.GetProperty("Members").EnumerateArray())
-                {
-                    if (member.TryGetProperty("StableId", out JsonElement id)
-                        && StringComparer.Ordinal.Equals(id.GetString(), stableId))
-                    {
-                        return new(
-                            "complexity-member-evidence/1.0",
-                            stableId,
-                            true,
-                            member.Clone(),
-                            resolvedAnalysisId,
-                            source);
-                    }
-                }
+                return new(
+                    "complexity-member-evidence/1.0",
+                    stableId,
+                    true,
+                    member.Clone(),
+                    resolvedAnalysisId,
+                    source);
             }
         }
 
@@ -301,36 +295,28 @@ public sealed class ComplexityMcpService
     private static McpAnalysisSummary CreateSummary(JsonElement report, int maximumMembers)
     {
         List<McpMemberSummary> members = [];
-        int projectCount = 0;
-        int fileCount = 0;
+        int projectCount = report.GetProperty("Projects").GetArrayLength();
+        int fileCount = CountFiles(report);
         int memberCount = 0;
         int unknownMemberCount = 0;
-        foreach (JsonElement project in report.GetProperty("Projects").EnumerateArray())
+        foreach (JsonElement member in EnumerateMembers(report))
         {
-            projectCount++;
-            foreach (JsonElement file in project.GetProperty("Files").EnumerateArray())
+            memberCount++;
+            JsonElement bigO = member.GetProperty("BigO");
+            if (bigO.GetProperty("IsUnknown").GetBoolean())
             {
-                fileCount++;
-                foreach (JsonElement member in file.GetProperty("Members").EnumerateArray())
-                {
-                    memberCount++;
-                    JsonElement bigO = member.GetProperty("BigO");
-                    if (bigO.GetProperty("IsUnknown").GetBoolean())
-                    {
-                        unknownMemberCount++;
-                    }
+                unknownMemberCount++;
+            }
 
-                    if (members.Count < maximumMembers)
-                    {
-                        JsonElement value = bigO.GetProperty("Value");
-                        members.Add(new(
-                            member.GetProperty("StableId").GetString()!,
-                            member.GetProperty("DisplayName").GetString()!,
-                            member.GetProperty("Kind").GetString()!,
-                            bigO.GetProperty("Status").GetString()!,
-                            value.ValueKind == JsonValueKind.Null ? null : value.GetString()));
-                    }
-                }
+            if (members.Count < maximumMembers)
+            {
+                JsonElement value = bigO.GetProperty("Value");
+                members.Add(new(
+                    member.GetProperty("StableId").GetString()!,
+                    member.GetProperty("DisplayName").GetString()!,
+                    member.GetProperty("Kind").GetString()!,
+                    bigO.GetProperty("Status").GetString()!,
+                    value.ValueKind == JsonValueKind.Null ? null : value.GetString()));
             }
         }
 
@@ -342,6 +328,31 @@ public sealed class ComplexityMcpService
             unknownMemberCount,
             members.Count < memberCount,
             members);
+    }
+
+    private static int CountFiles(JsonElement report)
+    {
+        int count = 0;
+        foreach (JsonElement project in report.GetProperty("Projects").EnumerateArray())
+        {
+            count = checked(count + project.GetProperty("Files").GetArrayLength());
+        }
+
+        return count;
+    }
+
+    private static IEnumerable<JsonElement> EnumerateMembers(JsonElement report)
+    {
+        foreach (JsonElement project in report.GetProperty("Projects").EnumerateArray())
+        {
+            foreach (JsonElement file in project.GetProperty("Files").EnumerateArray())
+            {
+                foreach (JsonElement member in file.GetProperty("Members").EnumerateArray())
+                {
+                    yield return member;
+                }
+            }
+        }
     }
 
     private static JsonElement Parse(string json)

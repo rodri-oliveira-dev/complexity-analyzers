@@ -14,26 +14,35 @@ function run(command, args) {
     child.once('error', reject);
     child.once('exit', (code, signal) => {
       if (code === 0) resolveRun();
-      else reject(new Error(`Lighthouse exited with ${signal ? `signal ${signal}` : `code ${code}`}.`));
+      else {
+        const exitReason = signal ? `signal ${signal}` : `code ${code}`;
+        reject(new Error(`Lighthouse exited with ${exitReason}.`));
+      }
     });
   });
+}
+
+function collectReport({ url, urlIndex, runIndex }) {
+  const outputPath = resolve(reportDirectory, `report-${urlIndex + 1}-${runIndex}.json`);
+  console.log(`Lighthouse run ${runIndex}/${config.numberOfRuns}: ${url}`);
+  return run(process.execPath, [
+    lighthouseCli,
+    url,
+    '--quiet',
+    '--output=json',
+    `--output-path=${outputPath}`,
+    `--chrome-flags=${config.chromeFlags.join(' ')}`,
+    `--only-categories=${Object.keys(config.assertions).join(',')}`,
+  ]);
 }
 
 await rm(reportDirectory, { recursive: true, force: true });
 await mkdir(reportDirectory, { recursive: true });
 
-for (const [urlIndex, url] of config.urls.entries()) {
-  for (let runIndex = 1; runIndex <= config.numberOfRuns; runIndex += 1) {
-    const outputPath = resolve(reportDirectory, `report-${urlIndex + 1}-${runIndex}.json`);
-    console.log(`Lighthouse run ${runIndex}/${config.numberOfRuns}: ${url}`);
-    await run(process.execPath, [
-      lighthouseCli,
-      url,
-      '--quiet',
-      '--output=json',
-      `--output-path=${outputPath}`,
-      `--chrome-flags=${config.chromeFlags.join(' ')}`,
-      `--only-categories=${Object.keys(config.assertions).join(',')}`,
-    ]);
-  }
-}
+const reports = config.urls.flatMap((url, urlIndex) =>
+  Array.from({ length: config.numberOfRuns }, (_, index) => ({ url, urlIndex, runIndex: index + 1 })));
+
+await reports.reduce(
+  (previous, report) => previous.then(() => collectReport(report)),
+  Promise.resolve(),
+);

@@ -400,7 +400,7 @@ internal sealed class ToolOptions
         return true;
     }
 
-    private static bool TryParseFormat(string value, out ReportFormat format)
+    internal static bool TryParseFormat(string value, out ReportFormat format)
     {
         if (StringComparer.OrdinalIgnoreCase.Equals(value, "json"))
         {
@@ -427,18 +427,16 @@ internal sealed class ToolOptions
     private static bool TryParseMaximumComplexity(string value, out string threshold)
     {
         string normalized = value.Trim().ToLowerInvariant();
-        ComplexityThreshold parsed = normalized switch
+        string canonical = normalized switch
         {
-            "constant" => ComplexityThreshold.Constant,
-            "log_n" => ComplexityThreshold.LogN,
-            "linear" or "n" => ComplexityThreshold.Linear,
-            "n_log_n" => ComplexityThreshold.NLogN,
-            "quadratic" or "n2" => ComplexityThreshold.Quadratic,
-            "cubic" or "n3" => ComplexityThreshold.Cubic,
-            "exponential" => ComplexityThreshold.Exponential,
-            "factorial" => ComplexityThreshold.Factorial,
-            _ => ComplexityThreshold.None,
+            "linear" => "n",
+            "quadratic" => "n2",
+            "cubic" => "n3",
+            _ => normalized,
         };
+        ComplexityThreshold parsed = ComplexityThreshold.ParseOrDefault(
+            canonical,
+            ComplexityThreshold.None);
 
         if (!parsed.TryCreateExpression(out _))
         {
