@@ -269,3 +269,4 @@ O tempo varia conforme hardware e runner de CI. A validação reproduzível é q
 - Leia o [Catálogo de Analyzers](analyzers.md) para entender cada diagnóstico.
 - Leia [Configuração](configuration.md) para ajustar budgets de análise e severidades.
 - Leia [Arquitetura](architecture.md) para conhecer o pipeline do analyzer e suas fronteiras de design.
+- Para executar a CLI no CI ou comparar pull requests, consulte o [guia da GitHub Action](github-action.md).
