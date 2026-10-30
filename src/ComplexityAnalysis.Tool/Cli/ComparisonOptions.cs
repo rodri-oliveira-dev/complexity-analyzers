@@ -43,52 +43,60 @@ internal sealed class ComparisonOptions
         ComparisonOptions parsed = new(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
         for (int index = 3; index < args.Length; index++)
         {
-            string option = args[index];
-            switch (option)
+            if (!TryParseOption(args, ref index, parsed, out error))
             {
-                case "--fail-on-regression":
-                    parsed.FailOnRegression = true;
-                    break;
-                case "--format":
-                    if (!TryReadValue(args, ref index, option, out string value, out error))
-                    {
-                        return false;
-                    }
-
-                    if (StringComparer.OrdinalIgnoreCase.Equals(value, "json"))
-                    {
-                        parsed.Format = ReportFormat.Json;
-                    }
-                    else if (StringComparer.OrdinalIgnoreCase.Equals(value, "console"))
-                    {
-                        parsed.Format = ReportFormat.Console;
-                    }
-                    else if (StringComparer.OrdinalIgnoreCase.Equals(value, "sarif"))
-                    {
-                        parsed.Format = ReportFormat.Sarif;
-                    }
-                    else
-                    {
-                        error = "Format must be 'console', 'json', or 'sarif'.";
-                        return false;
-                    }
-
-                    break;
-                case "--output":
-                    if (!TryReadValue(args, ref index, option, out string outputPath, out error))
-                    {
-                        return false;
-                    }
-
-                    parsed.OutputPath = Path.GetFullPath(outputPath);
-                    break;
-                default:
-                    error = "Unknown option '" + option + "'.";
-                    return false;
+                return false;
             }
         }
 
         options = parsed;
+        return true;
+    }
+
+    private static bool TryParseOption(
+        string[] args,
+        ref int index,
+        ComparisonOptions parsed,
+        out string? error)
+    {
+        string option = args[index];
+        switch (option)
+        {
+            case "--fail-on-regression":
+                parsed.FailOnRegression = true;
+                error = null;
+                return true;
+            case "--format":
+                return TryParseFormat(args, ref index, option, parsed, out error);
+            case "--output":
+                if (!TryReadValue(args, ref index, option, out string outputPath, out error))
+                {
+                    return false;
+                }
+
+                parsed.OutputPath = Path.GetFullPath(outputPath);
+                return true;
+            default:
+                error = "Unknown option '" + option + "'.";
+                return false;
+        }
+    }
+
+    private static bool TryParseFormat(
+        string[] args,
+        ref int index,
+        string option,
+        ComparisonOptions parsed,
+        out string? error)
+    {
+        if (!TryReadValue(args, ref index, option, out string value, out error)
+            || !ToolOptions.TryParseFormat(value, out ReportFormat format))
+        {
+            error ??= "Format must be 'console', 'json', or 'sarif'.";
+            return false;
+        }
+
+        parsed.Format = format;
         return true;
     }
 

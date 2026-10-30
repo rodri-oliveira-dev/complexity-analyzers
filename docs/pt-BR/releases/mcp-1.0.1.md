@@ -1,0 +1,36 @@
+# ComplexityAnalysis.Mcp 1.0.1
+
+Esta release patch preparada melhora a manutenibilidade sem alterar a superfície
+de ferramentas MCP nem seu contrato de compatibilidade.
+
+## Correções de manutenção
+
+- Dividiu o parsing das opções de inicialização em helpers focados de validação,
+  preservando todas as opções aceitas, defaults, limites e mensagens de erro.
+- Reutilizou uma única travessia determinística de membros para consulta completa
+  de evidências e resumos limitados, preservando ordem, contagens, truncamento e
+  comportamento do cache de snapshots exatos.
+- Preservou a raiz permitida, a proteção contra links simbólicos, o isolamento
+  entre requisições, o cancelamento, os timeouts e resultados conservadores
+  `Unknown`.
+
+## Compatibilidade
+
+- O pacote continua sendo uma ferramenta .NET 10 com o comando
+  `complexity-mcp`.
+- As três ferramentas MCP somente leitura e seus schemas de requisição e
+  resposta permanecem inalterados.
+- Nenhuma quebra de compatibilidade de código-fonte, transporte, Registry ou
+  pacote foi introduzida.
+
+## Estado da publicação
+
+A versão `1.0.1` está preparada para release após aprovação e merge. Até que o
+workflow protegido publique o pacote e verifique a entrada no Official MCP
+Registry, a documentação de instalação e descoberta continua identificando a
+versão atualmente publicada.
+
+O workflow cria a tag imutável `mcp-v1.0.1`, empacota e valida a ferramenta,
+produz a SBOM SPDX 2.3 e as attestations, publica os artefatos NuGet e GitHub e,
+em seguida, sincroniza e verifica o manifesto versionado do Registry. Esta
+preparação não executa nenhuma dessas etapas de publicação.

@@ -327,32 +327,18 @@ internal sealed class KnownOperationComplexityAnalyzer
         expression = UnwrapParentheses(expression);
         plan = SequenceEnumerationPlan.Unknown();
 
-        if (TryGetLocalInitializer(
-                expression,
-                out ExpressionSyntax? localInitializer,
-                out _)
-            && localInitializer is not null)
+        if (TryAnalyzeLocalPipeline(expression, out plan, out bool isLocalReference))
         {
-            if (TryResolveStableLocalInitializer(expression, out ExpressionSyntax? stableInitializer)
-                && stableInitializer is not null)
-            {
-                return TryAnalyzeDeferredPipeline(stableInitializer, out plan);
-            }
-
-            if (IsDeferredPipelineExpression(localInitializer))
-            {
-                plan = SequenceEnumerationPlan.Unknown();
-                return true;
-            }
+            return true;
         }
 
-        if (expression is not InvocationExpressionSyntax invocation
-            || !KnownOperationInvocation.TryResolve(invocation, context, Resolver, out IMethodSymbol? methodSymbol, out KnownOperationMapping? mapping)
-            || methodSymbol is null
-            || mapping is null
-            || mapping.ExecutionKind != KnownOperationExecutionKind.Deferred
-            || !KnownOperationInvocation.TryGetReceiverExpression(invocation, methodSymbol, out ExpressionSyntax? source)
-            || source is null)
+        if (isLocalReference
+            || !TryResolveDeferredInvocation(
+                expression,
+                out InvocationExpressionSyntax? invocation,
+                out IMethodSymbol? methodSymbol,
+                out KnownOperationMapping? mapping,
+                out ExpressionSyntax? source))
         {
             return false;
         }
@@ -374,14 +360,82 @@ internal sealed class KnownOperationComplexityAnalyzer
             return true;
         }
 
+        plan = CreateDeferredPipelinePlan(invocation, mapping, sourcePlan, delegateComplexity);
+        return true;
+    }
+
+    private bool TryAnalyzeLocalPipeline(
+        ExpressionSyntax expression,
+        out SequenceEnumerationPlan plan,
+        out bool isLocalReference)
+    {
+        plan = SequenceEnumerationPlan.Unknown();
+        isLocalReference = TryGetLocalInitializer(
+            expression,
+            out ExpressionSyntax? localInitializer,
+            out _)
+            && localInitializer is not null;
+
+        return isLocalReference
+            && (TryResolveStableLocalInitializer(expression, out ExpressionSyntax? stableInitializer)
+                && stableInitializer is not null
+                    ? TryAnalyzeDeferredPipeline(stableInitializer, out plan)
+                    : IsDeferredPipelineExpression(localInitializer!));
+    }
+
+    private bool TryResolveDeferredInvocation(
+        ExpressionSyntax expression,
+        out InvocationExpressionSyntax invocation,
+        out IMethodSymbol methodSymbol,
+        out KnownOperationMapping mapping,
+        out ExpressionSyntax source)
+    {
+        invocation = null!;
+        methodSymbol = null!;
+        mapping = null!;
+        source = null!;
+
+        if (expression is not InvocationExpressionSyntax candidate)
+        {
+            return false;
+        }
+
+        if (!KnownOperationInvocation.TryResolve(
+                candidate,
+                context,
+                Resolver,
+                out IMethodSymbol? resolvedMethod,
+                out KnownOperationMapping? resolvedMapping)
+            || resolvedMethod is null
+            || resolvedMapping is null
+            || resolvedMapping.ExecutionKind != KnownOperationExecutionKind.Deferred
+            || !KnownOperationInvocation.TryGetReceiverExpression(
+                candidate,
+                resolvedMethod,
+                out ExpressionSyntax? resolvedSource)
+            || resolvedSource is null)
+        {
+            return false;
+        }
+
+        invocation = candidate;
+        methodSymbol = resolvedMethod;
+        mapping = resolvedMapping;
+        source = resolvedSource;
+        return true;
+    }
+
+    private SequenceEnumerationPlan CreateDeferredPipelinePlan(
+        InvocationExpressionSyntax invocation,
+        KnownOperationMapping mapping,
+        SequenceEnumerationPlan sourcePlan,
+        ComplexityExpression delegateComplexity)
+    {
         ComplexityExpression total = sourcePlan.TotalEnumerationComplexity;
         ComplexityExpression elementIteration = sourcePlan.ElementIterationComplexity;
         string operationFamily = mapping.Metadata.OperationFamily;
 
-        if (StringComparer.Ordinal.Equals(operationFamily, "linq-orderby")
-            || StringComparer.Ordinal.Equals(operationFamily, "linq-orderby-descending")
-            || StringComparer.Ordinal.Equals(operationFamily, "linq-thenby")
-            || StringComparer.Ordinal.Equals(operationFamily, "linq-thenby-descending"))
+        if (IsOrderingOperation(operationFamily))
         {
             total = ComplexityComposer.Sequential(
                 total,
@@ -392,8 +446,7 @@ internal sealed class KnownOperationComplexityAnalyzer
             if (!TryResolveSelectManyInnerDimension(invocation, out ComplexityVariable? innerVariable)
                 || innerVariable is null)
             {
-                plan = SequenceEnumerationPlan.Unknown();
-                return true;
+                return SequenceEnumerationPlan.Unknown();
             }
 
             elementIteration = ComplexityComposer.Nested(
@@ -415,12 +468,19 @@ internal sealed class KnownOperationComplexityAnalyzer
                 ComplexityComposer.Nested(sourcePlan.ElementIterationComplexity, delegateComplexity));
         }
 
-        plan = new SequenceEnumerationPlan(
+        return new SequenceEnumerationPlan(
             isUnknown: false,
             sourcePlan.PrimaryVariable,
             elementIteration,
             total);
-        return true;
+    }
+
+    private static bool IsOrderingOperation(string operationFamily)
+    {
+        return operationFamily is "linq-orderby"
+            or "linq-orderby-descending"
+            or "linq-thenby"
+            or "linq-thenby-descending";
     }
 
     private bool TryResolveSelectManyInnerDimension(

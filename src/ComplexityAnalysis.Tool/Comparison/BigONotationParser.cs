@@ -21,29 +21,42 @@ internal static class BigONotationParser
             return true;
         }
 
-        if (body.EndsWith('!'))
-        {
-            return TryVariable(body[..^1], out ComplexityVariable? variable)
-                && TryCreate(() => ComplexityFactory.Factorial(variable), out expression);
-        }
+        return TryParseFactorial(body, out expression)
+            || TryParseExponential(body, out expression)
+            || TryParseLogarithm(body, out expression)
+            || TryParsePolynomialOrLog(body, out expression);
+    }
 
-        int exponentialSeparator = body.IndexOf('^');
-        if (exponentialSeparator > 0
-            && double.TryParse(body[..exponentialSeparator], NumberStyles.Float, CultureInfo.InvariantCulture, out double baseValue)
+    private static bool TryParseFactorial(string body, out ComplexityExpression expression)
+    {
+        expression = ComplexityFactory.Unknown();
+        return body.EndsWith('!')
+            && TryVariable(body[..^1], out ComplexityVariable? variable)
+            && TryCreate(() => ComplexityFactory.Factorial(variable), out expression);
+    }
+
+    private static bool TryParseExponential(string body, out ComplexityExpression expression)
+    {
+        expression = ComplexityFactory.Unknown();
+        int separator = body.IndexOf('^');
+        return separator > 0
+            && double.TryParse(body[..separator], NumberStyles.Float, CultureInfo.InvariantCulture, out double baseValue)
             && double.IsFinite(baseValue)
-            && TryVariable(body[(exponentialSeparator + 1)..], out ComplexityVariable? exponentialVariable))
-        {
-            return TryCreate(
-                () => ComplexityFactory.Exponential(exponentialVariable, baseValue),
-                out expression);
-        }
+            && TryVariable(body[(separator + 1)..], out ComplexityVariable? variable)
+            && TryCreate(() => ComplexityFactory.Exponential(variable, baseValue), out expression);
+    }
 
-        if (body.StartsWith("log ", StringComparison.Ordinal))
-        {
-            return TryVariable(body[4..], out ComplexityVariable? variable)
-                && TryCreate(() => ComplexityFactory.LogN(variable), out expression);
-        }
+    private static bool TryParseLogarithm(string body, out ComplexityExpression expression)
+    {
+        expression = ComplexityFactory.Unknown();
+        return body.StartsWith("log ", StringComparison.Ordinal)
+            && TryVariable(body[4..], out ComplexityVariable? variable)
+            && TryCreate(() => ComplexityFactory.LogN(variable), out expression);
+    }
 
+    private static bool TryParsePolynomialOrLog(string body, out ComplexityExpression expression)
+    {
+        expression = ComplexityFactory.Unknown();
         int logSeparator = body.IndexOf(" log ", StringComparison.Ordinal);
         string polynomial = logSeparator < 0 ? body : body[..logSeparator];
         if (!TryPolynomial(polynomial, out ComplexityVariable? polynomialVariable, out double degree))

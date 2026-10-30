@@ -11,4 +11,8 @@ The Analyzer, CLI, and MCP packages are independently consumable and may have di
 
 For MCP `1.0.0` publication details and registry metadata, see the synchronized [release note](/complexity-analyzers/reference/releases/mcp-1-0-0/).
 
+MCP `1.0.1` is prepared but not yet published. Its synchronized [release
+preparation note](/complexity-analyzers/reference/releases/mcp-1-0-1/) records
+the maintenance scope and the publication steps that remain protected.
+
 This portal is planned for `https://rodri-oliveira-dev.github.io/complexity-analyzers/`. Do not treat that URL as deployed until the GitHub Pages workflow completes successfully.

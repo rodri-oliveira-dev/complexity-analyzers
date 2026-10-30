@@ -1,6 +1,25 @@
 version: 2
 
 updates:
+  # Keep the documentation portal dependencies current.
+  - package-ecosystem: "npm"
+    directory: "/website"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:30"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 10
+    rebase-strategy: "auto"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      compatible-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
   # Central Package Management + project NuGet dependencies.
   - package-ecosystem: "nuget"
     directory: "/"

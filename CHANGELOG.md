@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### ComplexityAnalysis.Analyzers 1.6.1
+
+- Refactored deferred LINQ pipeline analysis into focused resolution and
+  composition steps without changing diagnostics, complexity estimates,
+  conservative `Unknown` propagation, evidence, cancellation, or concurrency
+  behavior.
+- Preserved the self-contained `netstandard2.0` analyzer package contract and
+  existing Roslyn compatibility constraints.
+
+### ComplexityAnalysis.Tool 1.0.1
+
+- Simplified analysis and comparison option parsing while preserving accepted
+  arguments, validation messages, exit codes, JSON/SARIF formats, quality
+  gates, and independently versioned .NET Tool packaging.
+- Refactored Big-O notation parsing into focused syntax handlers and added
+  regression coverage for supported and rejected forms.
+
+### ComplexityAnalysis.Mcp 1.0.1
+
+- Simplified startup option parsing and report traversal while preserving tool
+  schemas, response contracts, path boundaries, cache isolation, cancellation,
+  timeout behavior, and conservative `Unknown` results.
+- Kept the checked-in Official MCP Registry manifest on the currently
+  published version; the protected release workflow creates and publishes the
+  synchronized `1.0.1` manifest only after package publication.
+
 ### ComplexityAnalysis.Mcp 1.0.0
 
 - Prepared the first independently versioned public MCP .NET Tool package with

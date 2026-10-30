@@ -36,7 +36,11 @@ public sealed class McpPackageContractTests
             .Descendants("VersionPrefix")
             .Single()
             .Value;
-        Assert.Equal(projectVersion, manifest.GetProperty("version").GetString());
+        string manifestVersion = Assert.IsType<string>(manifest.GetProperty("version").GetString());
+        string stableProjectVersion = projectVersion.Split('-', 2)[0];
+        Assert.True(
+            Version.Parse(manifestVersion) <= Version.Parse(stableProjectVersion),
+            "The checked-in Registry manifest must not announce a version newer than the prepared package.");
 
         JsonElement package = Assert.Single(manifest.GetProperty("packages").EnumerateArray());
         Assert.Equal("nuget", package.GetProperty("registryType").GetString());
@@ -65,6 +69,9 @@ public sealed class McpPackageContractTests
         Assert.Contains("id-token: write", registryJob, StringComparison.Ordinal);
         Assert.Contains("MCP_PUBLISHER_VERSION: v1.8.4", workflow, StringComparison.Ordinal);
         Assert.Contains("cosign verify-blob", registryJob, StringComparison.Ordinal);
+        Assert.Contains("jq --arg version \"$PACKAGE_VERSION\"", registryJob, StringComparison.Ordinal);
+        Assert.Contains(".version = $version", registryJob, StringComparison.Ordinal);
+        Assert.Contains("then .version = $version", registryJob, StringComparison.Ordinal);
         Assert.Contains("mcp-publisher login github-oidc", registryJob, StringComparison.Ordinal);
         Assert.Contains("mcp-publisher publish .mcp/server.json", registryJob, StringComparison.Ordinal);
         Assert.DoesNotContain("MCP_GITHUB_TOKEN", registryJob, StringComparison.Ordinal);

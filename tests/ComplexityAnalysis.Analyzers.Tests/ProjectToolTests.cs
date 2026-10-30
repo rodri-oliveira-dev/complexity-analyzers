@@ -1,6 +1,8 @@
 using System.Text.Json;
 
+using ComplexityAnalysis.Analyzers.Model;
 using ComplexityAnalysis.Tool.Cli;
+using ComplexityAnalysis.Tool.Comparison;
 using ComplexityAnalysis.Tool.Duplicates;
 using ComplexityAnalysis.Tool.Project;
 using ComplexityAnalysis.Tool.Reporting;
@@ -533,6 +535,70 @@ public sealed class ProjectToolTests
 
         Assert.Null(options);
         Assert.Equal("Unknown option '--unknown'.", error);
+    }
+
+    [Theory]
+    [InlineData("O(1)", "O(1)")]
+    [InlineData("O(n!)", "O(n!)")]
+    [InlineData("O(2^n)", "O(2^n)")]
+    [InlineData("O(log n)", "O(log n)")]
+    [InlineData("O(n log n)", "O(n log n)")]
+    [InlineData("O(n^2 log n)", "O(n² log n)")]
+    public void Big_o_notation_parser_preserves_supported_forms(string notation, string expected)
+    {
+        Assert.True(BigONotationParser.TryParse(notation, out ComplexityExpression expression));
+        Assert.Equal(expected, expression.ToBigONotation());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("O()")]
+    [InlineData("O(2^)")]
+    [InlineData("O(n log m)")]
+    [InlineData("O(NaN^n)")]
+    public void Big_o_notation_parser_rejects_invalid_forms(string? notation)
+    {
+        Assert.False(BigONotationParser.TryParse(notation, out ComplexityExpression expression));
+        Assert.Equal("Unknown", expression.ToBigONotation());
+    }
+
+    [Fact]
+    public void Comparison_options_parse_all_supported_switches()
+    {
+        Assert.True(ComparisonOptions.TryParse(
+            ["compare", "baseline.json", "current.json", "--format", "SARIF", "--output", "result.sarif", "--fail-on-regression"],
+            out ComparisonOptions? options,
+            out string? error));
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.Equal(Path.GetFullPath("baseline.json"), options.BaselinePath);
+        Assert.Equal(Path.GetFullPath("current.json"), options.CurrentPath);
+        Assert.Equal(ReportFormat.Sarif, options.Format);
+        Assert.Equal(Path.GetFullPath("result.sarif"), options.OutputPath);
+        Assert.True(options.FailOnRegression);
+    }
+
+    [Theory]
+    [InlineData("--format", null, "--format requires a value.")]
+    [InlineData("--format", "xml", "Format must be 'console', 'json', or 'sarif'.")]
+    [InlineData("--output", null, "--output requires a value.")]
+    [InlineData("--unknown", null, "Unknown option '--unknown'.")]
+    public void Comparison_options_preserve_validation_errors(
+        string option,
+        string? value,
+        string expectedError)
+    {
+        List<string> args = ["compare", "baseline.json", "current.json", option];
+        if (value is not null)
+        {
+            args.Add(value);
+        }
+
+        Assert.False(ComparisonOptions.TryParse(args.ToArray(), out ComparisonOptions? options, out string? error));
+        Assert.Null(options);
+        Assert.Equal(expectedError, error);
     }
 
     [Fact]

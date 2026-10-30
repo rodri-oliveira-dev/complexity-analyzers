@@ -149,11 +149,13 @@ sob `io.github.rodri-oliveira-dev/complexity-analysis` e resolve o pacote
 `nuget` pelo NuGet.org; ele não substitui instalação nem inicialização stdio no
 VS Code/Copilot, Codex ou Claude Desktop.
 
-`.mcp/server.json` é a base versionada. Em cada release manual da `main`,
-`release-mcp.yml` substitui os dois campos de versão do manifesto pela versão
-validada no workflow, comprovando igualdade com `mcp-v<versão>` e o pacote
-NuGet. Depois da publicação NuGet e conclusão da GitHub Release, o job do
-Registry aguarda o README e o marcador exato de propriedade `mcp-name`, verifica
+`.mcp/server.json` é a base versionada da versão atualmente publicada no
+Registry; por isso, uma versão preparada do pacote pode ser mais nova. Em cada
+release manual da `main`, `release-mcp.yml` substitui os dois campos de versão
+do manifesto pela versão validada no workflow, comprovando igualdade com
+`mcp-v<versão>` e o pacote NuGet. Depois da publicação NuGet e conclusão da
+GitHub Release, o job do Registry aguarda o README e o marcador exato de
+propriedade `mcp-name`, verifica
 o artefato fixado do `mcp-publisher` por Sigstore, valida o manifesto, autentica
 por GitHub OIDC, publica e verifica o resultado na API. Pull requests executam
 somente validação.

@@ -54,13 +54,10 @@ jobs:
           exit 1
       - name: Collect three runs per page
         working-directory: website
-        run: npx --no-install lhci collect --config=lighthouserc.cjs
-      - name: Publish score summary
-        working-directory: website
-        run: node scripts/summarize-lighthouse.mjs
+        run: npm run lighthouse:collect
       - name: Enforce budgets
         working-directory: website
-        run: npx --no-install lhci assert --config=lighthouserc.cjs
+        run: npm run lighthouse:assert
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

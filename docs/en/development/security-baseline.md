@@ -22,6 +22,7 @@ This control evaluates the dependency delta of the pull request. It complements,
 
 Dependabot maintains:
 
+- npm dependencies for the documentation portal under `website/`, grouping compatible minor and patch updates while leaving major updates for separate compatibility review;
 - NuGet dependencies, including the repository's explicit Roslyn compatibility constraints;
 - the .NET SDK declared by `global.json`;
 - GitHub Actions references.

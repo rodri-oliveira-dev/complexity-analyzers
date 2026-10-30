@@ -19,7 +19,8 @@ const englishMappings = [
   ['docs/en/architecture.md', 'reference/architecture.md'],
   ['docs/en/development/security-baseline.md', 'reference/security-baseline.md'],
   ['docs/en/development/quality-gates.md', 'reference/development-quality-gates.md'],
-  ['docs/en/releases/mcp-1.0.0.md', 'reference/releases/mcp-1-0-0.md']
+  ['docs/en/releases/mcp-1.0.0.md', 'reference/releases/mcp-1-0-0.md'],
+  ['docs/en/releases/mcp-1.0.1.md', 'reference/releases/mcp-1-0-1.md']
 ];
 
 const mappings = [

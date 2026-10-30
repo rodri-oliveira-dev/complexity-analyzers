@@ -6,7 +6,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>complexity-mcp</ToolCommandName>
     <PackageId>ComplexityAnalysis.Mcp</PackageId>
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionPrefix>1.0.1</VersionPrefix>
     <Title>Complexity Analysis MCP Server</Title>
     <Description>Local read-only MCP server for deterministic C# project complexity analysis, member evidence, and snapshot comparison.</Description>
     <Authors>Rodrigo de Oliveira</Authors>
