@@ -1,9 +1,11 @@
 ---
 title: Integração com GitHub Actions
-description: Fixe a CLI, gere artefatos e aplique gates explícitos de complexidade na CI.
+description: Execute a CLI manualmente no GitHub Actions, com versões fixas e quality gates explícitos.
 sidebar:
   order: 2
 ---
+
+Esta página demonstra o uso **manual da CLI**. Para integrar relatórios e regressões em PRs por meio de uma Action reutilizável, consulte a [Complexity Analysis GitHub Action](/complexity-analyzers/pt-br/action/). A primeira release estável está planejada, mas ainda não foi publicada.
 
 Use um manifesto local de ferramentas para que o workflow restaure uma versão revisada.
 
