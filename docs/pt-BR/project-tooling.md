@@ -307,3 +307,7 @@ quality gates e detecção de duplicação vivem em `ComplexityAnalysis.Tool`.
 O pacote do analyzer permanece um asset Roslyn `netstandard2.0` em
 `analyzers/dotnet/cs/`. A CLI pode usar dependências de tooling do repositório,
 mas essas dependências não são expostas aos consumidores do pacote do analyzer.
+
+## Integração com GitHub Actions
+
+Para configurar o CI usando esta CLI, consulte o [guia da GitHub Action](github-action.md). A Action é mantida separadamente e invoca a CLI publicada; ela não altera as métricas, os padrões de quality gates nem a semântica da comparação de snapshots. As releases da Action e da CLI são independentes. Não considere a versão planejada `v1.0.0` como publicada antes de confirmar sua disponibilidade.
