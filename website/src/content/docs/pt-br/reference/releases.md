@@ -11,4 +11,9 @@ Os pacotes Analyzer, CLI e MCP são consumíveis de forma independente e podem t
 
 Para detalhes da publicação MCP `1.0.0` e metadados do registro, consulte a [nota de release](/complexity-analyzers/pt-br/reference/releases/mcp-1-0-0/) sincronizada.
 
+O MCP `1.0.1` está preparado, mas ainda não foi publicado. Sua [nota
+sincronizada de preparação](/complexity-analyzers/pt-br/reference/releases/mcp-1-0-1/)
+registra o escopo de manutenção e as etapas de publicação que continuam
+protegidas.
+
 Este portal está planejado para `https://rodri-oliveira-dev.github.io/complexity-analyzers/`. Não trate essa URL como publicada antes de o workflow do GitHub Pages concluir com sucesso.

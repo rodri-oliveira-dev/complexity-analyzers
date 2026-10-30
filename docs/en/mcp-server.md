@@ -155,11 +155,13 @@ under `io.github.rodri-oliveira-dev/complexity-analysis` and resolves its
 `nuget` package to NuGet.org; it does not replace installation or stdio startup
 in VS Code/Copilot, Codex, or Claude Desktop.
 
-`.mcp/server.json` is the version-controlled baseline. For every manual release
-from `main`, `release-mcp.yml` replaces both manifest version fields with the
-validated workflow version, proving equality with `mcp-v<version>` and the
-NuGet package. After NuGet publication and GitHub Release completion, the
-Registry job waits for the NuGet README and its exact `mcp-name` ownership
+`.mcp/server.json` is the version-controlled baseline for the version currently
+published in the Registry; a prepared package version may therefore be newer.
+For every manual release from `main`, `release-mcp.yml` replaces both manifest
+version fields with the validated workflow version, proving equality with
+`mcp-v<version>` and the NuGet package. After NuGet publication and GitHub
+Release completion, the Registry job waits for the NuGet README and its exact
+`mcp-name` ownership
 marker, verifies the pinned `mcp-publisher` artifact with Sigstore, validates
 the manifest, authenticates with GitHub OIDC, publishes, and verifies the API
 result. Pull requests execute validation only.

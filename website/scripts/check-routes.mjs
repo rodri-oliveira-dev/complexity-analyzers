@@ -30,7 +30,7 @@ const required = [
   'cli', 'cli/github-actions', 'cli/reference',
   'mcp', 'mcp/agent-workflows', 'mcp/reference',
   'examples', 'examples/collection-and-linq-costs', 'examples/recursion-and-cognition', 'examples/refactoring', 'examples/snapshot-comparison',
-  'reference', 'reference/report-contracts', 'reference/architecture', 'reference/security-baseline', 'reference/development-quality-gates', 'reference/releases', 'reference/releases/mcp-1-0-0', 'reference/contributing'
+  'reference', 'reference/report-contracts', 'reference/architecture', 'reference/security-baseline', 'reference/development-quality-gates', 'reference/releases', 'reference/releases/mcp-1-0-0', 'reference/releases/mcp-1-0-1', 'reference/contributing'
 ];
 
 const failures = [];
