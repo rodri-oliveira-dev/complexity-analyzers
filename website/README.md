@@ -1,6 +1,6 @@
 # Complexity Analyzers documentation portal
 
-This directory contains the static Astro + Starlight portal for the Analyzer, CLI, and MCP products. English is served at `/complexity-analyzers/` and Brazilian Portuguese at `/complexity-analyzers/pt-br/`.
+This directory contains the static Astro + Starlight portal for the Analyzer, CLI, and MCP products plus the separately maintained Complexity Analysis GitHub Action. English is served at `/complexity-analyzers/` and Brazilian Portuguese at `/complexity-analyzers/pt-br/`.
 
 The planned production URL is `https://rodri-oliveira-dev.github.io/complexity-analyzers/`. Do not describe the portal as published until the GitHub Pages deployment job succeeds.
 
@@ -44,7 +44,7 @@ The Lighthouse workflow uses the official Lighthouse CLI for three independent m
 
 Portal-owned editorial content lives in `src/content/docs/`, with Portuguese counterparts under `src/content/docs/pt-br/`. Keep equivalent routes and technical meaning in both languages.
 
-Repository technical documentation remains authoritative under `../docs/en/` and `../docs/pt-BR/`. `scripts/sync-docs.mjs` maps selected source documents to portal routes, adds deterministic frontmatter, rewrites mapped Markdown links and images, and emits ignored files before development, checks, tests, and builds.
+Repository technical documentation remains authoritative under `../docs/en/` and `../docs/pt-BR/`. The Action reference is synchronized from `github-action.md` in each language, while the product introduction lives in the portal's editorial `action/index.md` pages. `scripts/sync-docs.mjs` maps selected source documents to portal routes, adds deterministic frontmatter, rewrites mapped Markdown links and images, and emits ignored files before development, checks, tests, and builds.
 
 Do not edit a generated page carrying the **Source synced** or **Fonte sincronizada** badge. Edit its source in `docs/`, run `npm run sync:docs`, and review both generated locales locally.
 
@@ -69,4 +69,4 @@ Starlight's `splash` layout omits the sidebar that normally exposes theme and la
 
 `.github/workflows/documentation-portal.yml` validates pull requests but builds and deploys the Pages artifact only from `main`. Separate workflows cover SEO/HTML/spelling, automated accessibility, and Lighthouse budgets.
 
-In repository **Settings → Pages**, configure **Source = GitHub Actions** once. No custom domain is required for the planned project URL. Publishing the portal does not change Analyzer, CLI, or MCP release workflows.
+In repository **Settings → Pages**, configure **Source = GitHub Actions** once. No custom domain is required for the planned project URL. Publishing the portal does not change Analyzer, CLI, MCP, or GitHub Action release workflows. The Action has independent versioning and is not claimed as a Marketplace listing before approval.
