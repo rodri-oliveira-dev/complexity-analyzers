@@ -21,17 +21,9 @@ internal static class BigONotationParser
             return true;
         }
 
-        if (TryParseFactorial(body, out expression))
-        {
-            return true;
-        }
-
-        if (TryParseExponential(body, out expression))
-        {
-            return true;
-        }
-
-        return TryParseLogarithm(body, out expression)
+        return TryParseFactorial(body, out expression)
+            || TryParseExponential(body, out expression)
+            || TryParseLogarithm(body, out expression)
             || TryParsePolynomialOrLog(body, out expression);
     }
 
