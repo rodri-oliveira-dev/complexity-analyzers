@@ -15,11 +15,12 @@ English | [Português (Brasil)](README.pt-BR.md)
 
 The project's official bilingual documentation portal is planned for [rodri-oliveira-dev.github.io/complexity-analyzers](https://rodri-oliveira-dev.github.io/complexity-analyzers/). Until the GitHub Pages deployment is confirmed, use the versioned documentation in this repository as the authoritative source.
 
-The ecosystem has three independent integration surfaces:
+The ecosystem has four integration surfaces:
 
 - `ComplexityAnalysis.Analyzers`: Roslyn diagnostics during builds and IDE analysis.
 - `ComplexityAnalysis.Tool`: a .NET CLI for reports, snapshots, comparison, duplicate detection, and opt-in quality gates.
 - `ComplexityAnalysis.Mcp`: a local, read-only MCP server for compatible AI tools.
+- [Complexity Analysis Action](docs/en/github-action.md): a separately versioned GitHub Action for CI quality gates, JSON/SARIF reports, and pull-request regression checks.
 
 The portal source and local development instructions live in [`website/`](website/README.md).
 
@@ -375,6 +376,7 @@ See [Architecture](docs/en/architecture.md).
 - [C# Halstead Metrics](docs/en/halstead-metrics.md)
 - [Project-Level Tooling](docs/en/project-tooling.md)
 - [Local MCP Server](docs/en/mcp-server.md)
+- [GitHub Action for CI and pull requests](docs/en/github-action.md)
 - [Runnable sample](samples/ComplexityAnalysis.Sample/README.md)
 - [Release Quality Governance](docs/en/development/quality-gates.md)
 - [Documentação em português](README.pt-BR.md)
