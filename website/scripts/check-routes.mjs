@@ -28,6 +28,7 @@ const required = [
   'learn', 'learn/complexity-models', 'learn/operations-recursion-unknown', 'learn/cognitive-complexity', 'learn/halstead-metrics',
   'analyzer', 'analyzer/installation', 'analyzer/diagnostics', 'analyzer/configuration',
   'cli', 'cli/github-actions', 'cli/reference',
+  'action', 'action/reference',
   'mcp', 'mcp/agent-workflows', 'mcp/reference',
   'examples', 'examples/collection-and-linq-costs', 'examples/recursion-and-cognition', 'examples/refactoring', 'examples/snapshot-comparison',
   'reference', 'reference/report-contracts', 'reference/architecture', 'reference/security-baseline', 'reference/development-quality-gates', 'reference/releases', 'reference/releases/mcp-1-0-0', 'reference/releases/mcp-1-0-1', 'reference/contributing'

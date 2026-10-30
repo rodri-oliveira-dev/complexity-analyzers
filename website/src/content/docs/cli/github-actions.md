@@ -1,9 +1,11 @@
 ---
 title: GitHub Actions integration
-description: Pin the CLI, generate artifacts, and enforce explicit complexity gates in CI.
+description: Run the Complexity Analysis CLI manually in GitHub Actions, with pinned tools and explicit quality gates.
 sidebar:
   order: 2
 ---
+
+This page shows a **manual CLI workflow**. If you prefer a reusable Action with built-in reports and PR regression options, see the [Complexity Analysis GitHub Action](/complexity-analyzers/action/). Its first stable release is planned but not yet published.
 
 Use a repository-local tool manifest so the workflow restores a reviewed version.
 

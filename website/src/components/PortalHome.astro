@@ -23,20 +23,22 @@ const t = pt ? {
     ['Estrutura que pesa', 'Acompanhe complexidade ciclomática, cognitiva e profundidade sem confundi-las com Big-O.'],
     ['Limites explícitos', 'Veja Unknown quando uma conclusão segura não pode ser provada pelo subconjunto suportado.']
   ],
-  productsTitle: 'Três superfícies, um modelo de análise.', productsText: 'Escolha a integração pelo momento em que você precisa da evidência.',
+  productsTitle: 'Quatro integrações, um modelo de análise.', productsText: 'Escolha a integração pelo momento em que você precisa da evidência.',
   products: [
     ['Analyzer', 'Feedback no build e na IDE', 'Diagnósticos BIG* e thresholds via .editorconfig.', 'analyzer/'],
     ['CLI', 'Relatórios e quality gates', 'Console, JSON, SARIF, snapshots e comparação determinística.', 'cli/'],
-    ['MCP', 'Contexto para agentes locais', 'Ferramentas somente leitura sobre stdio, com limites e evidências.', 'mcp/']
+    ['MCP', 'Contexto para agentes locais', 'Ferramentas somente leitura sobre stdio, com limites e evidências.', 'mcp/'],
+    ['Action', 'Qualidade no GitHub CI', 'Gates, relatórios e regressões em pull requests usando a CLI.', 'action/']
   ],
   metricsTitle: 'Leia o código por mais de uma lente.', metricsText: 'O suporte é deliberadamente documentado e cada resultado preserva suas hipóteses.',
-  chooseTitle: 'Escolha pelo fluxo de trabalho.', chooseText: 'Os pacotes são independentes. Você pode adotar um deles ou combinar as três superfícies.',
+  chooseTitle: 'Escolha pelo fluxo de trabalho.', chooseText: 'Os pacotes e a Action têm versões independentes. Combine as integrações conforme a necessidade.',
   choices: [
     ['IDE', 'Use o Analyzer', 'quando o feedback precisa acompanhar compilação e edição.'],
     ['CI', 'Use a CLI', 'quando você precisa de relatórios, snapshots e gates explícitos.'],
-    ['AGENT', 'Use o MCP', 'quando um agente precisa consultar análise e evidências locais.']
+    ['AGENT', 'Use o MCP', 'quando um agente precisa consultar análise e evidências locais.'],
+    ['CI', 'Use a GitHub Action', 'quando quiser checks e comparações de PRs sem scripts próprios.']
   ],
-  ciTitle: 'Da revisão local ao gate de CI.', ciText: 'A CLI retorna códigos de saída estáveis; gates são opt-in e resultados Unknown não viram regressões provadas.',
+  ciTitle: 'Da revisão local ao gate de CI.', ciText: 'A CLI e a GitHub Action compartilham as regras de análise. Gates são opt-in e Unknown não significa regressão comprovada.',
   finalTitle: 'Comece com o produto que encontra seu código onde ele já está.', finalText: 'Instale, gere o primeiro resultado e aprofunde-se nos modelos, contratos e limites técnicos.',
   quick: 'Instalação rápida', reference: 'Explorar a referência'
 } : {
@@ -51,20 +53,22 @@ const t = pt ? {
     ['Structure that weighs', 'Track cyclomatic, cognitive, and nesting measures without confusing them with Big-O.'],
     ['Explicit limits', 'See Unknown when the supported subset cannot prove a safe conclusion.']
   ],
-  productsTitle: 'Three surfaces, one analysis model.', productsText: 'Choose the integration by when and where you need evidence.',
+  productsTitle: 'Four integrations, one analysis model.', productsText: 'Choose the integration by when and where you need evidence.',
   products: [
     ['Analyzer', 'Build and IDE feedback', 'BIG* diagnostics and thresholds through .editorconfig.', 'analyzer/'],
     ['CLI', 'Reports and quality gates', 'Console, JSON, SARIF, snapshots, and deterministic comparison.', 'cli/'],
-    ['MCP', 'Context for local agents', 'Read-only tools over stdio, with limits and evidence.', 'mcp/']
+    ['MCP', 'Context for local agents', 'Read-only tools over stdio, with limits and evidence.', 'mcp/'],
+    ['Action', 'Quality checks in GitHub CI', 'Gates, reports, and pull-request regressions through the CLI.', 'action/']
   ],
   metricsTitle: 'Read code through more than one lens.', metricsText: 'Support is deliberately documented, and every result preserves its assumptions.',
-  chooseTitle: 'Choose by workflow.', chooseText: 'The packages are independent. Adopt one surface or combine all three.',
+  chooseTitle: 'Choose by workflow.', chooseText: 'The packages and Action are independently versioned. Combine integrations where they help.',
   choices: [
     ['IDE', 'Use the Analyzer', 'when feedback must travel with compilation and editing.'],
     ['CI', 'Use the CLI', 'when you need reports, snapshots, and explicit gates.'],
-    ['AGENT', 'Use MCP', 'when an agent needs local analysis and evidence.']
+    ['AGENT', 'Use MCP', 'when an agent needs local analysis and evidence.'],
+    ['CI', 'Use the GitHub Action', 'when you want reusable PR checks without custom scripts.']
   ],
-  ciTitle: 'From local review to a CI gate.', ciText: 'The CLI returns stable exit codes; gates are opt-in, and Unknown results do not become proven regressions.',
+  ciTitle: 'From local review to a CI gate.', ciText: 'The CLI and GitHub Action share analysis rules. Gates are opt-in, and Unknown does not mean a proven regression.',
   finalTitle: 'Start with the product that meets your code where it already lives.', finalText: 'Install it, produce the first result, then explore the models, contracts, and technical limits.',
   quick: 'Quick installation', reference: 'Explore the reference'
 };
@@ -96,7 +100,7 @@ const t = pt ? {
 
   <section class="cx-section tinted" aria-labelledby="products-title">
     <div class="cx-heading"><h2 id="products-title">{t.productsTitle}</h2><p>{t.productsText}</p></div>
-    <div class="cx-grid">{t.products.map(([name, title, text, route]) => <a class="portal-card product-card" href={`${prefix}/${route}`}><span class="kicker">{name}</span><h3>{title}</h3><p>{text}</p></a>)}</div>
+    <div class="cx-grid products-grid">{t.products.map(([name, title, text, route]) => <a class="portal-card product-card" href={`${prefix}/${route}`}><span class="kicker">{name}</span><h3>{title}</h3><p>{text}</p></a>)}</div>
   </section>
 
   <section class="cx-section" aria-labelledby="metrics-title">
@@ -115,7 +119,7 @@ const t = pt ? {
 
   <section class="cx-section tinted"><div class="cx-decision"><div><h2>{t.chooseTitle}</h2><p>{t.chooseText}</p></div><div class="choice-list">{t.choices.map(([tag, title, text]) => <article class="choice"><b>{tag}</b><div><h3>{title}</h3><p>{text}</p></div></article>)}</div></div></section>
 
-  <section class="cx-section dark"><div class="cx-ci"><div><h2>{t.ciTitle}</h2><p>{t.ciText}</p><a class="button primary" href={`${prefix}/cli/github-actions/`}>GitHub Actions</a></div><pre><code>dotnet tool restore
+  <section class="cx-section dark"><div class="cx-ci"><div><h2>{t.ciTitle}</h2><p>{t.ciText}</p><div class="cx-actions"><a class="button primary" href={`${prefix}/action/`}>GitHub Action</a><a class="button secondary" href={`${prefix}/cli/github-actions/`}>{pt ? 'Workflow com CLI' : 'CLI workflow'}</a></div></div><pre><code>dotnet tool restore
 mkdir -p artifacts
 dotnet complexity-analysis analyze App.slnx \
   --format sarif \

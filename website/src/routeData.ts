@@ -12,6 +12,7 @@ const sectionNames: Record<string, Record<string, string>> = {
   learn: { en: 'Learn complexity', 'pt-BR': 'Aprenda complexidade' },
   analyzer: { en: 'Roslyn Analyzer', 'pt-BR': 'Roslyn Analyzer' },
   cli: { en: 'CLI', 'pt-BR': 'CLI' },
+  action: { en: 'GitHub Action', 'pt-BR': 'GitHub Action' },
   mcp: { en: 'MCP Server', 'pt-BR': 'Servidor MCP' },
   examples: { en: 'Examples', 'pt-BR': 'Exemplos' },
   reference: { en: 'Reference', 'pt-BR': 'Referência' }
@@ -53,7 +54,7 @@ export const onRequest = defineRouteMiddleware((context) => {
     },
     {
       '@type': 'SoftwareSourceCode', '@id': `${siteUrl}#software`, name: 'Complexity Analyzers', url: siteUrl,
-      description: 'Open-source C# complexity analysis through a Roslyn analyzer, a .NET CLI, and a local MCP server.',
+      description: 'Open-source C# complexity analysis through Roslyn, a .NET CLI, a local MCP server, and GitHub Actions.',
       programmingLanguage: 'C#', runtimePlatform: '.NET', codeRepository: repositoryUrl,
       license: `${repositoryUrl}/blob/main/LICENSE`, sameAs: [repositoryUrl]
     }

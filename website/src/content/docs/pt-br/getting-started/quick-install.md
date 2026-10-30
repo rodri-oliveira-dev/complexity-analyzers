@@ -1,6 +1,6 @@
 ---
 title: Instalação rápida
-description: Instale o Roslyn Analyzer, a CLI ou o servidor MCP por NuGet e ferramentas .NET.
+description: Instale Roslyn Analyzer, CLI e MCP ou integre a GitHub Action separada.
 sidebar:
   order: 2
 ---
@@ -25,6 +25,10 @@ complexity-analysis --version
 ```
 
 Para repositórios reproduzíveis, prefira um manifesto local e versione `.config/dotnet-tools.json`.
+
+## GitHub Action
+
+No GitHub CI, a [Complexity Analysis Action](/complexity-analyzers/pt-br/action/) executa a CLI publicada por você. A primeira `v1.0.0` e a referência `v1` **ainda não foram publicadas**; durante a avaliação, use um SHA completo de commit revisado, não uma tag inexistente.
 
 ## Servidor MCP
 

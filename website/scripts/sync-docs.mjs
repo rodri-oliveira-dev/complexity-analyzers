@@ -15,6 +15,7 @@ const englishMappings = [
   ['docs/en/cognitive-complexity.md', 'learn/cognitive-complexity.md'],
   ['docs/en/halstead-metrics.md', 'learn/halstead-metrics.md'],
   ['docs/en/project-tooling.md', 'cli/reference.md'],
+  ['docs/en/github-action.md', 'action/reference.md'],
   ['docs/en/mcp-server.md', 'mcp/reference.md'],
   ['docs/en/architecture.md', 'reference/architecture.md'],
   ['docs/en/development/security-baseline.md', 'reference/security-baseline.md'],
