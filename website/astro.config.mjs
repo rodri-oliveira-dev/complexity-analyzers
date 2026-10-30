@@ -45,6 +45,7 @@ export default defineConfig({
         { label: 'Roslyn Analyzer', items: [{ autogenerate: { directory: 'analyzer' } }] },
         { label: 'CLI', items: [{ autogenerate: { directory: 'cli' } }] },
         { label: 'MCP Server', translations: { 'pt-BR': 'Servidor MCP' }, items: [{ autogenerate: { directory: 'mcp' } }] },
+        { label: 'GitHub Action', items: [{ autogenerate: { directory: 'action' } }] },
         { label: 'Examples', translations: { 'pt-BR': 'Exemplos' }, items: [{ autogenerate: { directory: 'examples' } }] },
         { label: 'Reference', translations: { 'pt-BR': 'Referência' }, items: [{ autogenerate: { directory: 'reference' } }] }
       ]
