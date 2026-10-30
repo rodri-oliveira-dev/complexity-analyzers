@@ -12,6 +12,7 @@ public sealed class ComplexityMcpService
 {
     private const int DefaultSummaryMembers = 100;
     private const int MaximumSummaryMembers = 500;
+    private const string ProjectsPropertyName = "Projects";
 
     private readonly AllowedPathPolicy _paths;
     private readonly AnalysisResultCache _cache = new();
@@ -281,7 +282,7 @@ public sealed class ComplexityMcpService
     private static int CountMembers(JsonElement report)
     {
         int count = 0;
-        foreach (JsonElement project in report.GetProperty("Projects").EnumerateArray())
+        foreach (JsonElement project in report.GetProperty(ProjectsPropertyName).EnumerateArray())
         {
             foreach (JsonElement file in project.GetProperty("Files").EnumerateArray())
             {
@@ -295,7 +296,7 @@ public sealed class ComplexityMcpService
     private static McpAnalysisSummary CreateSummary(JsonElement report, int maximumMembers)
     {
         List<McpMemberSummary> members = [];
-        int projectCount = report.GetProperty("Projects").GetArrayLength();
+        int projectCount = report.GetProperty(ProjectsPropertyName).GetArrayLength();
         int fileCount = CountFiles(report);
         int memberCount = 0;
         int unknownMemberCount = 0;
@@ -333,7 +334,7 @@ public sealed class ComplexityMcpService
     private static int CountFiles(JsonElement report)
     {
         int count = 0;
-        foreach (JsonElement project in report.GetProperty("Projects").EnumerateArray())
+        foreach (JsonElement project in report.GetProperty(ProjectsPropertyName).EnumerateArray())
         {
             count = checked(count + project.GetProperty("Files").GetArrayLength());
         }
@@ -343,7 +344,7 @@ public sealed class ComplexityMcpService
 
     private static IEnumerable<JsonElement> EnumerateMembers(JsonElement report)
     {
-        foreach (JsonElement project in report.GetProperty("Projects").EnumerateArray())
+        foreach (JsonElement project in report.GetProperty(ProjectsPropertyName).EnumerateArray())
         {
             foreach (JsonElement file in project.GetProperty("Files").EnumerateArray())
             {

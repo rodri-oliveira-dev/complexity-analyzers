@@ -376,18 +376,11 @@ internal sealed class KnownOperationComplexityAnalyzer
             out _)
             && localInitializer is not null;
 
-        if (!isLocalReference)
-        {
-            return false;
-        }
-
-        if (TryResolveStableLocalInitializer(expression, out ExpressionSyntax? stableInitializer)
-            && stableInitializer is not null)
-        {
-            return TryAnalyzeDeferredPipeline(stableInitializer, out plan);
-        }
-
-        return IsDeferredPipelineExpression(localInitializer!);
+        return isLocalReference
+            && (TryResolveStableLocalInitializer(expression, out ExpressionSyntax? stableInitializer)
+                && stableInitializer is not null
+                    ? TryAnalyzeDeferredPipeline(stableInitializer, out plan)
+                    : IsDeferredPipelineExpression(localInitializer!));
     }
 
     private bool TryResolveDeferredInvocation(

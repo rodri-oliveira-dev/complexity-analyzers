@@ -31,12 +31,8 @@ internal static class BigONotationParser
             return true;
         }
 
-        if (TryParseLogarithm(body, out expression))
-        {
-            return true;
-        }
-
-        return TryParsePolynomialOrLog(body, out expression);
+        return TryParseLogarithm(body, out expression)
+            || TryParsePolynomialOrLog(body, out expression);
     }
 
     private static bool TryParseFactorial(string body, out ComplexityExpression expression)
