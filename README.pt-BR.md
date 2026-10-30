@@ -15,11 +15,12 @@
 
 O portal bilíngue oficial do projeto está planejado para [rodri-oliveira-dev.github.io/complexity-analyzers](https://rodri-oliveira-dev.github.io/complexity-analyzers/). Até a confirmação do deploy no GitHub Pages, use a documentação versionada neste repositório como fonte autoritativa.
 
-O ecossistema possui três superfícies de integração independentes:
+O ecossistema possui quatro formas de integração:
 
 - `ComplexityAnalysis.Analyzers`: diagnósticos Roslyn durante builds e análise na IDE.
 - `ComplexityAnalysis.Tool`: CLI .NET para relatórios, snapshots, comparação, detecção de duplicação e quality gates opt-in.
 - `ComplexityAnalysis.Mcp`: servidor MCP local e somente leitura para ferramentas de IA compatíveis.
+- [Complexity Analysis Action](docs/pt-BR/github-action.md): GitHub Action com versionamento independente para quality gates no CI, relatórios JSON/SARIF e análise de regressões em PRs.
 
 O código-fonte do portal e as instruções de desenvolvimento local ficam em [`website/`](website/README.md).
 
@@ -378,6 +379,7 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 - [Métricas Halstead para C#](docs/pt-BR/halstead-metrics.md)
 - [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md)
 - [Servidor MCP Local](docs/pt-BR/mcp-server.md)
+- [GitHub Action para CI e pull requests](docs/pt-BR/github-action.md)
 - [Sample executável](samples/ComplexityAnalysis.Sample/README.md)
 - [Governança de Qualidade de Release](docs/pt-BR/development/quality-gates.md)
 - [Documentation in English](README.md)

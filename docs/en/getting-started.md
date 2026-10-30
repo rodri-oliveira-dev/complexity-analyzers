@@ -267,3 +267,4 @@ Timing varies by hardware and CI runner. The repeatable validation is that the s
 - Read the [Analyzer Catalog](analyzers.md) to understand each diagnostic.
 - Read [Configuration](configuration.md) to tune analysis budgets and severities.
 - Read [Architecture](architecture.md) for the analyzer pipeline and design boundaries.
+- To run the CLI through CI or compare pull requests, see the [GitHub Action guide](github-action.md).
