@@ -310,4 +310,21 @@ mas essas dependências não são expostas aos consumidores do pacote do analyze
 
 ## Integração com GitHub Actions
 
-Para configurar o CI usando esta CLI, consulte o [guia da GitHub Action](github-action.md). A Action é mantida separadamente e invoca a CLI publicada; ela não altera as métricas, os padrões de quality gates nem a semântica da comparação de snapshots. As releases da Action e da CLI são independentes. Não considere a versão planejada `v1.0.0` como publicada antes de confirmar sua disponibilidade.
+Para integrar a análise ao CI do GitHub sem manter scripts próprios, use a
+[Complexity Analysis Action](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start).
+Sua [release estável `v1.0.0`](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0)
+foi publicada em 30/10/2026 e instala, por padrão, a versão exata publicada
+`1.0.1` de `ComplexityAnalysis.Tool`.
+
+Use a CLI diretamente para execução local ou orquestração personalizada no CI;
+prefira a Action para workflows reutilizáveis do GitHub Actions com relatórios
+JSON/SARIF, quality gates opcionais e comparação de regressões em pull requests.
+Ambas usam o mesmo motor de análise, preservando as métricas e a semântica dos
+snapshots. O versionamento da Action é independente da CLI, do Analyzer e do MCP.
+
+Para maior reprodutibilidade, fixe a Action no commit revisado da `v1.0.0`,
+`2d807ef29ca03c685d224543a135d8c30dfe2c67`; a tag publicada `@v1.0.0`
+também está disponível. A referência móvel `@v1` ainda não foi criada. Consulte
+o [guia da GitHub Action](github-action.md) e os
+[exemplos publicados](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/v1.0.0/examples) para
+informações sobre inputs e segurança.
