@@ -68,7 +68,7 @@ jobs:
           path: MySolution.slnx
 ```
 
-O exemplo utiliza o SHA revisado da `v1.0.0` para maior reprodutibilidade. A tag publicada `@v1.0.0` também está disponível, mas a referência móvel `@v1` ainda não foi verificada. Consulte as [instruções de instalação](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) e as [notas da release](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
+O exemplo utiliza o SHA revisado da `v1.0.0` para maior reprodutibilidade. A tag publicada `@v1.0.0` também está disponível, mas a referência móvel `@v1` ainda não foi criada; não a utilize até que esse alias exista. Consulte as [instruções de instalação](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) e as [notas da release](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
 
 ## Exemplo rápido
 

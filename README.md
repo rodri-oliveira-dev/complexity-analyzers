@@ -68,7 +68,7 @@ jobs:
           path: MySolution.slnx
 ```
 
-The example pins the reviewed `v1.0.0` commit for reproducibility. The published tag `@v1.0.0` is also available, but the moving `@v1` alias has not been verified. See the [Action installation instructions](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) and [release notes](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
+The example pins the reviewed `v1.0.0` commit for reproducibility. The published tag `@v1.0.0` is also available, but the moving `@v1` alias has not been created; do not use it until that reference exists. See the [Action installation instructions](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) and [release notes](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
 
 ## Quick example
 

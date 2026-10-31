@@ -32,7 +32,7 @@ Para maior reprodutibilidade, use o commit revisado da release no workflow:
 `rodri-oliveira-dev/complexity-analysis-action@2d807ef29ca03c685d224543a135d8c30dfe2c67`.
 A tag publicada `@v1.0.0` também está disponível; a referência móvel `@v1`
 **ainda não foi criada**. Consulte o [guia da Action](/complexity-analyzers/pt-br/action/)
-e os [exemplos publicados](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/v1.0.0/examples). Publicar a GitHub Release não
+e os [exemplos publicados](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples). Publicar a GitHub Release não
 comprova, por si só, a disponibilidade da listagem no Marketplace.
 
 ## Escolha o MCP quando

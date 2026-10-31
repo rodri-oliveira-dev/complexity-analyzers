@@ -326,5 +326,5 @@ Para maior reprodutibilidade, fixe a Action no commit revisado da `v1.0.0`,
 `2d807ef29ca03c685d224543a135d8c30dfe2c67`; a tag publicada `@v1.0.0`
 também está disponível. A referência móvel `@v1` ainda não foi criada. Consulte
 o [guia da GitHub Action](github-action.md) e os
-[exemplos publicados](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/v1.0.0/examples) para
+[exemplos publicados](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples) para
 informações sobre inputs e segurança.

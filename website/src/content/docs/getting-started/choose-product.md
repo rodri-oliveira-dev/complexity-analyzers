@@ -31,7 +31,7 @@ For reproducibility, use the verified release commit in your workflow:
 `rodri-oliveira-dev/complexity-analysis-action@2d807ef29ca03c685d224543a135d8c30dfe2c67`.
 The published `@v1.0.0` tag is also available; the moving `@v1` alias
 has **not** been created yet. See the [Action guide](/complexity-analyzers/action/)
-and [published workflow examples](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/v1.0.0/examples). GitHub Release publication
+and [published workflow examples](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples). GitHub Release publication
 does not by itself confirm Marketplace listing visibility.
 
 ## Choose MCP when

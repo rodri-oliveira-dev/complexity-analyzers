@@ -322,5 +322,5 @@ For reproducibility, pin the Action to the reviewed `v1.0.0` release commit
 `2d807ef29ca03c685d224543a135d8c30dfe2c67`; the published `@v1.0.0` tag is another
 supported option. The moving `@v1` alias has not been created yet. See the
 [GitHub Action guide](github-action.md) and
-[published examples](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/v1.0.0/examples) for
+[published examples](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples) for
 supported inputs and security considerations.

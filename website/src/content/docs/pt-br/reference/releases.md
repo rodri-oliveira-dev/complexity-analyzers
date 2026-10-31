@@ -13,7 +13,7 @@ Os pacotes Analyzer, CLI e MCP são consumíveis de forma independente e podem t
 
 A [Complexity Analysis Action v1.0.0](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0), com versionamento independente, foi publicada em 30 de outubro de 2026. Consulte o [guia de instalação da Action](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) para adicioná-la a um workflow do GitHub Actions, ou leia as [notas da release](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
 
-A tag `@v1.0.0` aponta para o commit `2d807ef29ca03c685d224543a135d8c30dfe2c67`. Para maior reprodutibilidade, utilize esse SHA completo em `uses:`. A referência móvel `@v1` ainda não foi verificada; confirme a existência da tag antes de utilizá-la. A existência da GitHub Release não comprova, por si só, a disponibilidade da listagem no Marketplace.
+A tag `@v1.0.0` aponta para o commit `2d807ef29ca03c685d224543a135d8c30dfe2c67`. Para maior reprodutibilidade, utilize esse SHA completo em `uses:`. A referência móvel `@v1` ainda não foi criada; não a utilize até que o alias seja criado. A existência da GitHub Release não comprova, por si só, a disponibilidade da listagem no Marketplace.
 
 A Action invoca `ComplexityAnalysis.Tool` e não substitui as versões independentes do Analyzer, da CLI ou do MCP.
 

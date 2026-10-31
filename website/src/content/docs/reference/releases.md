@@ -13,7 +13,7 @@ The Analyzer, CLI, and MCP packages are independently consumable and may have di
 
 The independently versioned [Complexity Analysis Action v1.0.0](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0) was published on October 30, 2026. Use the [Action installation guide](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) to add it to a GitHub Actions workflow, or inspect the [release notes](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
 
-The published `@v1.0.0` tag resolves to commit `2d807ef29ca03c685d224543a135d8c30dfe2c67`. For reproducible automation, reference that full commit SHA in `uses:`. The moving `@v1` reference is not yet verified; do not rely on it without confirming the tag exists. The GitHub release alone does not establish Marketplace listing visibility.
+The published `@v1.0.0` tag resolves to commit `2d807ef29ca03c685d224543a135d8c30dfe2c67`. For reproducible automation, reference that full commit SHA in `uses:`. The moving `@v1` alias has not been created; do not use it until that reference exists. The GitHub release alone does not establish Marketplace listing visibility.
 
 The Action invokes `ComplexityAnalysis.Tool` and does not replace the separately versioned Analyzer, CLI, or MCP packages.
 

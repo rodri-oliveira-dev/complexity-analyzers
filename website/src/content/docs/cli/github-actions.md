@@ -10,7 +10,7 @@ the [Complexity Analysis Action](/complexity-analyzers/action/)
 is available in its [published `v1.0.0` release](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
 It invokes the same CLI, but its release versions are independent. For adoption,
 see the [installation guide](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) and the
-[versioned examples](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/v1.0.0/examples).
+[versioned examples](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples).
 
 Use a repository-local tool manifest so the workflow restores a reviewed version.
 

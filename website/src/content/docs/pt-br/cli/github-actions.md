@@ -10,7 +10,7 @@ no CI do GitHub, a [Complexity Analysis Action](/complexity-analyzers/pt-br/acti
 já possui a [release `v1.0.0` publicada](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
 Ela invoca a mesma CLI, mas tem versionamento independente. Para começar, consulte
 as [instruções de instalação](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) e os
-[exemplos da versão](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/v1.0.0/examples).
+[exemplos da versão](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples).
 
 Use um manifesto local de ferramentas para que o workflow restaure uma versão revisada.
 
