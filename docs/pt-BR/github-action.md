@@ -4,7 +4,12 @@
 
 A `Complexity Analysis Action` disponibiliza a [ComplexityAnalysis.Tool](project-tooling.md) em workflows do GitHub Actions. Ela **não** implementa outro motor de análise. Use o pacote Roslyn para diagnósticos na IDE/compilação, a CLI para execução local ou automações próprias, o MCP para ferramentas de IA e a GitHub Action para verificações reutilizáveis em CI e feedback nos pull requests.
 
-A Action fica em um **repositório separado** e possui ciclo de releases independente. A primeira versão estável planejada é `v1.0.0`; **na data desta atualização ela ainda não foi publicada**, portanto `@v1` e `@v1.0.0` não devem ser tratados como tags existentes. Consulte o [repositório da Action](https://github.com/rodri-oliveira-dev/complexity-analysis-action) para confirmar o estado atual.
+A Action fica em um **repositório separado**, com ciclo de releases independente.
+Sua primeira versão estável, [`v1.0.0`](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0),
+foi publicada em 30 de outubro de 2026. A tag `@v1.0.0` existe e aponta
+para o commit revisado `2d807ef29ca03c685d224543a135d8c30dfe2c67`. A referência móvel
+`@v1` **ainda não foi criada**. Publicar a GitHub Release não comprova,
+por si só, que a Action já aparece publicamente no Marketplace.
 
 ## O que ela oferece
 
@@ -18,13 +23,21 @@ Uma estimativa de complexidade **não** equivale a benchmark de desempenho nem c
 
 ## Requisitos e versionamento
 
-A candidata atual suporta Ubuntu com Bash, Python 3 e acesso ao NuGet.org. Ela instala o SDK .NET 10 e a versão **exata** da `ComplexityAnalysis.Tool` configurada em `tool-version` (atualmente `1.0.1` por padrão). CLI, Action, Analyzer e MCP possuem **versões independentes**.
+A versão publicada `v1.0.0` suporta runners Ubuntu com Bash, Python 3 e
+acesso ao NuGet.org. Ela instala o SDK .NET `10.0.403` e usa a versão exata,
+publicada, da `ComplexityAnalysis.Tool` definida em `tool-version`
+(`1.0.1` por padrão). Windows e macOS ainda não possuem suporte validado.
+CLI, Action, Analyzer e MCP têm **versões independentes**.
 
-Até a primeira release estável, utilize no `uses:` um **SHA completo de 40 caracteres, revisado**, do repositório da Action. O marcador do exemplo abaixo não é executável sem substituição. Após a publicação, será possível utilizar uma tag específica, como `@v1.0.0`, ou o SHA completo. `@v1` só ficará disponível quando a referência da versão principal for criada.
+Para maior reprodutibilidade, prefira o SHA completo de 40 caracteres do commit
+revisado da release em `uses:`. A tag publicada `@v1.0.0` também pode ser usada.
+Não utilize `@v1` até que a referência compatível exista e seja verificada.
+A proteção das tags de release é diferente da imutabilidade de GitHub Releases;
+não presuma que esta última esteja habilitada.
 
 ## Exemplo: analisar um pull request
 
-Crie `.github/workflows/complexity.yml` no repositório **consumidor**, substituindo `REVIEWED_FULL_40_CHARACTER_SHA` e `MySolution.slnx`:
+Crie `.github/workflows/complexity.yml` no repositório **consumidor**. O exemplo usa o commit da Action publicado na release; substitua apenas `MySolution.slnx` pelo caminho do arquivo `.csproj`, `.sln` ou `.slnx`:
 
 ```yaml
 name: Complexity analysis
@@ -39,11 +52,11 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - id: complexity
-        uses: rodri-oliveira-dev/complexity-analysis-action@REVIEWED_FULL_40_CHARACTER_SHA
+        uses: rodri-oliveira-dev/complexity-analysis-action@2d807ef29ca03c685d224543a135d8c30dfe2c67
         with:
           path: MySolution.slnx
           max-cyclomatic-complexity: "15"
@@ -53,7 +66,18 @@ jobs:
           fail-on-regression: "true"
 ```
 
-Esse exemplo funciona com **permissões de leitura**: não publica comentários, não envia SARIF e não expõe um token de escrita. Falhas de comparação são apresentadas separadamente das regressões comprovadas. Para guardar os relatórios após o job, acrescente um passo `actions/upload-artifact` utilizando os caminhos retornados pela Action.
+Este exemplo usa **permissões somente de leitura**: não publica comentários,
+não envia SARIF ao Code Scanning e não expõe credenciais de escrita. Comparações
+indisponíveis são reportadas separadamente das regressões comprovadas; baseline
+ausente não significa ausência de regressões. Para preservar os relatórios após
+o job, adicione `actions/upload-artifact` fixado em um SHA revisado e utilize os
+caminhos retornados pela Action.
+
+Para outros workflows executáveis, consulte os
+[exemplos atualizados na branch `main` da Action](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples).
+A tag `v1.0.0` preserva a documentação da release original, inclusive
+exemplos com marcadores anteriores à publicação. Os exemplos corrigidos
+foram adicionados à `main` após o lançamento.
 
 ## Entradas e saídas
 
@@ -90,15 +114,15 @@ As saídas incluem `report-path`, `sarif-path`, `analysis-status`, `quality-gate
 | Comentário direto em PR confiável do mesmo repositório | `contents: read`, `pull-requests: write` |
 | Comentário em PR de fork | Análise somente leitura e publicação privilegiada separada via `workflow_run` |
 
-Nunca analise código de PR não confiável usando `pull_request_target`, nem exponha segredos ou credenciais de escrita ao job que carrega projetos externos. A avaliação de projetos MSBuild pode executar lógica definida no repositório; a Action **não é um sandbox**. Para PRs de forks, mantenha a análise somente leitura e avalie o [exemplo de publicador isolado](https://github.com/rodri-oliveira-dev/complexity-analysis-action/blob/feature/release-readiness/examples/secure-pr-publish.yml) antes de copiar o workflow. A validação da procedência do artefato é obrigatória.
+Nunca analise código de PR não confiável usando `pull_request_target`, nem exponha segredos ou credenciais de escrita ao job que carrega projetos externos. A avaliação de projetos MSBuild pode executar lógica definida no repositório; a Action **não é um sandbox**. Para PRs de forks, mantenha a análise somente leitura e avalie o [exemplo de publicador isolado](https://github.com/rodri-oliveira-dev/complexity-analysis-action/blob/main/examples/secure-pr-publish.yml) antes de copiar o workflow. A validação da procedência do artefato é obrigatória.
 
 ## Solução de problemas
 
-- **Action não encontrada em `@v1` ou `@v1.0.0`:** a release e as tags podem não existir. Confira as [releases](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases) e, na avaliação, use um SHA completo revisado.
-- **Runner não suportado:** a candidata documenta apenas Ubuntu; não há validação end-to-end equivalente para Windows/macOS.
+- **Action não encontrada com `@v1`:** essa referência móvel ainda não foi criada. Use a tag publicada `@v1.0.0` ou o SHA aprovado acima. Se `@v1.0.0` falhar, confirme a referência do repositório e a [release publicada](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
+- **Runner não suportado:** a `v1.0.0` suporta apenas Ubuntu; não há validação end-to-end equivalente para Windows/macOS.
 - **Projeto ausente ou comparação indisponível:** confira o caminho e se o projeto existe nas revisões-base e atual. Baseline ausente **não** significa ausência de regressões.
 - **Falha de instalação do NuGet:** confira o acesso à rede, o requisito de .NET 10 e a versão publicada exata de `tool-version`.
 - **Upload SARIF ou comentário negado:** confira permissões, disponibilidade do Code Scanning, restrições de forks e isolamento entre análise e publicação.
 - **Quality gate falhou:** violar um limite absoluto é diferente de introduzir uma regressão. Consulte `quality-gate-status`, `comparison-status` e os relatórios JSON.
 
-Os exemplos completos estão no [repositório da Action](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/feature/release-readiness/examples). Para executar a CLI diretamente, consulte [Ferramentas em Nível de Projeto](project-tooling.md).
+Os exemplos completos estão no [repositório da Action](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples). Para executar a CLI diretamente, consulte [Ferramentas em Nível de Projeto](project-tooling.md).

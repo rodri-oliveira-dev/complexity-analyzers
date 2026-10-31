@@ -13,17 +13,26 @@ sidebar:
 
 ## Choose the CLI when
 
-- you need whole-project or solution reports;
-- CI must consume JSON or SARIF;
-- snapshots, regression comparison, duplicate detection, or opt-in quality gates are required.
+- you need whole-project or solution reports from local scripts, terminals, or custom CI;
+- you want to manage CLI installation, snapshot comparison, and artifact handling yourself;
+- you need JSON/SARIF output, duplicate detection, regression analysis, or opt-in quality gates outside a reusable GitHub Action.
 
 ## Choose the GitHub Action when
 
-- your repository runs on GitHub Actions and needs reusable CI checks;
-- you want configured quality gates, SARIF, and PR regression comparisons without maintaining custom scripts;
-- you can use the currently supported Ubuntu runner and follow the Action's pre-release SHA guidance.
+- your repository uses GitHub Actions and needs reusable checks on supported Ubuntu runners;
+- you want opt-in quality gates, JSON/SARIF reports, and pull-request regression comparison without maintaining CLI setup scripts;
+- you prefer the Action to install a fixed, published CLI version and integrate results into GitHub workflow summaries.
 
-[Explore the Action](/complexity-analyzers/action/). The first stable `v1.0.0` is planned, not yet published.
+The separately versioned [Complexity Analysis Action `v1.0.0`](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0)
+was published on October 30, 2026. It uses `ComplexityAnalysis.Tool` `1.0.1` by default;
+the Analyzer, CLI, MCP, and Action retain independent version numbers.
+
+For reproducibility, use the verified release commit in your workflow:
+`rodri-oliveira-dev/complexity-analysis-action@2d807ef29ca03c685d224543a135d8c30dfe2c67`.
+The published `@v1.0.0` tag is also available; the moving `@v1` alias
+has **not** been created yet. See the [Action guide](/complexity-analyzers/action/)
+and [published workflow examples](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples). GitHub Release publication
+does not by itself confirm Marketplace listing visibility.
 
 ## Choose MCP when
 
@@ -33,4 +42,4 @@ sidebar:
 
 ## Combine them deliberately
 
-A common adoption path uses the Analyzer for immediate feedback, the CLI for local reports, the GitHub Action for reusable CI checks, and MCP for investigation. The Action invokes the CLI rather than reimplementing analysis. Keep all version pins and permissions explicit.
+A common adoption path uses the Analyzer for immediate feedback, the CLI for local reports, the GitHub Action for reusable CI checks, and MCP for investigation. The Action invokes the published CLI rather than reimplementing analysis. Keep each product's version pin and workflow permissions explicit.
