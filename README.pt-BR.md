@@ -20,7 +20,7 @@ O ecossistema possui quatro formas de integração:
 - `ComplexityAnalysis.Analyzers`: diagnósticos Roslyn durante builds e análise na IDE.
 - `ComplexityAnalysis.Tool`: CLI .NET para relatórios, snapshots, comparação, detecção de duplicação e quality gates opt-in.
 - `ComplexityAnalysis.Mcp`: servidor MCP local e somente leitura para ferramentas de IA compatíveis.
-- [Complexity Analysis Action](docs/pt-BR/github-action.md): GitHub Action com versionamento independente para quality gates no CI, relatórios JSON/SARIF e análise de regressões em PRs.
+- [Complexity Analysis Action](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0): GitHub Action com versionamento independente para quality gates no CI, relatórios JSON/SARIF e análise de regressões em PRs. Veja a [instalação](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) ou o [guia técnico](docs/pt-BR/github-action.md).
 
 O código-fonte do portal e as instruções de desenvolvimento local ficam em [`website/`](website/README.md).
 
@@ -39,6 +39,36 @@ dotnet add package ComplexityAnalysis.Analyzers
 ```
 
 O pacote funciona como um analyzer de tempo de compilação. Depois da instalação, o Roslyn o carrega durante builds e análise na IDE; o código da aplicação não chama o analyzer e não assume uma dependência de runtime nele. Para criação local do pacote e consumo a partir do repositório, veja [Primeiros Passos](docs/pt-BR/getting-started.md).
+
+## GitHub Action v1.0.0
+
+A [Complexity Analysis Action v1.0.0](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0) foi publicada em 30 de outubro de 2026. Ela executa a CLI publicada no GitHub Actions, em runners Ubuntu suportados, e possui versionamento independente do Analyzer, da CLI e do MCP.
+
+Crie o workflow `.github/workflows/complexity.yml` no repositório consumidor e substitua `MySolution.slnx` pelo caminho do projeto ou solução C#:
+
+```yaml
+name: Complexity Analysis
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  complexity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Analyze complexity
+        uses: rodri-oliveira-dev/complexity-analysis-action@2d807ef29ca03c685d224543a135d8c30dfe2c67
+        with:
+          path: MySolution.slnx
+```
+
+O exemplo utiliza o SHA revisado da `v1.0.0` para maior reprodutibilidade. A tag publicada `@v1.0.0` também está disponível, mas a referência móvel `@v1` ainda não foi verificada. Consulte as [instruções de instalação](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) e as [notas da release](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0).
 
 ## Exemplo rápido
 
@@ -379,7 +409,7 @@ Veja [Arquitetura](docs/pt-BR/architecture.md).
 - [Métricas Halstead para C#](docs/pt-BR/halstead-metrics.md)
 - [Ferramentas em Nível de Projeto](docs/pt-BR/project-tooling.md)
 - [Servidor MCP Local](docs/pt-BR/mcp-server.md)
-- [GitHub Action para CI e pull requests](docs/pt-BR/github-action.md)
+- [Release da GitHub Action v1.0.0](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0) e [instalação](https://github.com/rodri-oliveira-dev/complexity-analysis-action#quick-start) · [Guia técnico](docs/pt-BR/github-action.md)
 - [Sample executável](samples/ComplexityAnalysis.Sample/README.md)
 - [Governança de Qualidade de Release](docs/pt-BR/development/quality-gates.md)
 - [Documentation in English](README.md)
