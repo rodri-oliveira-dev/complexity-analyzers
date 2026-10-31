@@ -17,10 +17,10 @@ Roslyn loads the analyzer during builds and IDE analysis. Your application does 
 
 ## CLI
 
-The documented `1.0.0` command applies after that version is published on NuGet.org:
+The published `ComplexityAnalysis.Tool` version used by Action `v1.0.0` is `1.0.1`. Install the CLI directly for local scripts or custom CI orchestration:
 
 ```bash
-dotnet tool install --global ComplexityAnalysis.Tool --version 1.0.0
+dotnet tool install --global ComplexityAnalysis.Tool --version 1.0.1
 complexity-analysis --version
 ```
 
@@ -28,7 +28,47 @@ For reproducible repositories, prefer a local tool manifest and commit `.config/
 
 ## GitHub Action
 
-For GitHub CI, the separately maintained [Complexity Analysis Action](/complexity-analyzers/action/) runs the published CLI for you. The first stable `v1.0.0` and `v1` references are **not yet published**; evaluate with a reviewed full commit SHA after checking the Action repository, rather than copying a nonexistent release tag.
+The separately maintained [Complexity Analysis Action](/complexity-analyzers/action/)
+runs the published CLI for you in GitHub CI. Its
+[stable `v1.0.0` release](https://github.com/rodri-oliveira-dev/complexity-analysis-action/releases/tag/v1.0.0) was
+published on October 30, 2026. It supports Ubuntu runners, installs .NET SDK
+`10.0.403`, and uses `ComplexityAnalysis.Tool` `1.0.1` by default.
+
+Create `.github/workflows/complexity.yml` in the repository to be analyzed:
+
+```yaml
+name: Complexity Analysis
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Analyze C# complexity
+        uses: rodri-oliveira-dev/complexity-analysis-action@2d807ef29ca03c685d224543a135d8c30dfe2c67
+        with:
+          path: MySolution.slnx
+```
+
+Replace `MySolution.slnx` with the actual `.csproj`, `.sln`, or `.slnx`
+path. The example pins the reviewed `v1.0.0` commit to a full SHA for
+reproducibility. The published `@v1.0.0` tag is also available; the moving
+`@v1` alias has **not** been created yet. Analysis uses read-only
+`contents: read` permissions; optional Code Scanning uploads and PR comments
+require additional permissions and the security guidance in the full reference.
+
+See the [Action reference](/complexity-analyzers/action/reference/) and
+[maintained workflow examples](https://github.com/rodri-oliveira-dev/complexity-analysis-action/tree/main/examples).
+Marketplace listing visibility has not been independently verified by the
+GitHub Release publication. The Action, CLI, Analyzer, and MCP retain
+independent release versions.
 
 ## MCP server
 
