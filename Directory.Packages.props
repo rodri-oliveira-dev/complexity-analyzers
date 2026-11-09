@@ -12,7 +12,7 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
 
     <!-- Official SDK used only by the separate local stdio MCP host. -->
-    <PackageVersion Include="ModelContextProtocol" Version="2.3.0" />
+    <PackageVersion Include="ModelContextProtocol" Version="2.4.0" />
 
     <!-- Test infrastructure for the isolated analyzer workspace. -->
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
