@@ -7,7 +7,7 @@ namespace ComplexityAnalysis.Analyzers.Tests;
 
 public sealed class AnalyzerHostCompatibilityContractTests
 {
-    private const string BuildSdkVersion = "10.0.403";
+    private static readonly Version MinimumBuildSdkVersion = new(10, 0, 403);
     private const string AnalyzerTargetFramework = "netstandard2.0";
     private const string TestTargetFramework = "net10.0";
     private const string LanguageVersion = "12.0";
@@ -24,7 +24,13 @@ public sealed class AnalyzerHostCompatibilityContractTests
         XDocument testProject = XDocument.Load(Path.Combine(root, "tests", "ComplexityAnalysis.Analyzers.Tests", "ComplexityAnalysis.Analyzers.Tests.csproj"));
         XDocument performanceProject = XDocument.Load(Path.Combine(root, "performance", "ComplexityAnalysis.Analyzers.Performance", "ComplexityAnalysis.Analyzers.Performance.csproj"));
 
-        Assert.Equal(BuildSdkVersion, globalJson.RootElement.GetProperty("sdk").GetProperty("version").GetString());
+        string configuredSdk = globalJson.RootElement.GetProperty("sdk").GetProperty("version").GetString()!;
+        Version buildSdkVersion = Version.Parse(configuredSdk);
+        Assert.Equal(MinimumBuildSdkVersion.Major, buildSdkVersion.Major);
+        Assert.Equal(MinimumBuildSdkVersion.Minor, buildSdkVersion.Minor);
+        Assert.True(
+            buildSdkVersion.CompareTo(MinimumBuildSdkVersion) >= 0,
+            $"Build SDK {buildSdkVersion} must remain on the .NET 10.0 train and not precede {MinimumBuildSdkVersion}.");
         Assert.Equal("latestFeature", globalJson.RootElement.GetProperty("sdk").GetProperty("rollForward").GetString());
         Assert.False(globalJson.RootElement.GetProperty("sdk").GetProperty("allowPrerelease").GetBoolean());
         Assert.Equal(LanguageVersion, RequiredElementValue(buildProps, "LangVersion"));
