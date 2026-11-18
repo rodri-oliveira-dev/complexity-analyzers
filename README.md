@@ -224,7 +224,7 @@ Missing base cases, non-reducing arguments, unsupported recurrence shapes, unkno
 
 Prerequisites:
 
-- .NET SDK `10.0.403` or a compatible SDK selected by `global.json`.
+- A .NET 10 SDK compatible with the version selected by the root `global.json` (which receives patch updates).
 - A shell capable of running `dotnet` commands.
 
 From the repository root:
