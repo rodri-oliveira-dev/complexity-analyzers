@@ -324,6 +324,69 @@ public sealed class RecursiveCallAnalyzerTests
                 cancellationTokenSource.Token));
     }
 
+    [Fact]
+    public void Method_without_direct_recursive_call_is_not_split_into_execution_paths()
+    {
+        MethodFacts facts = CreateFacts(
+            CreateSequentialBranchSource(branchCount: 64, recursiveTail: false),
+            "M");
+        using var guard = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        RecursiveCallAnalysisResult result = new RecursiveCallAnalyzer().Analyze(
+            facts.MethodDeclaration,
+            facts.SemanticModel,
+            guard.Token);
+
+        Assert.True(result.IsSupported);
+        Assert.False(result.HasDirectRecursiveCalls);
+        Assert.Empty(result.ExecutionPaths);
+    }
+
+    [Fact]
+    public void Recursive_method_with_execution_paths_at_the_limit_is_supported()
+    {
+        int branchCount = (int)Math.Log(RecursiveCallAnalyzer.MaximumExecutionPaths, 2);
+
+        RecursiveCallAnalysisResult result = Analyze(
+            CreateSequentialBranchSource(branchCount, recursiveTail: true));
+
+        Assert.True(result.IsSupported);
+        Assert.Equal(RecursiveCallAnalyzer.MaximumExecutionPaths, result.ExecutionPaths.Length);
+    }
+
+    [Fact]
+    public void Recursive_method_with_more_execution_paths_than_the_limit_is_unsupported()
+    {
+        int branchCount = (int)Math.Log(RecursiveCallAnalyzer.MaximumExecutionPaths, 2) + 1;
+
+        RecursiveCallAnalysisResult result = Analyze(
+            CreateSequentialBranchSource(branchCount, recursiveTail: true));
+
+        Assert.False(result.IsSupported);
+        Assert.Contains("execution paths", result.UnsupportedReason, StringComparison.Ordinal);
+    }
+
+    private static string CreateSequentialBranchSource(int branchCount, bool recursiveTail)
+    {
+        string branches = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(0, branchCount)
+                .Select(index => $"        if (n > {index}) {{ total++; }}"));
+        string tail = recursiveTail ? "return M(n - 1) + total;" : "return total;";
+
+        return $$"""
+            public sealed class Sample
+            {
+                int M(int n)
+                {
+                    int total = 0;
+            {{branches}}
+                    {{tail}}
+                }
+            }
+            """;
+    }
+
     private static RecursiveArgumentRelation AnalyzeSingleArgumentRelation(
         string parameterType,
         string argument)

@@ -13,6 +13,8 @@ namespace ComplexityAnalysis.Analyzers.Analysis.Recursion;
 
 internal sealed class RecursiveCallAnalyzer
 {
+    internal const int MaximumExecutionPaths = 128;
+
     private const double IntegerTolerance = 0.000000001;
 
     internal RecursiveCallAnalysisResult Analyze(
@@ -51,6 +53,14 @@ internal sealed class RecursiveCallAnalyzer
         _ = context ?? throw new ArgumentNullException(nameof(context));
 
         context.CancellationToken.ThrowIfCancellationRequested();
+
+        SyntaxNode? body = (SyntaxNode?)member.Body.Block ?? member.Body.Expression;
+        if (body is not null && !ContainsDirectRecursiveInvocation(body, context))
+        {
+            return RecursiveCallAnalysisResult.Supported(
+                ImmutableArray<BaseCaseEvidence>.Empty,
+                ImmutableArray<RecursiveExecutionPath>.Empty);
+        }
 
         PathSummary summary = member.Body.Block is not null
             ? AnalyzeBlock(member.Body.Block, context, LocalArgumentFacts.Empty)
@@ -146,6 +156,12 @@ internal sealed class RecursiveCallAnalyzer
                 foreach (RecursivePathState statementPath in statementSummary.Paths)
                 {
                     nextPaths.Add(currentPath.Append(statementPath));
+                }
+
+                if (nextPaths.Count > MaximumExecutionPaths)
+                {
+                    return PathSummary.Unsupported(
+                        $"The method has more than {MaximumExecutionPaths} execution paths.");
                 }
             }
 
