@@ -305,6 +305,71 @@ public sealed class PhaseSixRecurrenceContractTests
     }
 
     [Fact]
+    public void Recursive_method_with_branches_below_the_execution_path_limit_solves_the_recurrence()
+    {
+        // 1 base-case path + 2^6 recursive paths = 65 paths, within the budget.
+        ComplexityExpression complexity = AnalyzeMethod(
+            """
+            public sealed class Sample
+            {
+                int M(int n)
+                {
+                    if (n <= 0)
+                    {
+                        return 0;
+                    }
+
+                    int total = 0;
+                    if (n > 1) { total++; }
+                    if (n > 2) { total++; }
+                    if (n > 3) { total++; }
+                    if (n > 4) { total++; }
+                    if (n > 5) { total++; }
+                    if (n > 6) { total++; }
+                    return M(n - 1) + total;
+                }
+            }
+            """,
+            "M",
+            out _);
+
+        Assert.Equal("O(n)", complexity.ToBigONotation());
+    }
+
+    [Fact]
+    public void Recursive_method_above_the_execution_path_limit_falls_back_to_unknown()
+    {
+        // 1 base-case path + 2^7 recursive paths = 129 paths, above the budget.
+        ComplexityExpression complexity = AnalyzeMethod(
+            """
+            public sealed class Sample
+            {
+                int M(int n)
+                {
+                    if (n <= 0)
+                    {
+                        return 0;
+                    }
+
+                    int total = 0;
+                    if (n > 1) { total++; }
+                    if (n > 2) { total++; }
+                    if (n > 3) { total++; }
+                    if (n > 4) { total++; }
+                    if (n > 5) { total++; }
+                    if (n > 6) { total++; }
+                    if (n > 7) { total++; }
+                    return M(n - 1) + total;
+                }
+            }
+            """,
+            "M",
+            out _);
+
+        Assert.Equal("Unknown", complexity.ToBigONotation());
+    }
+
+    [Fact]
     public void Unknown_matrix_keeps_unsupported_or_unsafe_recursion_conservative()
     {
         UnknownCase[] cases =

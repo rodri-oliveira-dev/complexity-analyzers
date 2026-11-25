@@ -139,6 +139,11 @@ internal sealed class RecursiveCallAnalyzer
 
                 if (currentPath.Terminates)
                 {
+                    if (ExceedsExecutionPathBudget(nextPaths.Count, 1))
+                    {
+                        return PathSummary.TooManyExecutionPaths();
+                    }
+
                     nextPaths.Add(currentPath);
                     continue;
                 }
@@ -152,16 +157,15 @@ internal sealed class RecursiveCallAnalyzer
                     return statementSummary;
                 }
 
+                if (ExceedsExecutionPathBudget(nextPaths.Count, statementSummary.Paths.Length))
+                {
+                    return PathSummary.TooManyExecutionPaths();
+                }
+
                 baseCases.AddRange(statementSummary.BaseCaseEvidence);
                 foreach (RecursivePathState statementPath in statementSummary.Paths)
                 {
                     nextPaths.Add(currentPath.Append(statementPath));
-                }
-
-                if (nextPaths.Count > MaximumExecutionPaths)
-                {
-                    return PathSummary.Unsupported(
-                        $"The method has more than {MaximumExecutionPaths} execution paths.");
                 }
             }
 
@@ -228,6 +232,11 @@ internal sealed class RecursiveCallAnalyzer
             return falseBranch;
         }
 
+        if (ExceedsExecutionPathBudget(trueBranch.Paths.Length, falseBranch.Paths.Length))
+        {
+            return PathSummary.TooManyExecutionPaths();
+        }
+
         ImmutableArray<BaseCaseEvidence>.Builder baseCases =
             ImmutableArray.CreateBuilder<BaseCaseEvidence>();
         baseCases.AddRange(trueBranch.BaseCaseEvidence);
@@ -237,6 +246,11 @@ internal sealed class RecursiveCallAnalyzer
         return PathSummary.Create(
             trueBranch.Paths.AddRange(falseBranch.Paths),
             baseCases.ToImmutable());
+    }
+
+    private static bool ExceedsExecutionPathBudget(int existingPathCount, int addedPathCount)
+    {
+        return addedPathCount > MaximumExecutionPaths - existingPathCount;
     }
 
     private static PathSummary AnalyzeReturnStatement(
@@ -1197,6 +1211,11 @@ internal sealed class RecursiveCallAnalyzer
             ImmutableArray<BaseCaseEvidence> baseCaseEvidence)
         {
             return Create(ImmutableArray.Create(path), baseCaseEvidence);
+        }
+
+        internal static PathSummary TooManyExecutionPaths()
+        {
+            return Unsupported($"The method has more than {MaximumExecutionPaths} execution paths.");
         }
 
         internal static PathSummary Unsupported(string reason)

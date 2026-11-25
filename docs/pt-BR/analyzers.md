@@ -1278,6 +1278,27 @@ numérica geral ou integração com solvers externos MathNet/SymPy.
 
 Casos não suportados permanecem `Unknown`.
 
+A análise de recursão segue cada caminho de execução de um método que contém
+uma chamada recursiva direta e mantém no máximo `128` caminhos. O budget conta
+todos os caminhos, inclusive um caminho de base case sem chamada recursiva. Cada
+statement `if` sequencial cujos branches não retornam pode dobrar os caminhos.
+Um método sem chamada recursiva direta não é dividido em caminhos de execução.
+
+Quando um método excede esse budget de caminhos, o analyzer não extrai sua
+recorrência. O método passa então pela análise convencional, que não consegue
+limitar a chamada recursiva; por isso, exceder o budget de caminhos pode
+resultar em uma estimativa `Unknown`. Nenhum diagnóstico informa que o budget
+foi excedido, e nenhuma opção altera o budget.
+
+O limite de `128` comporta seis branches independentes sequenciais ao lado de um
+base case (`2^6 + 1 = 65` caminhos); um base case com sete desses branches gera
+`2^7 + 1 = 129` caminhos e perde sua estimativa. Formatos de recorrência
+suportados costumam precisar de poucos branches de base case e de um ou dois
+caminhos recursivos, muito menos que esse budget. O budget também limita o
+custo da análise: cada lista de statements mantém no máximo `128` estados de
+caminho, então um método com muitos branches sequenciais não consegue fazer a
+análise de caminhos crescer exponencialmente e deixar o build lento.
+
 ## Configuração
 
 Use a configuração padrão de severidade do Roslyn:
