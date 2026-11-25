@@ -24,6 +24,12 @@ internal sealed class KnownOperationResolver
 
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (IsMemberOfAnonymousType(methodSymbol))
+        {
+            mapping = null!;
+            return false;
+        }
+
         KnownOperationIdentity identity = CreateIdentity(methodSymbol, cancellationToken);
         return registry.TryGetMapping(identity, out mapping);
     }
@@ -37,13 +43,20 @@ internal sealed class KnownOperationResolver
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (propertySymbol.GetMethod is null)
+        if (propertySymbol.GetMethod is null || IsMemberOfAnonymousType(propertySymbol))
         {
             mapping = null!;
             return false;
         }
 
         return registry.TryGetMapping(CreateIdentity(propertySymbol, cancellationToken), out mapping);
+    }
+
+    // An anonymous type or an anonymous delegate type has an empty metadata name, so it has no
+    // known-operation identity, and no registry entry can name it.
+    private static bool IsMemberOfAnonymousType(ISymbol symbol)
+    {
+        return symbol.ContainingType is { IsAnonymousType: true };
     }
 
     internal static KnownOperationIdentity CreateIdentity(

@@ -817,6 +817,68 @@ public sealed class KnownOperationRegistryTests
     }
 
     [Fact]
+    public void Default_registry_keeps_anonymous_type_property_unknown()
+    {
+        PropertyFacts facts = CreatePropertyFacts(
+            """
+            public sealed class Sample
+            {
+                int M()
+                {
+                    var entry = new { Count = 1 };
+                    return entry.Count;
+                }
+            }
+            """);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Default);
+
+        Assert.False(resolver.TryResolve(facts.PropertySymbol, CancellationToken.None, out _));
+    }
+
+    [Theory]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            string M()
+            {
+                var entry = new { Count = 1 };
+                return entry.ToString();
+            }
+        }
+        """)]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            bool M()
+            {
+                var entry = new { Count = 1 };
+                return entry.Equals(entry);
+            }
+        }
+        """)]
+    [InlineData(
+        """
+        public sealed class Sample
+        {
+            int M()
+            {
+                var read = (ref int value) => value;
+                int item = 1;
+                return read(ref item);
+            }
+        }
+        """)]
+    public void Default_registry_keeps_anonymous_type_method_unknown(string source)
+    {
+        InvocationFacts facts = CreateInvocationFacts(source);
+        KnownOperationResolver resolver = new(KnownOperationRegistry.Default);
+
+        Assert.False(resolver.TryResolve(facts.MethodSymbol, CancellationToken.None, out _));
+    }
+
+    [Fact]
     public void Bcl_registry_contains_no_linq_mappings()
     {
         Assert.DoesNotContain(
