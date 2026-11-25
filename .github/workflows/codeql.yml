@@ -21,9 +21,22 @@ concurrency:
 
 jobs:
   analyze:
-    name: Analyze C# with CodeQL
+    name: Analyze ${{ matrix.label }} with CodeQL
     runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            label: 'C#'
+            build-mode: manual
+          - language: javascript-typescript
+            label: JavaScript/TypeScript
+            build-mode: none
+          - language: actions
+            label: GitHub Actions
+            build-mode: none
 
     steps:
       - name: Checkout
@@ -32,6 +45,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup .NET
+        if: matrix.build-mode == 'manual'
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
           global-json-file: global.json
@@ -39,13 +53,15 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@38112626f97ac1fd7acf3df7ebca51f4677c1b38 # v4
         with:
-          languages: csharp
-          build-mode: manual
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
 
       - name: Restore
+        if: matrix.build-mode == 'manual'
         run: dotnet restore ComplexityAnalysis.Analyzers.slnx
 
       - name: Build for analysis
+        if: matrix.build-mode == 'manual'
         run: >
           dotnet build ComplexityAnalysis.Analyzers.slnx
           --configuration Release
@@ -54,7 +70,7 @@ jobs:
       - name: Analyze
         uses: github/codeql-action/analyze@38112626f97ac1fd7acf3df7ebca51f4677c1b38 # v4
         with:
-          category: '/language:csharp'
+          category: '/language:${{ matrix.language }}'
           output: ${{ runner.temp }}/codeql-results
           upload: always
           upload-database: false
@@ -62,7 +78,7 @@ jobs:
       - name: Upload SARIF artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: codeql-sarif-${{ github.sha }}
+          name: codeql-sarif-${{ matrix.language }}-${{ github.sha }}
           path: ${{ runner.temp }}/codeql-results
           if-no-files-found: error
           retention-days: 7
