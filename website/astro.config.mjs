@@ -8,6 +8,8 @@ export default defineConfig({
   site: 'https://rodri-oliveira-dev.github.io',
   base: '/complexity-analyzers',
   trailingSlash: 'always',
+  // Preserve the CSS specificity used before Starlight 0.43.
+  scopedStyleStrategy: 'where',
   integrations: [
     sitemap({
       filter: (page) => !/\/404(?:\.html|\/)$/.test(new URL(page).pathname),

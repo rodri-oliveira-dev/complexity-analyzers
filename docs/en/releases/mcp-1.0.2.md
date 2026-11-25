@@ -1,0 +1,26 @@
+# ComplexityAnalysis.Mcp 1.0.2
+
+This prepared patch release includes a shared analysis engine fix and dependency maintenance.
+
+## Changes
+
+- Prevent failures during known-operation resolution for anonymous types and
+  anonymous delegates. Unsupported identities remain conservative `Unknown`
+  (#149).
+- Update ModelContextProtocol to 2.4.0 and Microsoft.Extensions.Hosting to
+  11.0.0.
+
+## Compatibility and validation
+
+The package continues to target .NET 10 and expose the `complexity-mcp` command.
+No MCP tool schema changes are intended. Validate installed-tool startup,
+read-only tool calls, cancellation, and the existing package contracts before
+publication.
+
+## Publication status
+
+Version `1.0.2` is prepared, not announced as published. The protected release
+workflow validates the package, publishes the NuGet and GitHub artifacts,
+creates the immutable `mcp-v1.0.2` tag and release, and synchronizes the
+Official MCP Registry metadata after package publication. Verify publication
+and registry availability before updating installation or discovery references.
