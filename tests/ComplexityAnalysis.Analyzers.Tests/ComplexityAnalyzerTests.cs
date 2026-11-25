@@ -934,6 +934,62 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_reports_no_estimate_and_no_exception_for_recursion_above_the_execution_path_limit()
+    {
+        // WithinLimit has 1 base-case path + 2^6 recursive paths = 65 paths, within the budget.
+        // AboveLimit has 1 base-case path + 2^7 recursive paths = 129 paths, above the budget.
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            public sealed class Sample
+            {
+                public int WithinLimit(int n)
+                {
+                    if (n <= 0)
+                    {
+                        return 0;
+                    }
+
+                    int total = 0;
+                    if (n > 1) { total++; }
+                    if (n > 2) { total++; }
+                    if (n > 3) { total++; }
+                    if (n > 4) { total++; }
+                    if (n > 5) { total++; }
+                    if (n > 6) { total++; }
+                    return WithinLimit(n - 1) + total;
+                }
+
+                public int AboveLimit(int n)
+                {
+                    if (n <= 0)
+                    {
+                        return 0;
+                    }
+
+                    int total = 0;
+                    if (n > 1) { total++; }
+                    if (n > 2) { total++; }
+                    if (n > 3) { total++; }
+                    if (n > 4) { total++; }
+                    if (n > 5) { total++; }
+                    if (n > 6) { total++; }
+                    if (n > 7) { total++; }
+                    return AboveLimit(n - 1) + total;
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "AD0001");
+        Diagnostic estimate = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == EstimatedAlgorithmicComplexityId);
+        Assert.Equal(
+            "Estimated algorithmic complexity for 'WithinLimit' is O(n)",
+            estimate.GetMessage(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
     public async Task Analyzer_does_not_report_estimated_complexity_for_unknown_methods()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(

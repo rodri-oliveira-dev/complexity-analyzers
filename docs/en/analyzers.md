@@ -1260,6 +1260,27 @@ integration, or external MathNet/SymPy solver integration.
 
 Unsupported cases remain `Unknown`.
 
+The recursion analysis follows each execution path of a method that holds a
+direct recursive call, and it keeps at most `128` paths. The budget counts every
+path, also a base-case path without a recursive call. Each sequential `if`
+statement whose branches do not return can double the paths. A method without a
+direct recursive call is not split into execution paths.
+
+When a method exceeds this path budget, the analyzer does not extract its
+recurrence. The method then gets the conventional analysis, which cannot bound
+the recursive call, so exceeding the path budget may result in an `Unknown`
+estimate. No diagnostic reports that the budget was exceeded, and no option
+changes the budget.
+
+The limit of `128` fits six sequential independent branches beside a base case
+(`2^6 + 1 = 65` paths); a base case with seven such branches gives
+`2^7 + 1 = 129` paths and loses its estimate. Supported recurrence shapes
+usually need a few base-case branches and one or two recursive paths, far fewer
+than this budget. The budget also bounds the cost of the analysis: each
+statement list keeps at most `128` path states, so a method with many
+sequential branches cannot make the path analysis grow exponentially and slow
+the build.
+
 ## Configuration
 
 Use standard Roslyn severity configuration:
