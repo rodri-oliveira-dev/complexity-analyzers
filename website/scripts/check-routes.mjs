@@ -70,7 +70,8 @@ for (const route of ['', 'getting-started']) {
     if (!preferences.includes('<summary') || !preferences.includes('aria-label=')) {
       failures.push(location + ': mobile preferences trigger has no accessible label.');
     }
-    if (!preferences.includes('<starlight-theme-select>') || !preferences.includes('<starlight-lang-select>')) {
+    // Astro may add scoped-style attributes or classes to these custom elements.
+    if (!/<starlight-theme-select(?=\s|>)[^>]*>/.test(preferences) || !/<starlight-lang-select(?=\s|>)[^>]*>/.test(preferences)) {
       failures.push(location + ': expected native Starlight preference controls.');
     }
     if (['auto', 'dark', 'light'].some((value) => !preferences.includes('value="' + value + '"'))) {
