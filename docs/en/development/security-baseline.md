@@ -4,11 +4,11 @@ The repository uses layered controls so source-code security, dependency risk, c
 
 ## CodeQL
 
-GitHub CodeQL Default Setup is the authoritative source of alerts under **Security > Code scanning** for this repository.
+The versioned workflow `.github/workflows/codeql.yml` is the intended authoritative CodeQL configuration. It analyzes pull requests targeting `main`, pushes to `main`, a weekly schedule, and manual runs with independent matrix jobs for C#, JavaScript/TypeScript, and GitHub Actions. The C# job uses manual build mode, the SDK selected by `global.json`, and the explicit `ComplexityAnalysis.Analyzers.slnx` Release build contract. JavaScript/TypeScript and GitHub Actions use `build-mode: none`; they do not install .NET or run its build. Matrix fail-fast is disabled so a failed analysis does not cancel the other languages.
 
-`.github/workflows/codeql.yml` complements Default Setup by validating semantic C# analysis against the repository's explicit build contract for pull requests targeting `main`, pushes to `main`, a weekly schedule, and manual runs. The workflow uses manual build mode, the SDK selected by `global.json`, and the same `ComplexityAnalysis.Analyzers.slnx` Release build contract used by CI.
+It publishes SARIF results to **Security > Code scanning**, where the existing main ruleset enforces its security and alert severity thresholds. Each language publishes a distinct `/language:<language>` category and retains its own SARIF artifact for seven days for diagnostics and audit evidence. The workflow requests `contents: read` and `security-events: write` only. External pull requests use the ordinary `pull_request` event (not `pull_request_target`); GitHub restricts fork tokens and supports Code Scanning uploads for pull request runs. No repository secrets or elevated fork-token settings are required.
 
-Because GitHub does not process CodeQL analyses from advanced configurations while Default Setup is enabled, the versioned workflow intentionally does not upload its SARIF to Code Scanning. It runs the standard high-precision query suite, stores the generated SARIF as a short-lived workflow artifact for diagnostics/audit evidence, and keeps workflow permissions read-only with `contents: read` and `security-events: read` only.
+**Migration from Default Setup:** a repository administrator must switch off CodeQL Default Setup before validating this configuration; GitHub rejects advanced-setup uploads while Default Setup is enabled. Keep the ruleset enabled throughout the migration. Validate successful Code Scanning publication for all three languages on the migration PR before merging it, then update open PR branches and confirm the Code Scanning gate passes. If publication fails, diagnose the configuration before merging rather than bypassing the ruleset.
 
 Broader query suites can be evaluated later after the initial findings are understood; new noise should not be hidden merely to keep automation green.
 
