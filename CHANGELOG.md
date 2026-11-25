@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### ComplexityAnalysis.Analyzers 1.6.2
+
+- Prevent AD0001 when known-operation resolution encounters members of anonymous
+  types or anonymous delegates; unsupported identities remain conservative
+  `Unknown` (#149).
+- Preserve the existing analyzer package layout and Roslyn compatibility
+  baseline.
+- Migrate repository CodeQL analysis to the versioned configuration and retain
+  coverage for C#, JavaScript/TypeScript and GitHub Actions (#152).
+
+### ComplexityAnalysis.Tool 1.0.2
+
+- Include the shared analysis engine fix for anonymous types (#149).
+- Retain the existing CLI commands, output contracts and quality gates.
+
+### ComplexityAnalysis.Mcp 1.0.2
+
+- Include the shared analysis engine fix for anonymous types (#149).
+- Update ModelContextProtocol to 2.4.0 and Microsoft.Extensions.Hosting to
+  11.0.0; retain the .NET 10 target and validate installed-tool compatibility.
+
+## Previously released
+
+The following entries preserve the historical release notes.
+
 ### ComplexityAnalysis.Analyzers 1.6.1
 
 - Refactored deferred LINQ pipeline analysis into focused resolution and

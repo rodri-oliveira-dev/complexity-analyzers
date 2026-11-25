@@ -19,9 +19,8 @@ A Action invoca `ComplexityAnalysis.Tool` e não substitui as versões independe
 
 Para detalhes da publicação MCP `1.0.0` e metadados do registro, consulte a [nota de release](/complexity-analyzers/pt-br/reference/releases/mcp-1-0-0/) sincronizada.
 
-O MCP `1.0.1` está preparado, mas ainda não foi publicado. Sua [nota
-sincronizada de preparação](/complexity-analyzers/pt-br/reference/releases/mcp-1-0-1/)
-registra o escopo de manutenção e as etapas de publicação que continuam
-protegidas.
+A [GitHub Release do MCP 1.0.1](https://github.com/rodri-oliveira-dev/complexity-analyzers/releases/tag/mcp-v1.0.1) está disponível. Sua [nota de release sincronizada](/complexity-analyzers/pt-br/reference/releases/mcp-1-0-1/) registra o escopo original de manutenção.
+
+O Analyzer `1.6.2`, a CLI `1.0.2` e o MCP `1.0.2` estão preparados para releases independentes. Consulte a [nota de preparação do MCP 1.0.2](/complexity-analyzers/pt-br/reference/releases/mcp-1-0-2/). Verifique a disponibilidade dos pacotes e do registro antes de instalar essas versões.
 
 Este portal está planejado para `https://rodri-oliveira-dev.github.io/complexity-analyzers/`. Não trate essa URL como publicada antes de o workflow do GitHub Pages concluir com sucesso.
