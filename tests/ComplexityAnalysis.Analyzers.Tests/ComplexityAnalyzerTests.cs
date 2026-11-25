@@ -563,6 +563,26 @@ public sealed class ComplexityAnalyzerTests
     }
 
     [Fact]
+    public async Task Analyzer_does_not_throw_on_lambda_that_reads_member_of_anonymous_type()
+    {
+        ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
+            """
+            using System.Linq;
+
+            public sealed class Sample
+            {
+                public int M()
+                {
+                    return new[] { 1 }.Select(x => new { Count = x }).Where(entry => entry.Count > 0).Count();
+                }
+            }
+            """,
+            enableComplexity: true);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "AD0001");
+    }
+
+    [Fact]
     public async Task Analyzer_does_not_double_report_actionable_diagnostics_for_nested_lambda_bodies()
     {
         ImmutableArray<Diagnostic> diagnostics = await GetAnalyzerDiagnosticsAsync(
